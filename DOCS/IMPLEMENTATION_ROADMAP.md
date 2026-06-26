@@ -14,7 +14,7 @@ BENNO must not be built as one large big-bang application. Every phase should be
 
 ## Phase 0: Project Baseline
 
-Status: mostly done.
+Status: complete.
 
 Goal:
 
@@ -30,7 +30,7 @@ Done:
 - Initial documentation
 - `.gitignore`
 
-Next small step:
+Next phase:
 
 - Create the Python/Flask project structure.
 - Prepare the virtual environment.
