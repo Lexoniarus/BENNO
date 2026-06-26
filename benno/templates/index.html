@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}BENNO - Visit Report Assistant{% endblock %}
+
+{% block content %}
+  <section class="hero" aria-labelledby="page-title">
+    <div class="hero__content">
+      <p class="hero__eyebrow">B2B field sales assistant</p>
+      <h1 id="page-title">BENNO</h1>
+      <p class="hero__subtitle">B2B Encounter Notes and Next-step Organizer</p>
+      <p class="hero__copy">
+        BENNO is being prepared as a guided visit report assistant for B2B field
+        sales. The first foundation is ready when this local web application
+        starts reliably and can grow into the report workflow.
+      </p>
+    </div>
+
+    <div class="status-panel" aria-label="Project foundation status">
+      <div class="status-panel__item">
+        <span class="status-panel__label">Application</span>
+        <strong class="status-panel__value">Flask foundation</strong>
+      </div>
+      <div class="status-panel__item">
+        <span class="status-panel__label">Database</span>
+        <strong class="status-panel__value">SQLite prepared</strong>
+      </div>
+      <div class="status-panel__item">
+        <span class="status-panel__label">Next phase</span>
+        <strong class="status-panel__value">Data model</strong>
+      </div>
+    </div>
+  </section>
+{% endblock %}
