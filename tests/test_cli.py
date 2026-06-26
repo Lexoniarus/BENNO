@@ -27,6 +27,18 @@ def test_seed_db_command_creates_demo_data_without_duplicates(app) -> None:
     assert db.session.query(MockCustomer).count() == 4
 
 
+def test_seed_db_command_initializes_missing_tables(app) -> None:
+    runner = app.test_cli_runner()
+    db.drop_all()
+
+    result = runner.invoke(args=["seed-db"])
+
+    assert result.exit_code == 0
+    assert "Seeded the BENNO database." in result.output
+    assert db.session.query(User).count() == 2
+    assert db.session.query(MockCustomer).count() == 4
+
+
 def test_reset_db_command_recreates_seeded_database(app) -> None:
     runner = app.test_cli_runner()
     db.session.add(

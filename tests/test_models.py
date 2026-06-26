@@ -2,6 +2,8 @@
 
 from datetime import date
 
+import pytest
+from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from benno.enums import (
@@ -55,6 +57,17 @@ def test_user_can_be_saved_with_role_and_password_hash(app) -> None:
     saved_user = db.session.query(User).filter_by(email=user.email).one()
     assert saved_user.role == UserRole.SALES_REP.value
     assert check_password_hash(saved_user.password_hash, "secret")
+
+
+def test_sqlite_foreign_keys_are_enforced(app) -> None:
+    invalid_chat = Chat(sales_user_id=999, session_language=SessionLanguage.DE.value)
+
+    db.session.add(invalid_chat)
+
+    with pytest.raises(IntegrityError):
+        db.session.commit()
+
+    db.session.rollback()
 
 
 def test_chat_message_and_report_draft_can_be_saved(app) -> None:

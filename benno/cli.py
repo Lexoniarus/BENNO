@@ -20,6 +20,7 @@ def register_cli_commands(app: Flask) -> None:
         """Create or update local demo data."""
         from benno.seed import seed_database
 
+        db.create_all()
         seed_database()
         click.echo("Seeded the BENNO database.")
 
