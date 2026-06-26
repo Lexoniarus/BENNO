@@ -8,7 +8,8 @@ Recommended reading order:
 
 1. `MVP_ERKLAERUNG.md` for a non-technical German project overview
 2. `MVP_MASTER_SPEC.md` for the canonical English project specification
-3. Older `MVP_*.md` files only when historical context is needed
+3. `IMPLEMENTATION_ROADMAP.md` for the practical development phase plan
+4. Older `MVP_*.md` files only when historical context is needed
 
 Next documentation cleanup step:
 
