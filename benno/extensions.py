@@ -10,7 +10,7 @@ db = SQLAlchemy()
 
 
 @event.listens_for(Engine, "connect")
-def enable_sqlite_foreign_keys(dbapi_connection, connection_record) -> None:
+def enable_sqlite_foreign_keys(dbapi_connection, _connection_record) -> None:
     """Enable foreign key enforcement for SQLite connections."""
     if not isinstance(dbapi_connection, SQLiteConnection):
         return

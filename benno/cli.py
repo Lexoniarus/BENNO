@@ -4,6 +4,7 @@ import click
 from flask import Flask, current_app
 
 from benno.extensions import db
+from benno.seed import seed_database
 
 
 def register_cli_commands(app: Flask) -> None:
@@ -18,8 +19,6 @@ def register_cli_commands(app: Flask) -> None:
     @app.cli.command("seed-db")
     def seed_db_command() -> None:
         """Create or update local demo data."""
-        from benno.seed import seed_database
-
         db.create_all()
         seed_database()
         click.echo("Seeded the BENNO database.")
@@ -34,8 +33,6 @@ def register_cli_commands(app: Flask) -> None:
         """Drop, recreate, and seed the local development database."""
         if not yes and not current_app.testing:
             raise click.ClickException("Use --yes to confirm local database reset.")
-
-        from benno.seed import seed_database
 
         db.drop_all()
         db.create_all()
