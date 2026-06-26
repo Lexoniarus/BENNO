@@ -1,11 +1,13 @@
 """Application factory for BENNO."""
 
+import importlib
 import os
 from pathlib import Path
 
 from dotenv import load_dotenv
 from flask import Flask
 
+from benno.cli import register_cli_commands
 from benno.config import CONFIG_BY_NAME, DevelopmentConfig
 from benno.extensions import db
 from benno.routes import main_blueprint
@@ -18,8 +20,10 @@ def create_app(config_name: str | None = None) -> Flask:
     app = Flask(__name__, instance_relative_config=True)
     _configure_app(app, config_name)
     _ensure_instance_folder(app)
+    _load_models()
     _initialize_extensions(app)
     _register_blueprints(app)
+    _register_cli(app)
 
     return app
 
@@ -56,9 +60,17 @@ def _ensure_instance_folder(app: Flask) -> None:
     Path(app.instance_path).mkdir(parents=True, exist_ok=True)
 
 
+def _load_models() -> None:
+    importlib.import_module("benno.models")
+
+
 def _initialize_extensions(app: Flask) -> None:
     db.init_app(app)
 
 
 def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(main_blueprint)
+
+
+def _register_cli(app: Flask) -> None:
+    register_cli_commands(app)

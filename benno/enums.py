@@ -1,0 +1,142 @@
+"""Controlled internal codes for BENNO."""
+
+from enum import StrEnum
+
+
+class AiProvider(StrEnum):
+    """Supported AI provider codes."""
+
+    OPENAI = "openai"
+    LOCAL = "local"
+
+
+class CustomerContextType(StrEnum):
+    """Customer or lead context for a report draft."""
+
+    EXISTING_CUSTOMER = "existing_customer"
+    EXISTING_LEAD = "existing_lead"
+    NEW_LEAD = "new_lead"
+    UNCLEAR = "unclear"
+
+
+class InsideSalesTaskStatus(StrEnum):
+    """Lifecycle status for inside sales tasks."""
+
+    OPEN = "open"
+    IN_REVIEW = "in_review"
+    DONE = "done"
+    CANCELLED = "cancelled"
+
+
+class InsideSalesTaskType(StrEnum):
+    """Canonical inside sales task types."""
+
+    COMPLETE_MASTER_DATA = "complete_master_data"
+    CREATE_OFFER = "create_offer"
+    CLARIFY_DETAILS = "clarify_details"
+    FOLLOW_UP_CALL = "follow_up_call"
+
+
+class MessageSender(StrEnum):
+    """Allowed chat message senders."""
+
+    USER = "user"
+    ASSISTANT = "assistant"
+    SYSTEM = "system"
+
+
+class MessageType(StrEnum):
+    """Allowed chat message types."""
+
+    FREE_INPUT = "free_input"
+    ASSISTANT_QUESTION = "assistant_question"
+    ASSISTANT_CONFIRMATION = "assistant_confirmation"
+    CORRECTION = "correction"
+    FINAL_REVIEW = "final_review"
+    SYSTEM_EVENT = "system_event"
+
+
+class ReasonCode(StrEnum):
+    """Visit reason codes."""
+
+    OFFER_FOLLOW_UP = "offer_follow_up"
+    NEW_DEMAND = "new_demand"
+    RELATIONSHIP_MEETING = "relationship_meeting"
+    CONTRACT_DISCUSSION = "contract_discussion"
+    LEAD_INITIAL_CONTACT = "lead_initial_contact"
+    COMPLAINT_RELATED = "complaint_related"
+    OTHER = "other"
+
+
+class ReportSection(StrEnum):
+    """Internal report sections used before final eNVenta field mapping."""
+
+    CUSTOMER_CONTEXT = "customer_context"
+    CONTACTS = "contacts"
+    VISIT_REASON = "visit_reason"
+    SUMMARY = "summary"
+    OUTCOME = "outcome"
+    NEXT_ACTION = "next_action"
+    OFFER_REFERENCE = "offer_reference"
+    ORDER_REFERENCE = "order_reference"
+    RATINGS = "ratings"
+    FINAL_REPORT = "final_report"
+    USER_CONFIRMATION = "user_confirmation"
+
+
+class ReportStatus(StrEnum):
+    """Lifecycle status for report work."""
+
+    IN_PROGRESS = "in_progress"
+    READY_FOR_REVIEW = "ready_for_review"
+    INSIDE_SALES_INPUT_REQUIRED = "inside_sales_input_required"
+    BLOCKED = "blocked"
+    CONFIRMED = "confirmed"
+    SUBMITTED = "submitted"
+    CANCELLED = "cancelled"
+
+
+class SectionStatus(StrEnum):
+    """Status values for individual report sections."""
+
+    OPEN = "open"
+    DETECTED = "detected"
+    UNCLEAR = "unclear"
+    CONFIRMED = "confirmed"
+    CORRECTED = "corrected"
+    NOT_APPLICABLE = "not_applicable"
+
+
+class SessionLanguage(StrEnum):
+    """Supported session languages."""
+
+    DE = "de"
+    EN = "en"
+
+
+class UserRole(StrEnum):
+    """BENNO user roles."""
+
+    SALES_REP = "sales_rep"
+    ADMIN = "admin"
+
+
+class ValidationStatus(StrEnum):
+    """Validation status for CRM/ERP references."""
+
+    NOT_PROVIDED = "not_provided"
+    DETECTED_UNVALIDATED = "detected_unvalidated"
+    MATCHED = "matched"
+    AMBIGUOUS = "ambiguous"
+    UNKNOWN = "unknown"
+    CONFIRMED_NEW = "confirmed_new"
+
+
+class VisitType(StrEnum):
+    """Visit type codes."""
+
+    ON_SITE = "on_site"
+    PHONE = "phone"
+    VIDEO = "video"
+    TRADE_FAIR = "trade_fair"
+    OTHER = "other"

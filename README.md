@@ -42,3 +42,23 @@ ruff check .
 black --check .
 pytest
 ```
+
+## Local Database
+
+Create the SQLite tables:
+
+```powershell
+flask --app benno:create_app init-db
+```
+
+Create or update the demo users and mock CRM/ERP data:
+
+```powershell
+flask --app benno:create_app seed-db
+```
+
+Reset the local development database:
+
+```powershell
+flask --app benno:create_app reset-db --yes
+```
