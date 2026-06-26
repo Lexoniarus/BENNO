@@ -1,0 +1,179 @@
+# BENNO User And Admin Settings
+
+## Purpose
+
+This document defines the current user, admin, and configuration behavior for BENNO.
+
+It consolidates the valid admin and user-setting content from the archived German notes.
+
+## Roles
+
+The MVP has two roles:
+
+| Role | Purpose |
+|---|---|
+| `sales_rep` | Field sales user who creates and manages their own visit report chats |
+| `admin` | User who manages basic configuration and technical status overview |
+
+No mixed role is required for the MVP.
+
+## Sales User Area
+
+After login, a sales user sees a focused dashboard.
+
+The first slice should include:
+
+- new report
+- open reports
+- completed reports
+- options
+
+Sales users should not see:
+
+- AI provider selection
+- concrete model configuration
+- STT model selection
+- TTS model selection
+
+The sales workflow should stay focused on creating and continuing visit reports.
+
+## Admin Area
+
+The admin area should stay simple.
+
+It should include:
+
+- user list
+- create or edit users
+- set roles
+- set user language
+- set global AI provider
+- set optional per-user provider override
+- simple status overview
+
+The admin area does not need to be mobile-optimized for the first slice.
+
+## Admin Content Boundary
+
+The admin status overview must not become content surveillance.
+
+Admins may see:
+
+- users
+- roles
+- language settings
+- provider overrides
+- global provider
+- global language default
+- number of open chats per user
+- number of completed reports per user
+- number of chats with error or blocked status
+- number of reports requiring inside sales input
+
+Admins should not see in this view:
+
+- complete chat content
+- transcripts
+- full free-text reports
+- detailed conversation history
+
+## Language Settings
+
+The MVP supports:
+
+- `de`
+- `en`
+
+Rules:
+
+- Default language is German.
+- Each user can have a preferred language.
+- New chats copy the user's current preferred language into the chat session.
+- Running chats keep the language they started with.
+- UI text, assistant questions, summaries, confirmations, STT expectations, and TTS output follow the session language.
+
+For the first technical slice, the session language is the controlling language.
+
+## AI Provider Settings
+
+AI provider configuration is an admin topic.
+
+Planned providers:
+
+- `openai`
+- `local`
+
+Rules:
+
+- Normal sales users do not choose the provider.
+- There is a global default provider.
+- A user may have an optional provider override.
+- Concrete model settings are not normal user settings.
+- Local provider support comes after the OpenAI workflow is stable.
+
+Resolution at chat start:
+
+```text
+ai_provider = user.ai_provider_override or global.default_ai_provider
+session_language = user.preferred_language or global.default_language
+```
+
+## Authentication
+
+The MVP needs real login behavior, but not a full identity-management system.
+
+Required:
+
+- email and password login
+- password hashing
+- active or inactive users
+- role-based routing
+- user-specific language setting
+- optional external sales representative ID
+
+For the first implementation:
+
+- seeded demo users are sufficient
+- setup links can be delayed
+- password reset can be delayed
+- no email delivery is required
+- no two-factor authentication is required
+
+## Registration And Password Reset Direction
+
+Later target flow:
+
+```text
+Admin creates user -> system generates setup token/link -> user sets password
+```
+
+Password reset can follow the same pattern:
+
+```text
+Admin starts reset -> system generates reset token/link -> user sets new password
+```
+
+For the first slice, this is not required. Seeded users are enough to prove the core product loop.
+
+## External Sales Representative Reference
+
+A BENNO user may later be linked to a CRM/ERP sales representative.
+
+The optional field can be represented as:
+
+```text
+external_sales_rep_id
+```
+
+This keeps BENNO independent from any specific CRM user model while allowing a later eNVenta or CRM/ERP integration to map users properly.
+
+## First-Slice Acceptance
+
+This area is done for the first slice when:
+
+- admin and sales users can log in
+- users are routed by role
+- sales users can only access their own reports
+- admins can see basic user and status information
+- admin does not expose detailed chat content
+- provider and language defaults exist

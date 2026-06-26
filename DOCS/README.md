@@ -12,9 +12,15 @@ Recommended reading order:
 2. `MVP_MASTER_SPEC.md` for the canonical English project specification
 3. `IMPLEMENTATION_ROADMAP.md` for the practical development phase plan
 4. `CODING_STANDARDS.md` for code quality, naming, and architecture rules
-5. Older `MVP_*.md` files only when historical context is needed
+5. `CONVERSATION_FLOW.md` for report-state and dialog behavior
+6. `DATA_MODEL.md` for database and mock CRM structure
+7. `USER_ADMIN_SETTINGS.md` for login, role, language, and admin behavior
+8. `AI_VOICE_PRIVACY.md` for provider, voice, and privacy direction
+9. `DOCUMENTATION_COVERAGE.md` for the mapping from archived German notes to current English docs
+10. `archive_de/` only when historical German concept context is needed
 
-Next documentation cleanup step:
+Archived documents:
 
-- translate or replace the older German notes with focused English follow-up documents only where they add detail not already covered by the master specification
-- avoid duplicating decisions across many files unless a document has a clear, separate purpose
+- `archive_de/` contains the original German concept notes.
+- Those files preserve the project's thinking history.
+- They may contain superseded assumptions and must not be used as current implementation guidance.
