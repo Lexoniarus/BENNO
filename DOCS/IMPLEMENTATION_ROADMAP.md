@@ -1,81 +1,81 @@
 # BENNO Implementation Roadmap
 
-## Zweck
+## Purpose
 
-Dieses Dokument beschreibt den geplanten Entwicklungsablauf für BENNO.
+This document describes the planned development path for BENNO.
 
-Es ist kein fachliches Konzeptpapier, sondern ein praktischer Laufplan: In welcher Reihenfolge wird gebaut, wann ist ein Schritt fertig, und welche Themen werden bewusst erst später angegangen?
+It is not a product concept document. It is a practical implementation roadmap: what we build first, when each phase is considered done, and which topics are intentionally delayed.
 
-Grundsatz:
+Guiding principle:
 
-> Erst einen kleinen, vollständigen Text-Loop bauen. Danach Tiefe, Voice, eNVenta-Feldmapping und lokale KI ergänzen.
+> Build a small, complete text loop first. Then add depth, voice, eNVenta field mapping, and local AI.
 
-BENNO soll nicht als Big-Bang-App entstehen. Jede Phase soll lauffähig, testbar und committbar sein.
+BENNO must not be built as one large big-bang application. Every phase should be runnable, testable, and committable.
 
-## Phase 0: Projektbasis
+## Phase 0: Project Baseline
 
-Status: weitgehend erledigt.
+Status: mostly done.
 
-Ziel:
+Goal:
 
-- Lokales Git-Repository ist initialisiert.
-- Privates GitHub-Repository ist verbunden.
-- Dokumentation ist versioniert.
-- Das Projekt kann in PyCharm geöffnet werden.
+- Local Git repository is initialized.
+- Private GitHub repository is connected.
+- Documentation is versioned.
+- The project can be opened in PyCharm.
 
-Erledigt:
+Done:
 
-- Git lokal auf Branch `main`
-- privates GitHub-Remote `Lexoniarus/BENNO`
-- erste Dokumentationsbasis
+- Local Git on branch `main`
+- Private GitHub remote `Lexoniarus/BENNO`
+- Initial documentation
 - `.gitignore`
 
-Nächster kleiner Schritt:
+Next small step:
 
-- Python-/Flask-Projektstruktur anlegen.
-- Virtuelle Umgebung vorbereiten.
-- Startkommando dokumentieren.
+- Create the Python/Flask project structure.
+- Prepare the virtual environment.
+- Document the local start command.
 
-## Phase 1: Flask-Grundgerüst
+## Phase 1: Flask Foundation
 
-Ziel:
+Goal:
 
-BENNO startet als lokale Web-App.
+BENNO starts as a local web application.
 
-Umfang:
+Scope:
 
-- Flask App Factory
-- Konfiguration
+- Flask app factory
+- Configuration
 - `templates`
 - `static`
-- SQLite-Anbindung vorbereiten
-- einfacher Startscreen oder Login-Screen
-- Basislayout für Desktop und Smartphone
+- Prepared SQLite connection
+- Simple start screen or login screen
+- Base layout for desktop and smartphone
 - `.env.example`
-- Abhängigkeiten in `requirements.txt` oder `pyproject.toml`
+- Dependencies in `requirements.txt` or `pyproject.toml`
 
-Technische Richtung:
+Technical direction:
 
 - Flask
 - Jinja
 - Vanilla JavaScript
 - SQLite
-- SQLAlchemy oder Flask-SQLAlchemy
-- Passwort-Hashing mit Werkzeug
+- SQLAlchemy or Flask-SQLAlchemy
+- Password hashing with Werkzeug
 
-Fertig, wenn:
+Done when:
 
-- Die App lokal startet.
-- Eine erste Seite im Browser sichtbar ist.
-- Es noch keine KI geben muss.
+- The app starts locally.
+- A first page is visible in the browser.
+- No AI is required yet.
 
-## Phase 2: Datenmodell und MockDB
+## Phase 2: Data Model And Mock Database
 
-Ziel:
+Goal:
 
-BENNO bekommt die Datenbasis, auf der der spätere Bericht-Loop läuft.
+BENNO has the data foundation required for the later report loop.
 
-Erste Tabellen:
+Initial tables:
 
 - `users`
 - `global_settings`
@@ -89,304 +89,304 @@ Erste Tabellen:
 - `mock_offers`
 - `mock_orders`
 
-Seed-Daten:
+Seed data:
 
-- ein Admin-User
-- ein Sales-User
-- drei bis vier Demo-Kunden
-- Ansprechpartner
-- Angebote
-- optional ein bis zwei Aufträge
+- one admin user
+- one sales user
+- three to four demo customers
+- contacts
+- offers
+- optionally one or two orders
 
-Wichtig:
+Important:
 
-- Die finale eNVenta-Feldstruktur wird erst ergänzt, wenn Bernds Feldliste vorliegt.
-- Bis dahin dienen die bestehenden Report Sections als interne Arbeitsstruktur.
+- The final eNVenta field structure is added only after Bernd's field list is available.
+- Until then, the existing report sections are the internal working structure.
 
-Fertig, wenn:
+Done when:
 
-- Die Datenbank initialisiert werden kann.
-- Demo-User existieren.
-- Mock-Kunden, Kontakte, Angebote und Aufträge abgefragt werden können.
+- The database can be initialized.
+- Demo users exist.
+- Mock customers, contacts, offers, and orders can be queried.
 
-## Phase 3: Login, Rollen und Navigation
+## Phase 3: Login, Roles, And Navigation
 
-Ziel:
+Goal:
 
-Nutzer kommen sauber in ihren jeweiligen Bereich.
+Users reach the correct area after login.
 
-Sales User sieht:
+Sales users see:
 
-- Neuer Bericht
-- Offene Berichte
-- Abgeschlossene Berichte
-- Optionen
+- New report
+- Open reports
+- Completed reports
+- Options
 
-Admin sieht:
+Admins see:
 
-- Userliste
-- einfache Statusübersicht
-- globale Provider-Einstellung
+- User list
+- Simple status overview
+- Global provider setting
 
-Entscheidung für den ersten Schnitt:
+Decision for the first slice:
 
-- Keine Setup-/Reset-Link-Logik.
-- Seed-User reichen für den Start.
-- Registrierung und Passwort-Reset können später ergänzt werden.
+- No setup/reset link logic.
+- Seed users are sufficient at the beginning.
+- Registration and password reset can be added later.
 
-Fertig, wenn:
+Done when:
 
-- Login funktioniert.
-- Sales User und Admin landen auf verschiedenen Dashboards.
-- Sales User sehen nur ihre eigenen Chats und Berichte.
-- Admin sieht keine Chatinhalte.
+- Login works.
+- Sales users and admins land on different dashboards.
+- Sales users only see their own chats and reports.
+- Admins do not see chat content.
 
-## Phase 4: Erster kompletter Text-Loop ohne echte KI-Magie
+## Phase 4: First Complete Text Loop Without Real AI Magic
 
-Ziel:
+Goal:
 
-Der wichtigste Produktfluss funktioniert einmal komplett.
+The most important product flow works end to end.
 
-Ein Sales User kann:
+A sales user can:
 
-1. einen Bericht starten
-2. freien Text eingeben
-3. daraus einen Draft aufbauen
-4. fehlende Informationen ergänzen
-5. einen Review sehen
-6. den Review bestätigen
-7. einen finalen Bericht speichern
+1. start a report
+2. enter free text
+3. build a draft from it
+4. fill missing information
+5. see a review
+6. confirm the review
+7. save a final report
 
-Vorgehen:
+Approach:
 
-Zuerst wird die Logik bewusst einfach gebaut. Es muss noch keine perfekte KI-Extraktion geben. Wichtig ist, dass der gesamte Ablauf steht.
+Build the logic deliberately simple at first. It does not need perfect AI extraction yet. The important part is that the whole flow exists.
 
-Zu prüfende Berichtsteile:
+Report parts to check:
 
-- Kunde oder Lead
-- Ansprechpartner
-- Besuchsanlass
-- Zusammenfassung
-- Ergebnis
-- nächste Aktion
-- Follow-up oder Wiedervorlagedatum
-- Angebotsbezug, falls relevant
-- Auftragsbezug, falls relevant
-- Ratings
+- customer or lead
+- contact person
+- visit reason
+- summary
+- outcome
+- next action
+- follow-up or reminder date
+- offer reference, if relevant
+- order reference, if relevant
+- ratings
 
-Benötigtes Verhalten:
+Required behavior:
 
-- Chat starten
-- freie Eingabe speichern
-- Draft State anlegen
-- fehlende Bereiche erkennen
-- nächste sinnvolle Frage stellen
-- Korrekturen übernehmen
-- blockweisen Review erzeugen
-- finale Bestätigung einholen
-- Final Report speichern
-- bei Bedarf Inside-Sales-Task erzeugen
+- start chat
+- save free input
+- create draft state
+- detect missing sections
+- ask the next useful question
+- apply corrections
+- create block-based review
+- request final confirmation
+- save final report
+- create inside sales task if needed
 
-Fertig, wenn:
+Done when:
 
-- Ein kompletter Bericht ohne OpenAI gespeichert werden kann.
-- Der Ablauf von Start bis Speicherung demonstrierbar ist.
-- Korrekturen nicht verloren gehen.
+- A complete report can be saved without OpenAI.
+- The flow from start to save can be demonstrated.
+- Corrections are not lost.
 
-## Phase 5: OpenAI-Anbindung
+## Phase 5: OpenAI Integration
 
-Ziel:
+Goal:
 
-BENNO versteht freie Texte besser und formuliert natürlicher.
+BENNO understands free text better and responds more naturally.
 
-Umfang:
+Scope:
 
-- OpenAI Provider Service
-- kontrollierte KI-Antwortstruktur
-- Extraktion aus freier Nutzereingabe
-- Intent-Erkennung
-- Vorschlag für nächste Frage
-- Review-Formulierung
-- finaler Berichtstext
+- OpenAI provider service
+- controlled AI response structure
+- extraction from free user input
+- intent detection
+- suggestion for next question
+- review wording
+- final report text
 
-Wichtige Regel:
+Important rule:
 
-Die KI darf Vorschläge machen, aber nicht direkt speichern.
+The AI may suggest values, but it must not save directly.
 
-Der Code entscheidet weiterhin:
+The code still decides:
 
-- Welche Felder fehlen?
-- Welche Werte sind erlaubt?
-- Was wurde gegen Mock-CRM validiert?
-- Wann ist der Bericht bereit für Review?
-- Wann darf gespeichert werden?
-- Ob eine Innendienstaufgabe entsteht.
+- Which fields are missing?
+- Which values are allowed?
+- What was validated against the mock CRM?
+- When is the report ready for review?
+- When may the report be saved?
+- Whether an inside sales task is created.
 
-Fertig, wenn:
+Done when:
 
-- OpenAI freie Besuchsbeschreibungen sinnvoll auswertet.
-- Rückfragen natürlicher werden.
-- Review und finaler Bericht verständlich formuliert sind.
-- Der Backend-Code weiterhin die Kontrolle über Speicherung und Status behält.
+- OpenAI can interpret free visit descriptions usefully.
+- Follow-up questions become more natural.
+- Review and final report text are understandable.
+- Backend code remains in control of saving and status transitions.
 
-## Phase 6: eNVenta-Felder und Placeholder-CRM-Vertrag
+## Phase 6: eNVenta Fields And Placeholder CRM Contract
 
-Auslöser:
+Trigger:
 
-Bernds eNVenta-Feldliste liegt vor.
+Bernd's eNVenta field list is available.
 
-Ziel:
+Goal:
 
-Die interne Berichtstruktur wird auf die erwarteten eNVenta-Besuchsberichtfelder gemappt.
+The internal report structure is mapped to the expected eNVenta visit report fields.
 
-Zu klären:
+Questions to resolve:
 
-- Welche Felder sind Pflicht?
-- Welche Felder sind optional?
-- Welche Werte kommen aus Login oder User-Kontext?
-- Welche Werte kommen aus Mock-CRM-Daten?
-- Welche Werte muss BENNO abfragen?
-- Welche Felder werden zurückgeschrieben?
-- Welche Informationen erzeugen Wiedervorlagen oder Innendienstaufgaben?
+- Which fields are required?
+- Which fields are optional?
+- Which values come from login or user context?
+- Which values come from mock CRM data?
+- Which values must BENNO ask for?
+- Which fields are written back?
+- Which information creates reminders or inside sales tasks?
 
-Placeholder-CRM-Service soll danach klar definieren:
+The placeholder CRM service should then define:
 
-- Kunde suchen
-- Ansprechpartner suchen
-- Angebot suchen
-- Auftrag suchen
-- Besuchsbericht speichern
-- Wiedervorlage oder Innendienstaufgabe erzeugen
+- search customer
+- search contact
+- search offer
+- search order
+- save visit report
+- create reminder or inside sales task
 
-Fertig, wenn:
+Done when:
 
-- Die MockDB die relevanten eNVenta-Felder abbildet.
-- Ein finaler Bericht in der erwarteten Struktur gespeichert werden kann.
-- Der Placeholder-CRM-Vertrag klar genug ist, um später durch eine echte Integration ersetzt zu werden.
+- The mock database represents the relevant eNVenta fields.
+- A final report can be saved in the expected structure.
+- The placeholder CRM contract is clear enough to be replaced by a real integration later.
 
-## Phase 7: Admin minimal fertigstellen
+## Phase 7: Minimal Admin Completion
 
-Ziel:
+Goal:
 
-Der Admin-Bereich ist funktional, aber nicht überbaut.
+The admin area is functional, but not overbuilt.
 
-Admin kann:
+Admins can:
 
-- User sehen
-- Rollen sehen oder ändern
-- Sprache pro User setzen
-- globalen Provider setzen
-- offene Chats pro User zählen
-- abgeschlossene Berichte zählen
-- problematische Chats zählen
-- Fälle mit `inside_sales_input_required` sehen
+- see users
+- view or change roles
+- set user language
+- set global provider
+- count open chats per user
+- count completed reports
+- count problematic chats
+- see cases with `inside_sales_input_required`
 
-Admin darf nicht:
+Admins must not:
 
-- vollständige Chatinhalte sehen
-- Transkripte lesen
-- komplette Freitextberichte kontrollieren
+- see complete chat content
+- read transcripts
+- inspect complete free-text reports
 
-Fertig, wenn:
+Done when:
 
-- Admin-Konfiguration funktioniert.
-- Die Statusübersicht einfach, aber brauchbar ist.
-- Keine fachliche Überwachung einzelner Außendienstgespräche entsteht.
+- Admin configuration works.
+- The status overview is simple but useful.
+- The admin area does not become a content surveillance interface.
 
-## Phase 8: Stabilisierung und Demo-Fälle
+## Phase 8: Stabilization And Demo Scenarios
 
-Ziel:
+Goal:
 
-BENNO ist als textbasierter MVP zuverlässig vorführbar.
+BENNO is reliable enough to demo as a text-based MVP.
 
-Demo-Szenarien:
+Demo scenarios:
 
-1. Bekannter Kunde, bekannter Ansprechpartner, normales Follow-up
-2. Bekannter Kunde, neuer Ansprechpartner, Innendienstaufgabe
-3. Bestehendes Angebot wird erwähnt und gefunden
-4. Angebot wird erwähnt, ist aber unklar
-5. Neuer Lead mit Wiedervorlage
-6. Nutzer korrigiert eine frühere Angabe
-7. Review wird abgelehnt und korrigiert
-8. Review wird bestätigt und gespeichert
+1. Known customer, known contact, normal follow-up
+2. Known customer, new contact, inside sales task
+3. Existing offer is mentioned and found
+4. Offer is mentioned but unclear
+5. New lead with reminder
+6. User corrects earlier information
+7. Review is rejected and corrected
+8. Review is confirmed and saved
 
-Fertig, wenn:
+Done when:
 
-- Alle Demo-Szenarien durchspielbar sind.
-- Fehlerfälle verständlich behandelt werden.
-- Der Text-Loop stabil genug ist, um darauf Voice aufzubauen.
+- All demo scenarios can be played through.
+- Error cases are handled understandably.
+- The text loop is stable enough to build voice on top.
 
-## Phase 9: STT und TTS
+## Phase 9: STT And TTS
 
-Ziel:
+Goal:
 
-Sprache wird als Layer auf denselben Workflow gelegt.
+Voice is added as a layer over the same workflow.
 
-Grundprinzip:
+Principle:
 
 ```text
 voice input -> STT -> text turn -> same chat workflow -> assistant text -> TTS -> voice output
 ```
 
-Umfang:
+Scope:
 
-- Spracheingabe aufnehmen
-- Sprache in Text umwandeln
-- Transkript als normale Chatnachricht behandeln
-- BENNO-Antwort vorlesen
-- finalen Review vorlesen
+- capture voice input
+- convert speech to text
+- treat transcript as a normal chat message
+- read BENNO responses aloud
+- read the final review aloud
 
-Wichtig:
+Important:
 
-- Der fachliche Workflow bleibt derselbe.
-- STT ersetzt nur die Texteingabe.
-- TTS ersetzt nur die visuelle Ausgabe nicht, sondern ergänzt sie.
+- The business workflow stays the same.
+- STT only replaces text input.
+- TTS does not replace visual output; it adds voice output.
 
-Fertig, wenn:
+Done when:
 
-- Ein Bericht per Spracheingabe begonnen werden kann.
-- BENNO Antworten vorlesen kann.
-- Der Nutzer weiterhin Text sehen und notfalls eingreifen kann.
+- A report can be started by voice input.
+- BENNO can read responses aloud.
+- The user can still see text and intervene manually if needed.
 
 ## Phase 10: Local Provider
 
-Ziel:
+Goal:
 
-Die Datenschutzrichtung wird praktisch geprüft.
+The privacy direction is tested practically.
 
-Umfang:
+Scope:
 
-- lokaler Provider über OpenAI-kompatible API
-- zum Beispiel LM Studio
-- gleicher Provider-Vertrag wie OpenAI
-- Vergleich gegen dieselben Demo-Fälle
+- local provider through an OpenAI-compatible API
+- for example LM Studio
+- same provider contract as OpenAI
+- comparison against the same demo cases
 
-Zu prüfen:
+Questions to test:
 
-- Versteht das lokale Modell die Eingaben ausreichend gut?
-- Liefert es stabile strukturierte Vorschläge?
-- Braucht es engere Prompts?
-- Müssen Aufgaben stärker in Code aufgeteilt werden?
-- Ist die Performance akzeptabel?
+- Does the local model understand the inputs well enough?
+- Does it provide stable structured suggestions?
+- Does it need tighter prompts?
+- Do tasks need to be split more strongly in code?
+- Is performance acceptable?
 
-Fertig, wenn:
+Done when:
 
-- Der gleiche Text-Loop mit einem lokalen Provider testbar ist.
-- Unterschiede zu OpenAI dokumentiert sind.
-- Eine belastbare Entscheidung möglich ist, wie weit BENNO lokal betrieben werden kann.
+- The same text loop can be tested with a local provider.
+- Differences to OpenAI are documented.
+- There is enough evidence to decide how far BENNO can run locally.
 
-## Empfohlener Start
+## Recommended Start
 
-Als nächstes sollten Phase 1 und Phase 2 umgesetzt werden:
+Next, implement Phase 1 and Phase 2:
 
-1. Flask-Projektstruktur
-2. SQLite-Anbindung
-3. Datenmodelle
-4. Seed-Daten
-5. Login-Grundlage
+1. Flask project structure
+2. SQLite connection
+3. Data models
+4. Seed data
+5. Login foundation
 
-Danach folgt direkt Phase 4:
+Then move directly to Phase 4:
 
-> Ein kompletter Bericht-Loop von "Neuer Bericht" bis "gespeichert".
+> A complete report loop from "New report" to "saved".
 
-Dieser Loop ist das Fundament. Sobald er steht, sind OpenAI, Voice, eNVenta-Feldmapping und Local Provider Erweiterungen auf einem tragfähigen Kern.
+This loop is the foundation. Once it works, OpenAI, voice, eNVenta field mapping, and the local provider are extensions on a stable core.
