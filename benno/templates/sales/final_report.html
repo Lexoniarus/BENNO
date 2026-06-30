@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Final Report - BENNO{% endblock %}
+{% block shell_class %}app-shell--page{% endblock %}
+
+{% block content %}
+  <section class="page-section" aria-labelledby="final-report-title">
+    <p class="hero__eyebrow">Sales workspace</p>
+    <h1 id="final-report-title">Final Report #{{ report.id }}</h1>
+
+    <dl class="definition-list">
+      <div>
+        <dt>Status</dt>
+        <dd>{{ report.status }}</dd>
+      </div>
+      <div>
+        <dt>Summary</dt>
+        <dd>{{ report.summary }}</dd>
+      </div>
+      <div>
+        <dt>Outcome</dt>
+        <dd>{{ report.outcome or "Not provided" }}</dd>
+      </div>
+      <div>
+        <dt>Next Action</dt>
+        <dd>{{ report.next_action or "Not provided" }}</dd>
+      </div>
+      <div>
+        <dt>Inside Sales Tasks</dt>
+        <dd>{{ report.inside_sales_tasks | length }}</dd>
+      </div>
+    </dl>
+
+    <article class="review-block review-block--wide">
+      <span>Final Report Text</span>
+      <pre>{{ report.final_report_text }}</pre>
+    </article>
+  </section>
+{% endblock %}

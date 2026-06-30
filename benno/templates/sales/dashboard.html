@@ -20,10 +20,10 @@
         <span>Options</span>
         <strong>{{ current_user.preferred_language }}</strong>
       </a>
-      <div class="action-card action-card--muted">
+      <a class="action-card" href="{{ url_for('sales.new_report') }}">
         <span>New Report</span>
-        <strong>Phase 4</strong>
-      </div>
+        <strong>Start</strong>
+      </a>
     </div>
   </section>
 {% endblock %}

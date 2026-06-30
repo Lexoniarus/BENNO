@@ -21,7 +21,11 @@
           <tbody>
             {% for report in reports %}
               <tr data-report-id="{{ report.id }}">
-                <td>{{ report.id }}</td>
+                <td>
+                  <a href="{{ url_for('sales.final_report_detail', report_id=report.id) }}">
+                    {{ report.id }}
+                  </a>
+                </td>
                 <td>{{ report.status }}</td>
                 <td>{{ report.visit_date or "Not set" }}</td>
                 <td>{{ report.report_language }}</td>

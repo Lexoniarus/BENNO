@@ -21,7 +21,11 @@
           <tbody>
             {% for chat in chats %}
               <tr data-chat-id="{{ chat.id }}">
-                <td>{{ chat.id }}</td>
+                <td>
+                  <a href="{{ url_for('sales.report_chat', chat_id=chat.id) }}">
+                    {{ chat.id }}
+                  </a>
+                </td>
                 <td>{{ chat.status }}</td>
                 <td>{{ chat.session_language }}</td>
                 <td>{{ chat.updated_at.strftime("%Y-%m-%d") }}</td>

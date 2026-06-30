@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Report Chat - BENNO{% endblock %}
+{% block shell_class %}app-shell--page{% endblock %}
+
+{% block content %}
+  <section class="page-section" aria-labelledby="report-chat-title">
+    <p class="hero__eyebrow">Sales workspace</p>
+    <h1 id="report-chat-title">Report Chat #{{ chat.id }}</h1>
+
+    <div class="report-layout">
+      <div class="chat-panel" aria-label="Report chat messages">
+        {% for message in chat.messages %}
+          <article class="chat-message chat-message--{{ message.sender }}">
+            <span>{{ message.sender }}</span>
+            <p>{{ message.message_text }}</p>
+          </article>
+        {% endfor %}
+      </div>
+
+      <aside class="progress-panel" aria-label="Report progress">
+        <h2>Progress</h2>
+        <dl class="definition-list definition-list--compact">
+          <div>
+            <dt>Status</dt>
+            <dd>{{ chat.status }}</dd>
+          </div>
+          <div>
+            <dt>Missing sections</dt>
+            <dd>
+              {% if draft.missing_sections_json %}
+                {{ draft.missing_sections_json | join(", ") }}
+              {% else %}
+                Complete
+              {% endif %}
+            </dd>
+          </div>
+          <div>
+            <dt>Last question</dt>
+            <dd>{{ draft.last_question }}</dd>
+          </div>
+        </dl>
+      </aside>
+    </div>
+
+    {% if ready_for_review %}
+      <div class="action-row">
+        <a class="button button--link" href="{{ url_for('sales.report_review', chat_id=chat.id) }}">
+          Review Report
+        </a>
+      </div>
+    {% elif chat.status != "cancelled" %}
+      <form class="form-stack" method="post" action="{{ url_for('sales.report_message', chat_id=chat.id) }}">
+        <label for="message">Your answer</label>
+        <textarea id="message" name="message" rows="4" required></textarea>
+        <button class="button" type="submit">Send</button>
+      </form>
+    {% endif %}
+
+    {% if chat.status in ["in_progress", "ready_for_review"] %}
+      <form class="inline-form" method="post" action="{{ url_for('sales.cancel_report_route', chat_id=chat.id) }}">
+        <button class="text-button" type="submit">Cancel report</button>
+      </form>
+    {% endif %}
+  </section>
+{% endblock %}

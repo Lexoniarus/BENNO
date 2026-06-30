@@ -1,11 +1,19 @@
 """Sales user routes for BENNO."""
 
-from flask import Blueprint, render_template
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 
 from benno.auth import sales_required
 from benno.enums import ReportStatus
 from benno.models import Chat, FinalReport
+from benno.services.report_loop import (
+    build_report_review,
+    cancel_report,
+    confirm_report,
+    is_ready_for_review,
+    process_report_message,
+    start_report_chat,
+)
 
 sales_blueprint = Blueprint("sales", __name__, url_prefix="/sales")
 
@@ -51,6 +59,96 @@ def completed_reports():
     return render_template("sales/completed_reports.html", reports=reports)
 
 
+@sales_blueprint.get("/reports/new")
+@sales_required
+def new_report():
+    """Start a new deterministic report chat."""
+    chat = start_report_chat(current_user)
+
+    return redirect(url_for("sales.report_chat", chat_id=chat.id))
+
+
+@sales_blueprint.get("/reports/<int:chat_id>")
+@sales_required
+def report_chat(chat_id: int):
+    """Render one report chat for the current sales user."""
+    chat = _get_own_chat_or_404(chat_id)
+
+    return render_template(
+        "sales/report_chat.html",
+        chat=chat,
+        draft=chat.report_draft,
+        ready_for_review=is_ready_for_review(chat),
+    )
+
+
+@sales_blueprint.post("/reports/<int:chat_id>/messages")
+@sales_required
+def report_message(chat_id: int):
+    """Store a user message and advance the report chat."""
+    chat = _get_own_chat_or_404(chat_id)
+    message_text = request.form.get("message", "").strip()
+    if not message_text:
+        flash("Please enter a message before sending.", "warning")
+        return redirect(url_for("sales.report_chat", chat_id=chat.id))
+
+    try:
+        process_report_message(chat, message_text)
+    except ValueError as error:
+        flash(str(error), "warning")
+
+    return redirect(url_for("sales.report_chat", chat_id=chat.id))
+
+
+@sales_blueprint.get("/reports/<int:chat_id>/review")
+@sales_required
+def report_review(chat_id: int):
+    """Render the block-based final review for a completed draft."""
+    chat = _get_own_chat_or_404(chat_id)
+    if not is_ready_for_review(chat):
+        flash("Please complete the missing report sections first.", "warning")
+        return redirect(url_for("sales.report_chat", chat_id=chat.id))
+
+    return render_template(
+        "sales/report_review.html",
+        chat=chat,
+        review=build_report_review(chat.report_draft),
+    )
+
+
+@sales_blueprint.post("/reports/<int:chat_id>/confirm")
+@sales_required
+def confirm_report_route(chat_id: int):
+    """Confirm and save a report draft."""
+    chat = _get_own_chat_or_404(chat_id)
+    try:
+        final_report = confirm_report(chat)
+    except ValueError as error:
+        flash(str(error), "warning")
+        return redirect(url_for("sales.report_chat", chat_id=chat.id))
+
+    return redirect(url_for("sales.final_report_detail", report_id=final_report.id))
+
+
+@sales_blueprint.post("/reports/<int:chat_id>/cancel")
+@sales_required
+def cancel_report_route(chat_id: int):
+    """Cancel an unfinished report chat."""
+    chat = _get_own_chat_or_404(chat_id)
+    cancel_report(chat)
+
+    return redirect(url_for("sales.open_reports"))
+
+
+@sales_blueprint.get("/reports/final/<int:report_id>")
+@sales_required
+def final_report_detail(report_id: int):
+    """Render a saved final report for the current sales user."""
+    final_report = _get_own_final_report_or_404(report_id)
+
+    return render_template("sales/final_report.html", report=final_report)
+
+
 @sales_blueprint.get("/options")
 @sales_required
 def options():
@@ -67,3 +165,25 @@ def _own_open_chats_query():
 
 def _own_completed_reports_query():
     return FinalReport.query.filter_by(sales_user_id=current_user.id)
+
+
+def _get_own_chat_or_404(chat_id: int) -> Chat:
+    chat = Chat.query.filter_by(
+        id=chat_id,
+        sales_user_id=current_user.id,
+    ).one_or_none()
+    if chat is None:
+        abort(404)
+
+    return chat
+
+
+def _get_own_final_report_or_404(report_id: int) -> FinalReport:
+    final_report = FinalReport.query.filter_by(
+        id=report_id,
+        sales_user_id=current_user.id,
+    ).one_or_none()
+    if final_report is None:
+        abort(404)
+
+    return final_report
