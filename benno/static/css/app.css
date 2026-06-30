@@ -38,6 +38,69 @@ body {
   place-items: center;
 }
 
+.app-shell--page {
+  min-height: calc(100vh - 72px);
+  padding-top: 40px;
+  place-items: start center;
+}
+
+.topbar {
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px 48px;
+  border-bottom: 1px solid var(--color-line);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.topbar__brand {
+  color: var(--color-accent-strong);
+  font-size: 1.2rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.topbar__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: flex-end;
+}
+
+.topbar__nav a {
+  color: var(--color-muted);
+  font-size: 0.94rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.topbar__nav a:hover {
+  color: var(--color-accent);
+}
+
+.flash-list {
+  width: min(960px, 100%);
+  margin-bottom: 18px;
+}
+
+.flash,
+.form-error,
+.empty-state {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: #eef3f1;
+  color: var(--color-accent-strong);
+}
+
+.form-error {
+  margin: 22px 0 0;
+  background: #f8e8e5;
+  color: #8a2d20;
+}
+
 .hero {
   display: grid;
   width: min(1120px, 100%);
@@ -111,10 +174,167 @@ body {
   font-size: 1.05rem;
 }
 
+.auth-panel,
+.page-section {
+  width: min(960px, 100%);
+}
+
+.auth-panel {
+  max-width: 520px;
+  padding: 28px;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.auth-panel h1,
+.page-section h1 {
+  margin: 0;
+  color: var(--color-accent-strong);
+  font-size: clamp(2.6rem, 8vw, 5.2rem);
+  line-height: 1;
+}
+
+.form-stack {
+  display: grid;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.form-stack label {
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.form-stack input {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  color: var(--color-ink);
+  font: inherit;
+}
+
+.button {
+  min-height: 46px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--color-accent);
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.action-card {
+  display: grid;
+  gap: 10px;
+  min-height: 132px;
+  align-content: space-between;
+  padding: 18px;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.action-card--muted {
+  color: var(--color-muted);
+}
+
+.action-card span {
+  color: var(--color-muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.action-card strong {
+  color: var(--color-accent-strong);
+  font-size: 1.8rem;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  margin-top: 28px;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--color-line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.definition-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 28px;
+}
+
+.definition-list div {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.definition-list dt {
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.definition-list dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
 @media (max-width: 760px) {
   .app-shell {
     padding: 28px 18px;
     place-items: start center;
+  }
+
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 18px;
+  }
+
+  .topbar__nav {
+    justify-content: flex-start;
   }
 
   .hero {

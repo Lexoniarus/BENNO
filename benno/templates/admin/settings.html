@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Settings - BENNO{% endblock %}
+{% block shell_class %}app-shell--page{% endblock %}
+
+{% block content %}
+  <section class="page-section" aria-labelledby="settings-title">
+    <p class="hero__eyebrow">Admin workspace</p>
+    <h1 id="settings-title">Global Settings</h1>
+    {% if global_setting %}
+      <dl class="definition-list">
+        <div>
+          <dt>Default Language</dt>
+          <dd>{{ global_setting.default_language }}</dd>
+        </div>
+        <div>
+          <dt>AI Provider</dt>
+          <dd>{{ global_setting.ai_provider }}</dd>
+        </div>
+      </dl>
+    {% else %}
+      <p class="empty-state">No global settings have been seeded yet.</p>
+    {% endif %}
+  </section>
+{% endblock %}

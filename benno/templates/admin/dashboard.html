@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - BENNO{% endblock %}
+{% block shell_class %}app-shell--page{% endblock %}
+
+{% block content %}
+  <section class="page-section" aria-labelledby="admin-title">
+    <p class="hero__eyebrow">Admin workspace</p>
+    <h1 id="admin-title">Status Overview</h1>
+    <div class="action-grid">
+      {% for label, value in status.items() %}
+        <div class="action-card">
+          <span>{{ label.replace("_", " ").title() }}</span>
+          <strong>{{ value }}</strong>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Users - BENNO{% endblock %}
+{% block shell_class %}app-shell--page{% endblock %}
+
+{% block content %}
+  <section class="page-section" aria-labelledby="users-title">
+    <p class="hero__eyebrow">Admin workspace</p>
+    <h1 id="users-title">Users</h1>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Name</th>
+            <th>Role</th>
+            <th>Language</th>
+            <th>Active</th>
+            <th>Provider Override</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for user in users %}
+            <tr>
+              <td>{{ user.email }}</td>
+              <td>{{ user.username }}</td>
+              <td>{{ user.role }}</td>
+              <td>{{ user.preferred_language }}</td>
+              <td>{{ "yes" if user.is_active else "no" }}</td>
+              <td>{{ user.ai_provider_override or "default" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

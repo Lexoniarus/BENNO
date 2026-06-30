@@ -8,7 +8,35 @@
     <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
   </head>
   <body>
-    <main class="app-shell">
+    {% if current_user.is_authenticated %}
+      <header class="topbar">
+        <a class="topbar__brand" href="{{ url_for('main.index') }}">BENNO</a>
+        <nav class="topbar__nav" aria-label="Main navigation">
+          {% if current_user.is_sales_rep %}
+            <a href="{{ url_for('sales.dashboard') }}">Sales</a>
+            <a href="{{ url_for('sales.open_reports') }}">Open Reports</a>
+            <a href="{{ url_for('sales.completed_reports') }}">Completed Reports</a>
+            <a href="{{ url_for('sales.options') }}">Options</a>
+          {% elif current_user.is_admin %}
+            <a href="{{ url_for('admin.dashboard') }}">Admin</a>
+            <a href="{{ url_for('admin.users') }}">Users</a>
+            <a href="{{ url_for('admin.settings') }}">Settings</a>
+          {% endif %}
+          <a href="{{ url_for('auth.logout') }}">Logout</a>
+        </nav>
+      </header>
+    {% endif %}
+
+    <main class="app-shell {% block shell_class %}{% endblock %}">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-list" aria-live="polite">
+            {% for category, message in messages %}
+              <p class="flash flash--{{ category }}">{{ message }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
       {% block content %}{% endblock %}
     </main>
   </body>

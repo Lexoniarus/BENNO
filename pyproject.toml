@@ -10,6 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "Flask>=3.0",
+    "Flask-Login>=0.6",
     "Flask-SQLAlchemy>=3.1",
     "python-dotenv>=1.0",
 ]
@@ -28,6 +29,9 @@ include = ["benno*"]
 benno = [
     "static/css/*.css",
     "static/js/*.js",
+    "templates/admin/*.html",
+    "templates/auth/*.html",
+    "templates/sales/*.html",
     "templates/*.html",
 ]
 

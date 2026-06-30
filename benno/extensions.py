@@ -2,11 +2,13 @@
 
 from sqlite3 import Connection as SQLiteConnection
 
+from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
 db = SQLAlchemy()
+login_manager = LoginManager()
 
 
 @event.listens_for(Engine, "connect")

@@ -16,14 +16,14 @@ def test_create_app_uses_testing_configuration() -> None:
     assert app.config["SQLALCHEMY_DATABASE_URI"] == "sqlite:///:memory:"
 
 
-def test_index_page_is_available() -> None:
+def test_index_redirects_anonymous_users_to_login() -> None:
     app = create_app("testing")
 
     with app.test_client() as client:
         response = client.get("/")
 
-    assert response.status_code == 200
-    assert b"BENNO" in response.data
+    assert response.status_code == 302
+    assert response.location == "/login"
 
 
 def test_health_endpoint_returns_ok_status() -> None:

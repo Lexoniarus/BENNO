@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Open Reports - BENNO{% endblock %}
+{% block shell_class %}app-shell--page{% endblock %}
+
+{% block content %}
+  <section class="page-section" aria-labelledby="open-reports-title">
+    <p class="hero__eyebrow">Sales workspace</p>
+    <h1 id="open-reports-title">Open Reports</h1>
+    {% if chats %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Status</th>
+              <th>Language</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for chat in chats %}
+              <tr data-chat-id="{{ chat.id }}">
+                <td>{{ chat.id }}</td>
+                <td>{{ chat.status }}</td>
+                <td>{{ chat.session_language }}</td>
+                <td>{{ chat.updated_at.strftime("%Y-%m-%d") }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="empty-state">No open reports yet.</p>
+    {% endif %}
+  </section>
+{% endblock %}

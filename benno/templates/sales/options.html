@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Sales Options - BENNO{% endblock %}
+{% block shell_class %}app-shell--page{% endblock %}
+
+{% block content %}
+  <section class="page-section" aria-labelledby="sales-options-title">
+    <p class="hero__eyebrow">Sales workspace</p>
+    <h1 id="sales-options-title">Options</h1>
+    <dl class="definition-list">
+      <div>
+        <dt>Email</dt>
+        <dd>{{ current_user.email }}</dd>
+      </div>
+      <div>
+        <dt>Language</dt>
+        <dd>{{ current_user.preferred_language }}</dd>
+      </div>
+      <div>
+        <dt>External Sales ID</dt>
+        <dd>{{ current_user.external_sales_rep_id or "Not set" }}</dd>
+      </div>
+    </dl>
+  </section>
+{% endblock %}

@@ -58,6 +58,25 @@ class User(db.Model, TimestampMixin):
         """Return whether the user has the admin role."""
         return self.role == UserRole.ADMIN.value
 
+    @property
+    def is_authenticated(self) -> bool:
+        """Return whether the user is authenticated."""
+        return True
+
+    @property
+    def is_anonymous(self) -> bool:
+        """Return whether the user is anonymous."""
+        return False
+
+    def get_id(self) -> str:
+        """Return the Flask-Login user identifier."""
+        return str(self.id)
+
+    @property
+    def is_sales_rep(self) -> bool:
+        """Return whether the user has the sales representative role."""
+        return self.role == UserRole.SALES_REP.value
+
 
 class GlobalSetting(db.Model, TimestampMixin):
     """Global BENNO settings."""

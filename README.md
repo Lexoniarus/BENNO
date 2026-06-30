@@ -33,6 +33,11 @@ flask --app benno:create_app run
 
 Open `http://127.0.0.1:5000` in a browser.
 
+Demo logins after `seed-db`:
+
+- `admin@benno.local` / `admin-demo-password`
+- `sales@benno.local` / `sales-demo-password`
+
 ## Quality Checks
 
 Run the checks before committing code:

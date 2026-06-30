@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Sales Dashboard - BENNO{% endblock %}
+{% block shell_class %}app-shell--page{% endblock %}
+
+{% block content %}
+  <section class="page-section" aria-labelledby="sales-title">
+    <p class="hero__eyebrow">Sales workspace</p>
+    <h1 id="sales-title">Visit Reports</h1>
+    <div class="action-grid">
+      <a class="action-card" href="{{ url_for('sales.open_reports') }}">
+        <span>Open Reports</span>
+        <strong>{{ open_report_count }}</strong>
+      </a>
+      <a class="action-card" href="{{ url_for('sales.completed_reports') }}">
+        <span>Completed Reports</span>
+        <strong>{{ completed_report_count }}</strong>
+      </a>
+      <a class="action-card" href="{{ url_for('sales.options') }}">
+        <span>Options</span>
+        <strong>{{ current_user.preferred_language }}</strong>
+      </a>
+      <div class="action-card action-card--muted">
+        <span>New Report</span>
+        <strong>Phase 4</strong>
+      </div>
+    </div>
+  </section>
+{% endblock %}

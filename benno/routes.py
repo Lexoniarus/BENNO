@@ -1,14 +1,23 @@
 """Main routes for the BENNO foundation."""
 
-from flask import Blueprint, render_template
+from flask import Blueprint, redirect, url_for
+from flask_login import current_user
+
+from benno.enums import UserRole
 
 main_blueprint = Blueprint("main", __name__)
 
 
 @main_blueprint.get("/")
-def index() -> str:
-    """Render the BENNO start screen."""
-    return render_template("index.html")
+def index():
+    """Route users to the correct BENNO entry point."""
+    if not current_user.is_authenticated:
+        return redirect(url_for("auth.login"))
+
+    if current_user.role == UserRole.ADMIN.value:
+        return redirect(url_for("admin.dashboard"))
+
+    return redirect(url_for("sales.dashboard"))
 
 
 @main_blueprint.get("/health")

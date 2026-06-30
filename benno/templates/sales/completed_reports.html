@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Completed Reports - BENNO{% endblock %}
+{% block shell_class %}app-shell--page{% endblock %}
+
+{% block content %}
+  <section class="page-section" aria-labelledby="completed-reports-title">
+    <p class="hero__eyebrow">Sales workspace</p>
+    <h1 id="completed-reports-title">Completed Reports</h1>
+    {% if reports %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Status</th>
+              <th>Visit Date</th>
+              <th>Language</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for report in reports %}
+              <tr data-report-id="{{ report.id }}">
+                <td>{{ report.id }}</td>
+                <td>{{ report.status }}</td>
+                <td>{{ report.visit_date or "Not set" }}</td>
+                <td>{{ report.report_language }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="empty-state">No completed reports yet.</p>
+    {% endif %}
+  </section>
+{% endblock %}

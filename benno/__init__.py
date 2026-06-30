@@ -9,7 +9,7 @@ from flask import Flask
 
 from benno.cli import register_cli_commands
 from benno.config import CONFIG_BY_NAME, DevelopmentConfig
-from benno.extensions import db
+from benno.extensions import db, login_manager
 from benno.routes import main_blueprint
 
 
@@ -66,10 +66,32 @@ def _load_models() -> None:
 
 def _initialize_extensions(app: Flask) -> None:
     db.init_app(app)
+    login_manager.init_app(app)
+    login_manager.login_view = "auth.login"
+    login_manager.login_message_category = "warning"
+    _register_user_loader()
 
 
 def _register_blueprints(app: Flask) -> None:
+    from benno.admin import admin_blueprint
+    from benno.auth import auth_blueprint
+    from benno.sales import sales_blueprint
+
     app.register_blueprint(main_blueprint)
+    app.register_blueprint(auth_blueprint)
+    app.register_blueprint(admin_blueprint)
+    app.register_blueprint(sales_blueprint)
+
+
+def _register_user_loader() -> None:
+    from benno.models import User
+
+    @login_manager.user_loader
+    def load_user(user_id: str):
+        if not user_id.isdigit():
+            return None
+
+        return db.session.get(User, int(user_id))
 
 
 def _register_cli(app: Flask) -> None:
