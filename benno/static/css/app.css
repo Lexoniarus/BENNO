@@ -14,18 +14,19 @@
   --custom-4: #002f34;
   --custom-5: #e7413b;
   --custom-6: #6b174d;
-  --color-background: #dfe6e8;
-  --color-background-rim: #d0dadc;
-  --color-surface: #e8edef;
-  --color-surface-raised: #d7e0e3;
-  --color-ink: #102734;
-  --color-muted: #56636a;
+  --color-background: var(--awb-color-5);
+  --color-background-rim: #0f2838;
+  --color-surface: #e1d9c8;
+  --color-surface-raised: #d2d4cf;
+  --color-ink: #102c3d;
+  --color-muted: #59656a;
   --color-accent: var(--awb-color-4);
   --color-accent-secondary: var(--custom-3);
   --color-accent-strong: var(--awb-color-5);
-  --color-line: #c5ced1;
-  --color-line-strong: #aebabe;
-  --shadow-soft: 0 18px 42px rgba(20, 51, 71, 0.14);
+  --color-line: rgba(20, 51, 71, 0.22);
+  --color-line-strong: rgba(20, 51, 71, 0.42);
+  --color-text-on-dark: #f6f8f8;
+  --shadow-soft: 0 18px 42px rgba(0, 47, 52, 0.24);
 }
 
 * {
@@ -45,8 +46,8 @@ body {
     "Segoe UI",
     sans-serif;
   background:
-    linear-gradient(135deg, rgba(20, 51, 71, 0.11), transparent 38%),
-    linear-gradient(315deg, rgba(235, 229, 102, 0.12), transparent 30%),
+    linear-gradient(145deg, rgba(235, 229, 102, 0.1), rgba(235, 229, 102, 0.04) 24%, transparent 44%),
+    linear-gradient(180deg, rgba(0, 47, 52, 0.16), transparent 42%),
     var(--color-background);
 }
 
@@ -70,9 +71,9 @@ body {
   justify-content: space-between;
   gap: 24px;
   padding: 18px 48px;
-  border-bottom: 1px solid rgba(235, 229, 102, 0.32);
-  background: var(--color-accent-strong);
-  box-shadow: 0 10px 28px rgba(20, 51, 71, 0.18);
+  border-bottom: 1px solid rgba(235, 229, 102, 0.36);
+  background: var(--color-background-rim);
+  box-shadow: 0 10px 28px rgba(0, 47, 52, 0.24);
 }
 
 .topbar__brand {
@@ -137,7 +138,7 @@ body {
 
 .hero__eyebrow {
   margin: 0 0 18px;
-  color: var(--color-accent-strong);
+  color: var(--color-accent);
   font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0;
@@ -146,14 +147,14 @@ body {
 
 .hero h1 {
   margin: 0;
-  color: var(--color-accent-strong);
+  color: var(--color-text-on-dark);
   font-size: clamp(4rem, 12vw, 8.5rem);
   line-height: 0.92;
 }
 
 .hero__subtitle {
   margin: 20px 0 0;
-  color: var(--color-ink);
+  color: var(--color-text-on-dark);
   font-size: clamp(1.3rem, 3vw, 2.25rem);
   font-weight: 700;
   line-height: 1.12;
@@ -162,7 +163,7 @@ body {
 .hero__copy {
   max-width: 620px;
   margin: 24px 0 0;
-  color: var(--color-muted);
+  color: #dbe3e5;
   font-size: 1.08rem;
   line-height: 1.7;
 }
@@ -171,7 +172,7 @@ body {
   display: grid;
   gap: 16px;
   padding: 22px;
-  border: 1px solid var(--color-line);
+  border: 1px solid rgba(235, 229, 102, 0.28);
   border-radius: 8px;
   background: var(--color-surface);
   box-shadow: var(--shadow-soft);
@@ -203,10 +204,14 @@ body {
   width: min(960px, 100%);
 }
 
+.page-section {
+  color: var(--color-text-on-dark);
+}
+
 .auth-panel {
   max-width: 520px;
   padding: 28px;
-  border: 1px solid var(--color-line);
+  border: 1px solid rgba(235, 229, 102, 0.28);
   border-radius: 8px;
   background: var(--color-surface);
   box-shadow: var(--shadow-soft);
@@ -215,9 +220,21 @@ body {
 .auth-panel h1,
 .page-section h1 {
   margin: 0;
-  color: var(--color-accent-strong);
   font-size: clamp(2.6rem, 8vw, 5.2rem);
   line-height: 1;
+}
+
+.auth-panel h1,
+.auth-panel .hero__subtitle {
+  color: var(--color-ink);
+}
+
+.auth-panel .hero__eyebrow {
+  color: var(--color-accent-strong);
+}
+
+.page-section h1 {
+  color: var(--color-text-on-dark);
 }
 
 .form-stack {
@@ -227,7 +244,7 @@ body {
 }
 
 .form-stack label {
-  color: var(--color-muted);
+  color: var(--color-ink);
   font-size: 0.9rem;
   font-weight: 700;
 }
@@ -238,7 +255,7 @@ body {
   padding: 10px 12px;
   border: 1px solid var(--color-line);
   border-radius: 6px;
-  background: #f1f4f5;
+  background: #f6f5ef;
   color: var(--color-ink);
   font: inherit;
 }
@@ -254,15 +271,15 @@ body {
   margin-top: 10px;
   border: 0;
   border-radius: 6px;
-  background: var(--color-accent-strong);
-  color: #ffffff;
+  background: var(--color-accent);
+  color: var(--color-accent-strong);
   cursor: pointer;
   font: inherit;
   font-weight: 800;
 }
 
 .button:hover {
-  background: var(--custom-4);
+  background: var(--custom-3);
 }
 
 .action-grid {
@@ -288,6 +305,7 @@ body {
 .action-card:hover {
   border-color: var(--color-line-strong);
   box-shadow: var(--shadow-soft);
+  transform: translateY(-1px);
 }
 
 .action-card--muted {
