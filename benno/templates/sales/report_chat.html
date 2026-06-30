@@ -49,12 +49,20 @@
           Review Report
         </a>
       </div>
-    {% elif chat.status != "cancelled" %}
+    {% elif chat.status == "in_progress" %}
       <form class="form-stack" method="post" action="{{ url_for('sales.report_message', chat_id=chat.id) }}">
         <label for="message">Your answer</label>
         <textarea id="message" name="message" rows="4" required></textarea>
         <button class="button" type="submit">Send</button>
       </form>
+    {% elif chat.status == "confirmed" and chat.final_report %}
+      <div class="action-row">
+        <a class="button button--link" href="{{ url_for('sales.final_report_detail', report_id=chat.final_report.id) }}">
+          Open Final Report
+        </a>
+      </div>
+    {% elif chat.status == "cancelled" %}
+      <p class="empty-state">This report was cancelled.</p>
     {% endif %}
 
     {% if chat.status in ["in_progress", "ready_for_review"] %}

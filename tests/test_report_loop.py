@@ -190,6 +190,28 @@ def test_confirmed_report_cannot_be_cancelled(app) -> None:
     assert chat.report_draft.report_status == ReportStatus.CONFIRMED.value
 
 
+def test_confirmed_report_chat_links_to_final_report(app) -> None:
+    seed_database()
+
+    with app.test_client() as client:
+        _login(client, "sales@benno.local", "sales-demo-password")
+        start_response = client.get("/sales/reports/new")
+        chat_id = _chat_id_from_redirect(start_response.location)
+
+        for answer in STANDARD_ANSWERS:
+            client.post(
+                f"/sales/reports/{chat_id}/messages",
+                data={"message": answer},
+            )
+
+        client.post(f"/sales/reports/{chat_id}/confirm")
+        chat_response = client.get(f"/sales/reports/{chat_id}")
+
+    assert chat_response.status_code == 200
+    assert b"Your answer" not in chat_response.data
+    assert b"Open Final Report" in chat_response.data
+
+
 def test_review_page_is_blocked_until_sections_are_complete(app) -> None:
     seed_database()
 
