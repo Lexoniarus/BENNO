@@ -69,6 +69,26 @@ def test_service_advances_to_review_and_confirms_once(app) -> None:
     assert "Visit Report" in first_report.final_report_text
 
 
+def test_confirmed_report_rejects_late_messages(app) -> None:
+    seed_database()
+    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    chat = start_report_chat(sales_user)
+
+    for answer in STANDARD_ANSWERS:
+        process_report_message(chat, answer)
+
+    confirm_report(chat)
+    message_count = len(chat.messages)
+
+    try:
+        process_report_message(chat, "Please change the summary.")
+    except ValueError as error:
+        assert str(error) == "This report can no longer be changed."
+
+    assert len(chat.messages) == message_count
+    assert chat.status == ReportStatus.CONFIRMED.value
+
+
 def test_service_creates_inside_sales_tasks_for_clear_cases(app) -> None:
     seed_database()
     sales_user = User.query.filter_by(email="sales@benno.local").one()
@@ -144,6 +164,30 @@ def test_report_web_flow_creates_confirmed_final_report(app) -> None:
     assert b"Confirm and Save" in review_response.data
     assert confirm_response.status_code == 302
     assert final_report.status == ReportStatus.CONFIRMED.value
+
+
+def test_confirmed_report_cannot_be_cancelled(app) -> None:
+    seed_database()
+
+    with app.test_client() as client:
+        _login(client, "sales@benno.local", "sales-demo-password")
+        start_response = client.get("/sales/reports/new")
+        chat_id = _chat_id_from_redirect(start_response.location)
+
+        for answer in STANDARD_ANSWERS:
+            client.post(
+                f"/sales/reports/{chat_id}/messages",
+                data={"message": answer},
+            )
+
+        client.post(f"/sales/reports/{chat_id}/confirm")
+        cancel_response = client.post(f"/sales/reports/{chat_id}/cancel")
+
+    chat = db.session.get(Chat, chat_id)
+    assert cancel_response.status_code == 302
+    assert cancel_response.location == f"/sales/reports/{chat_id}"
+    assert chat.status == ReportStatus.CONFIRMED.value
+    assert chat.report_draft.report_status == ReportStatus.CONFIRMED.value
 
 
 def test_review_page_is_blocked_until_sections_are_complete(app) -> None:

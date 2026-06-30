@@ -135,7 +135,11 @@ def confirm_report_route(chat_id: int):
 def cancel_report_route(chat_id: int):
     """Cancel an unfinished report chat."""
     chat = _get_own_chat_or_404(chat_id)
-    cancel_report(chat)
+    try:
+        cancel_report(chat)
+    except ValueError as error:
+        flash(str(error), "warning")
+        return redirect(url_for("sales.report_chat", chat_id=chat.id))
 
     return redirect(url_for("sales.open_reports"))
 

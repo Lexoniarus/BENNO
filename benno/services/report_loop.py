@@ -35,6 +35,10 @@ from benno.services.mock_crm import (
 )
 
 REVIEW_STEP = "review"
+MUTABLE_REPORT_STATUSES = {
+    ReportStatus.IN_PROGRESS.value,
+    ReportStatus.READY_FOR_REVIEW.value,
+}
 
 
 @dataclass(frozen=True)
@@ -147,6 +151,7 @@ def start_report_chat(sales_user: User) -> Chat:
 def process_report_message(chat: Chat, message_text: str) -> Chat:
     """Store a user answer and advance the deterministic report state."""
     draft = _require_draft(chat)
+    _ensure_report_is_mutable(chat)
     normalized_message = message_text.strip()
     if not normalized_message:
         raise ValueError("Message text must not be empty.")
@@ -246,6 +251,7 @@ def confirm_report(chat: Chat) -> FinalReport:
 def cancel_report(chat: Chat) -> None:
     """Cancel unfinished report work."""
     draft = _require_draft(chat)
+    _ensure_report_is_mutable(chat)
     chat.status = ReportStatus.CANCELLED.value
     draft.report_status = ReportStatus.CANCELLED.value
     _add_assistant_message(chat, "The visit report has been cancelled.")
@@ -262,6 +268,11 @@ def _require_draft(chat: Chat) -> ReportDraft:
         raise ValueError("Report chat has no draft.")
 
     return chat.report_draft
+
+
+def _ensure_report_is_mutable(chat: Chat) -> None:
+    if chat.status not in MUTABLE_REPORT_STATUSES:
+        raise ValueError("This report can no longer be changed.")
 
 
 def _current_step(draft: ReportDraft) -> ReportStep | None:
