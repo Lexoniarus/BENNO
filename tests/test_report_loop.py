@@ -52,7 +52,7 @@ def test_service_creates_chat_draft_and_initial_question(app) -> None:
     assert "Kunden oder Lead" in chat.messages[0].message_text
 
 
-def test_ai_analysis_can_assist_current_step_without_direct_saving(app) -> None:
+def test_ai_analysis_can_apply_multiple_open_sections(app) -> None:
     seed_database()
     sales_user = User.query.filter_by(email="sales@benno.local").one()
     chat = start_report_chat(sales_user)
@@ -63,7 +63,7 @@ def test_ai_analysis_can_assist_current_step_without_direct_saving(app) -> None:
             target_sections=["customer_context", "summary"],
             section_updates={
                 "customer_context": "Nordlicht Maschinenbau GmbH",
-                "summary": "This must not be saved yet.",
+                "summary": "Modernisierung wurde besprochen.",
             },
             suggested_next_section="contacts",
             suggested_next_question="Wer hat an dem Gespräch teilgenommen?",
@@ -79,8 +79,47 @@ def test_ai_analysis_can_assist_current_step_without_direct_saving(app) -> None:
     answers = chat.report_draft.draft_data_json["answers"]
     assert ai_service.analysis_calls == 1
     assert answers["customer_context"] == "Nordlicht Maschinenbau GmbH"
-    assert chat.report_draft.summary is None
+    assert answers["summary"] == "Modernisierung wurde besprochen."
+    assert chat.report_draft.summary == "Modernisierung wurde besprochen."
     assert chat.messages[-1].message_text == "Wer hat an dem Gespräch teilgenommen?"
+
+
+def test_ai_extracts_perfsolar_sections_and_preserves_umlaut(app) -> None:
+    seed_database()
+    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    chat = start_report_chat(sales_user)
+    summary_question = "Fasse bitte die wichtigsten Gesprächspunkte zusammen."
+    ai_service = _FakeAiService(
+        analysis=AiMessageAnalysis(
+            intent=UserIntent.ADDITIONAL_INFO,
+            intent_confidence=0.91,
+            target_sections=["customer_context", "contacts", "visit_reason"],
+            section_updates={
+                "customer_context": "PerfSolar",
+                "contacts": "Frau Schmidt",
+                "visit_reason": "Forecast",
+            },
+            suggested_next_section="summary",
+            suggested_next_question=summary_question,
+        )
+    )
+
+    process_report_message_with_ai(
+        chat,
+        "Ich war bei PerfSolar und habe mit Frau Schmidt über den Forecast gesprochen.",
+        ai_service,
+    )
+
+    answers = chat.report_draft.draft_data_json["answers"]
+    assert "über" in chat.messages[1].message_text
+    assert answers["customer_context"] == "PerfSolar"
+    assert answers["contacts"] == "Frau Schmidt"
+    assert answers["visit_reason"] == "Forecast"
+    assert "customer_context" not in chat.report_draft.missing_sections_json
+    assert "contacts" not in chat.report_draft.missing_sections_json
+    assert "visit_reason" not in chat.report_draft.missing_sections_json
+    assert chat.report_draft.draft_data_json["current_step"] == "summary"
+    assert chat.messages[-1].message_text == summary_question
 
 
 def test_ai_question_is_ignored_when_next_section_does_not_match(app) -> None:
@@ -105,6 +144,88 @@ def test_ai_question_is_ignored_when_next_section_does_not_match(app) -> None:
     )
 
     assert chat.messages[-1].message_text == "Wer hat an dem Gespräch teilgenommen?"
+
+
+def test_ai_unknown_section_update_is_ignored(app) -> None:
+    seed_database()
+    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    chat = start_report_chat(sales_user)
+    ai_service = _FakeAiService(
+        analysis=AiMessageAnalysis(
+            intent=UserIntent.ANSWER,
+            intent_confidence=0.9,
+            target_sections=["customer_context"],
+            section_updates={
+                "customer_context": "Nordlicht Maschinenbau GmbH",
+                "not_a_section": "Must be ignored.",
+            },
+        )
+    )
+
+    process_report_message_with_ai(chat, "Nordlicht Maschinenbau GmbH", ai_service)
+
+    answers = chat.report_draft.draft_data_json["answers"]
+    assert answers["customer_context"] == "Nordlicht Maschinenbau GmbH"
+    assert "not_a_section" not in answers
+    assert (
+        "not_a_section"
+        not in chat.report_draft.draft_data_json["last_ai_analysis"]["section_updates"]
+    )
+
+
+def test_normal_ai_update_does_not_overwrite_completed_section(app) -> None:
+    seed_database()
+    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    chat = start_report_chat(sales_user)
+    process_report_message(chat, "Nordlicht Maschinenbau GmbH")
+    process_report_message(chat, "Frau Schmidt")
+    ai_service = _FakeAiService(
+        analysis=AiMessageAnalysis(
+            intent=UserIntent.ANSWER,
+            intent_confidence=0.88,
+            target_sections=["contacts", "visit_reason"],
+            section_updates={
+                "contacts": "Frau Überschreiber",
+                "visit_reason": "Forecast",
+            },
+        )
+    )
+
+    process_report_message_with_ai(chat, "Es ging um den Forecast.", ai_service)
+
+    answers = chat.report_draft.draft_data_json["answers"]
+    assert answers["contacts"] == "Frau Schmidt"
+    assert answers["visit_reason"] == "Forecast"
+
+
+def test_ai_correction_can_overwrite_targeted_completed_section(app) -> None:
+    seed_database()
+    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    chat = start_report_chat(sales_user)
+    process_report_message(chat, "Nordlicht Maschinenbau GmbH")
+    process_report_message(chat, "Frau Schmidt")
+    ai_service = _FakeAiService(
+        analysis=AiMessageAnalysis(
+            intent=UserIntent.CORRECTION,
+            intent_confidence=0.93,
+            target_sections=["contacts"],
+            section_updates={"contacts": "Frau Müller"},
+            suggested_next_section="visit_reason",
+            suggested_next_question="Was war der Hauptgrund für den Besuch?",
+        )
+    )
+
+    process_report_message_with_ai(
+        chat,
+        "Korrektur: Es war Frau Müller.",
+        ai_service,
+    )
+
+    answers = chat.report_draft.draft_data_json["answers"]
+    assert answers["contacts"] == "Frau Müller"
+    assert "visit_reason" not in answers
+    assert chat.report_draft.draft_data_json["current_step"] == "visit_reason"
+    assert chat.messages[-1].message_text == "Was war der Hauptgrund für den Besuch?"
 
 
 def test_ai_provider_error_falls_back_to_deterministic_answer(app) -> None:
@@ -169,6 +290,44 @@ def test_ai_review_and_final_report_text_are_cached(app) -> None:
     assert final_report.final_report_text == "AI final report text."
     assert ai_service.review_calls == 1
     assert ai_service.final_report_calls == 1
+
+
+def test_german_special_characters_survive_review_and_final_report(app) -> None:
+    seed_database()
+    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    chat = start_report_chat(sales_user)
+    answers = [
+        "Müller & Söhne Köln",
+        "Frau Größe",
+        "Forecast über größere Stückzahlen",
+        "Der Kunde aus Köln möchte größere Stückzahlen prüfen.",
+        "Größe und Maß bleiben offen.",
+        "Wiedervorlage für Köln am 2026-07-10.",
+        "keiner",
+        "keiner",
+        "8 wegen größerer Chance.",
+        "7 wegen guter Gesprächsstimmung.",
+        "8 wegen hoher Priorität.",
+        "6 weil die Freigabe noch offen ist.",
+        "8 wegen nötiger Wiedervorlage.",
+        "7 weil Müller & Söhne zufrieden wirkte.",
+    ]
+
+    for answer in answers:
+        process_report_message(chat, answer)
+
+    review = build_report_review(chat.report_draft)
+    final_report = confirm_report(chat)
+    review_text = " ".join(value for _label, value in review["sections"])
+
+    assert (
+        "Müller & Söhne Köln"
+        in chat.report_draft.draft_data_json["answers"]["customer_context"]
+    )
+    assert "größere Stückzahlen" in review_text
+    assert "Köln" in final_report.final_report_text
+    assert "größere Stückzahlen" in final_report.final_report_text
+    assert "Müller & Söhne" in final_report.final_report_text
 
 
 def test_confirmed_report_rejects_late_messages(app) -> None:

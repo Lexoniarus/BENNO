@@ -14,6 +14,7 @@ from benno.enums import (
     ReportSection,
     ReportStatus,
     SectionStatus,
+    UserIntent,
     ValidationStatus,
 )
 from benno.extensions import db
@@ -220,9 +221,13 @@ def process_report_message_with_ai(
         normalized_message,
         ai_service,
     )
-    answer_text = _answer_for_step(current_step, normalized_message, analysis)
-    _apply_step_answer(draft, current_step, answer_text)
-    next_step = _advance_step(draft, current_step)
+    applied_steps = _apply_assisted_answers(
+        draft,
+        current_step,
+        normalized_message,
+        analysis,
+    )
+    next_step = _advance_after_applied_steps(draft, applied_steps)
     next_question = _next_question(chat, next_step, analysis)
     _add_assistant_message(chat, next_question)
     db.session.commit()
@@ -485,19 +490,95 @@ def _sanitize_ai_analysis(analysis: AiMessageAnalysis) -> AiMessageAnalysis:
     )
 
 
+def _apply_assisted_answers(
+    draft: ReportDraft,
+    current_step: ReportStep,
+    message_text: str,
+    analysis: AiMessageAnalysis | None,
+) -> list[ReportStep]:
+    completed_before_message = set(_draft_data(draft).get("completed_steps", []))
+    applied_steps = []
+    current_answer = _answer_for_step(current_step, message_text, analysis)
+    if current_answer is not None:
+        _apply_step_answer(draft, current_step, current_answer)
+        applied_steps.append(current_step)
+
+    for step in _additional_ai_steps(
+        current_step,
+        analysis,
+        completed_before_message,
+    ):
+        _apply_step_answer(draft, step, analysis.section_updates[step.key])
+        applied_steps.append(step)
+
+    return applied_steps
+
+
 def _answer_for_step(
     step: ReportStep,
     message_text: str,
     analysis: AiMessageAnalysis | None,
-) -> str:
+) -> str | None:
     if analysis is None:
         return message_text
 
     suggested_value = analysis.section_updates.get(step.key)
     if not suggested_value:
+        if analysis.intent == UserIntent.CORRECTION:
+            return None
         return message_text
 
     return suggested_value
+
+
+def _additional_ai_steps(
+    current_step: ReportStep,
+    analysis: AiMessageAnalysis | None,
+    completed_before_message: set[str],
+) -> list[ReportStep]:
+    if analysis is None:
+        return []
+
+    current_index = _step_index(current_step)
+    return [
+        step
+        for step in REPORT_STEPS
+        if step.key != current_step.key
+        and step.key in analysis.section_updates
+        and _can_apply_ai_update(
+            step,
+            current_index,
+            analysis,
+            completed_before_message,
+        )
+    ]
+
+
+def _can_apply_ai_update(
+    step: ReportStep,
+    current_index: int,
+    analysis: AiMessageAnalysis,
+    completed_before_message: set[str],
+) -> bool:
+    if analysis.intent == UserIntent.CORRECTION and _analysis_targets_step(
+        analysis,
+        step,
+    ):
+        return True
+
+    if step.key in completed_before_message:
+        return False
+
+    return _step_index(step) > current_index
+
+
+def _analysis_targets_step(
+    analysis: AiMessageAnalysis,
+    step: ReportStep,
+) -> bool:
+    return step.key in analysis.target_sections or step.section.value in (
+        analysis.target_sections
+    )
 
 
 def _suggested_question(
@@ -559,13 +640,17 @@ def _clean_section_key(value: str | None) -> str | None:
     return cleaned_value
 
 
-def _advance_step(draft: ReportDraft, current_step: ReportStep) -> ReportStep | None:
+def _advance_after_applied_steps(
+    draft: ReportDraft,
+    applied_steps: list[ReportStep],
+) -> ReportStep | None:
     draft_data = _draft_data(draft)
     completed_steps = list(draft_data.get("completed_steps", []))
-    if current_step.key not in completed_steps:
-        completed_steps.append(current_step.key)
+    for step in applied_steps:
+        if step.key not in completed_steps:
+            completed_steps.append(step.key)
 
-    next_step = _step_after(current_step)
+    next_step = _first_incomplete_step(completed_steps)
     draft_data["completed_steps"] = completed_steps
     draft_data["current_step"] = next_step.key if next_step else REVIEW_STEP
     draft.draft_data_json = draft_data
@@ -579,13 +664,17 @@ def _advance_step(draft: ReportDraft, current_step: ReportStep) -> ReportStep | 
     return next_step
 
 
-def _step_after(current_step: ReportStep) -> ReportStep | None:
-    step_keys = [step.key for step in REPORT_STEPS]
-    next_index = step_keys.index(current_step.key) + 1
-    if next_index >= len(REPORT_STEPS):
-        return None
+def _first_incomplete_step(completed_steps: list[str]) -> ReportStep | None:
+    completed_step_set = set(completed_steps)
+    return next(
+        (step for step in REPORT_STEPS if step.key not in completed_step_set),
+        None,
+    )
 
-    return REPORT_STEPS[next_index]
+
+def _step_index(step: ReportStep) -> int:
+    step_keys = [report_step.key for report_step in REPORT_STEPS]
+    return step_keys.index(step.key)
 
 
 def _next_question(
