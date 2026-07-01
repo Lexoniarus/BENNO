@@ -448,6 +448,28 @@ def test_report_web_flow_creates_confirmed_final_report(app) -> None:
     assert final_report.status == ReportStatus.CONFIRMED.value
 
 
+def test_report_message_route_preserves_raw_user_message(app) -> None:
+    seed_database()
+    raw_message = "  Müller aus Köln spricht über größere Mengen.  \n"
+
+    with app.test_client() as client:
+        _login(client, "sales@benno.local", "sales-demo-password")
+        start_response = client.get("/sales/reports/new")
+        chat_id = _chat_id_from_redirect(start_response.location)
+        response = client.post(
+            f"/sales/reports/{chat_id}/messages",
+            data={"message": raw_message},
+        )
+
+    chat = db.session.get(Chat, chat_id)
+    user_message = chat.messages[1]
+    answers = chat.report_draft.draft_data_json["answers"]
+
+    assert response.status_code == 302
+    assert user_message.message_text == raw_message
+    assert answers["customer_context"] == raw_message.strip()
+
+
 def test_review_correction_route_updates_review_content(app) -> None:
     seed_database()
 

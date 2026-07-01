@@ -207,7 +207,7 @@ def process_report_message_with_ai(
     if not normalized_message:
         raise ValueError("Message text must not be empty.")
 
-    _add_user_message(chat, normalized_message)
+    _add_user_message(chat, message_text)
 
     current_step = _current_step(draft)
     if current_step is None:

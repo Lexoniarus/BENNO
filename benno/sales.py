@@ -114,8 +114,8 @@ def report_chat(chat_id: int):
 def report_message(chat_id: int):
     """Store a user message and advance the report chat."""
     chat = _get_own_chat_or_404(chat_id)
-    message_text = request.form.get("message", "").strip()
-    if not message_text:
+    message_text = request.form.get("message", "")
+    if not message_text.strip():
         flash("Please enter a message before sending.", "warning")
         return redirect(url_for("sales.report_chat", chat_id=chat.id))
 
