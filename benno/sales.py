@@ -7,6 +7,7 @@ from benno.auth import sales_required
 from benno.enums import ReportStatus
 from benno.models import Chat, FinalReport
 from benno.services.report_loop import (
+    apply_report_correction,
     build_report_review,
     cancel_report,
     confirm_report,
@@ -114,6 +115,21 @@ def report_review(chat_id: int):
         chat=chat,
         review=build_report_review(chat.report_draft),
     )
+
+
+@sales_blueprint.post("/reports/<int:chat_id>/corrections")
+@sales_required
+def report_correction(chat_id: int):
+    """Apply a targeted correction to a report draft under review."""
+    chat = _get_own_chat_or_404(chat_id)
+    field_key = request.form.get("field_key", "").strip()
+    correction_text = request.form.get("correction_text", "").strip()
+    try:
+        apply_report_correction(chat, field_key, correction_text)
+    except ValueError as error:
+        flash(str(error), "warning")
+
+    return redirect(url_for("sales.report_review", chat_id=chat.id))
 
 
 @sales_blueprint.post("/reports/<int:chat_id>/confirm")

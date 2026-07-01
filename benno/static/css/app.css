@@ -250,6 +250,7 @@ body {
 }
 
 .form-stack input,
+.form-stack select,
 .form-stack textarea {
   width: 100%;
   min-height: 46px;
@@ -266,6 +267,7 @@ body {
 }
 
 .form-stack input:focus,
+.form-stack select:focus,
 .form-stack textarea:focus {
   border-color: var(--color-accent-strong);
   box-shadow: 0 0 0 3px rgba(235, 229, 102, 0.45);

@@ -3,6 +3,7 @@
 from benno.enums import (
     InsideSalesTaskType,
     MessageSender,
+    MessageType,
     ReportStatus,
     UserRole,
 )
@@ -10,6 +11,7 @@ from benno.extensions import db
 from benno.models import Chat, FinalReport, InsideSalesTask, User
 from benno.seed import seed_database
 from benno.services.report_loop import (
+    apply_report_correction,
     confirm_report,
     process_report_message,
     start_report_chat,
@@ -113,6 +115,27 @@ def test_service_creates_inside_sales_tasks_for_clear_cases(app) -> None:
     assert InsideSalesTaskType.CLARIFY_DETAILS.value in task_types
 
 
+def test_service_applies_review_correction_before_confirmation(app) -> None:
+    seed_database()
+    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    chat = start_report_chat(sales_user)
+
+    for answer in STANDARD_ANSWERS:
+        process_report_message(chat, answer)
+
+    apply_report_correction(chat, "summary", "Corrected summary after review.")
+    final_report = confirm_report(chat)
+    correction_message = next(
+        message
+        for message in chat.messages
+        if message.message_type == MessageType.CORRECTION.value
+    )
+
+    assert chat.report_draft.summary == "Corrected summary after review."
+    assert final_report.summary == "Corrected summary after review."
+    assert correction_message.message_text == "summary: Corrected summary after review."
+
+
 def test_normal_known_customer_flow_creates_no_inside_sales_task(app) -> None:
     seed_database()
     sales_user = User.query.filter_by(email="sales@benno.local").one()
@@ -164,6 +187,37 @@ def test_report_web_flow_creates_confirmed_final_report(app) -> None:
     assert b"Confirm and Save" in review_response.data
     assert confirm_response.status_code == 302
     assert final_report.status == ReportStatus.CONFIRMED.value
+
+
+def test_review_correction_route_updates_review_content(app) -> None:
+    seed_database()
+
+    with app.test_client() as client:
+        _login(client, "sales@benno.local", "sales-demo-password")
+        start_response = client.get("/sales/reports/new")
+        chat_id = _chat_id_from_redirect(start_response.location)
+
+        for answer in STANDARD_ANSWERS:
+            client.post(
+                f"/sales/reports/{chat_id}/messages",
+                data={"message": answer},
+            )
+
+        correction_response = client.post(
+            f"/sales/reports/{chat_id}/corrections",
+            data={
+                "field_key": "summary",
+                "correction_text": "Corrected web summary.",
+            },
+        )
+        review_response = client.get(f"/sales/reports/{chat_id}/review")
+
+    chat = db.session.get(Chat, chat_id)
+    assert correction_response.status_code == 302
+    assert correction_response.location == f"/sales/reports/{chat_id}/review"
+    assert chat.report_draft.summary == "Corrected web summary."
+    assert b"Corrected web summary." in review_response.data
+    assert b"Apply Correction" in review_response.data
 
 
 def test_confirmed_report_cannot_be_cancelled(app) -> None:

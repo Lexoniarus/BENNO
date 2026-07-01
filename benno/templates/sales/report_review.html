@@ -22,6 +22,19 @@
       <pre>{{ review.final_report_text }}</pre>
     </article>
 
+    <form class="form-stack review-correction" method="post" action="{{ url_for('sales.report_correction', chat_id=chat.id) }}">
+      <label for="field_key">Correction field</label>
+      <select id="field_key" name="field_key" required>
+        {% for field_key, label in review.correction_fields %}
+          <option value="{{ field_key }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+
+      <label for="correction_text">Correction</label>
+      <textarea id="correction_text" name="correction_text" rows="3" required></textarea>
+      <button class="button" type="submit">Apply Correction</button>
+    </form>
+
     <div class="action-row">
       <form method="post" action="{{ url_for('sales.confirm_report_route', chat_id=chat.id) }}">
         <button class="button" type="submit">Confirm and Save</button>

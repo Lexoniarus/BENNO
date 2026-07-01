@@ -58,6 +58,19 @@ RATING_FIELDS = (
     ("need_for_action", "need for action"),
     ("customer_satisfaction", "customer satisfaction"),
 )
+BASE_CORRECTION_FIELDS = (
+    ("customer_context", "Customer or Lead"),
+    ("contacts", "Contacts"),
+    ("visit_reason", "Visit Reason"),
+    ("summary", "Summary"),
+    ("outcome", "Outcome"),
+    ("next_action", "Next Action"),
+    ("offer_reference", "Offer Reference"),
+    ("order_reference", "Order Reference"),
+)
+CORRECTION_FIELDS = BASE_CORRECTION_FIELDS + tuple(
+    (f"rating_{rating_key}", f"Rating: {label}") for rating_key, label in RATING_FIELDS
+)
 
 REPORT_STEPS = (
     ReportStep(
@@ -173,6 +186,39 @@ def process_report_message(chat: Chat, message_text: str) -> Chat:
     return chat
 
 
+def apply_report_correction(
+    chat: Chat,
+    field_key: str,
+    correction_text: str,
+) -> Chat:
+    """Apply a targeted correction during final review."""
+    draft = _require_draft(chat)
+    _ensure_report_is_mutable(chat)
+    if not _is_ready_for_review(draft):
+        raise ValueError("Corrections are only available during final review.")
+
+    normalized_correction = correction_text.strip()
+    if not normalized_correction:
+        raise ValueError("Correction text must not be empty.")
+
+    correction_step = _correction_step(field_key)
+    _add_correction_message(chat, correction_step.key, normalized_correction)
+    _apply_step_answer(draft, correction_step, normalized_correction)
+    _refresh_missing_sections(draft)
+    draft.report_status = ReportStatus.READY_FOR_REVIEW.value
+    chat.status = ReportStatus.READY_FOR_REVIEW.value
+    draft.last_question = "Correction saved. Please review the report again."
+    draft.draft_data_json = {
+        **_draft_data(draft),
+        "current_step": REVIEW_STEP,
+    }
+    _set_section_status(draft, ReportSection.FINAL_REPORT, SectionStatus.DETECTED)
+    _add_assistant_message(chat, draft.last_question)
+    db.session.commit()
+
+    return chat
+
+
 def build_report_review(draft: ReportDraft) -> dict[str, Any]:
     """Build a human-readable review from a report draft."""
     draft_data = _draft_data(draft)
@@ -198,6 +244,7 @@ def build_report_review(draft: ReportDraft) -> dict[str, Any]:
             ("Inside Sales Tasks", _format_task_preview(draft)),
         ],
         "final_report_text": _build_final_report_text(draft),
+        "correction_fields": CORRECTION_FIELDS,
         "status": draft.report_status,
     }
 
@@ -281,6 +328,17 @@ def _current_step(draft: ReportDraft) -> ReportStep | None:
         return None
 
     return next((step for step in REPORT_STEPS if step.key == current_key), None)
+
+
+def _correction_step(field_key: str) -> ReportStep:
+    correction_step = next(
+        (step for step in REPORT_STEPS if step.key == field_key),
+        None,
+    )
+    if correction_step is None:
+        raise ValueError("Unknown correction field.")
+
+    return correction_step
 
 
 def _apply_step_answer(
@@ -368,6 +426,9 @@ def _update_customer_context(draft: ReportDraft, message_text: str) -> None:
     normalized_text = message_text.lower()
     customer_matches = find_customers(message_text)
     lead_matches = find_leads(message_text)
+    draft.customer = None
+    draft.lead = None
+    draft.contact = None
 
     if _mentions_new(normalized_text) or "lead" in normalized_text:
         draft.customer_context_type = CustomerContextType.NEW_LEAD.value
@@ -391,6 +452,7 @@ def _update_customer_context(draft: ReportDraft, message_text: str) -> None:
 
 
 def _update_contacts(draft: ReportDraft, message_text: str) -> None:
+    draft.contact = None
     if draft.customer_id is None:
         return
 
@@ -400,6 +462,7 @@ def _update_contacts(draft: ReportDraft, message_text: str) -> None:
 
 
 def _update_offer_reference(draft: ReportDraft, message_text: str) -> None:
+    draft.related_offer = None
     if _is_none_answer(message_text):
         draft.external_offer_reference = None
         return
@@ -414,7 +477,12 @@ def _update_offer_reference(draft: ReportDraft, message_text: str) -> None:
 
 
 def _update_order_reference(draft: ReportDraft, message_text: str) -> None:
+    draft.related_order = None
     if _is_none_answer(message_text):
+        draft.draft_data_json = {
+            **_draft_data(draft),
+            "order_reference_raw": None,
+        }
         return
 
     draft.draft_data_json = {
@@ -676,6 +744,15 @@ def _is_unclear_answer(normalized_text: str) -> bool:
 
 def _add_user_message(chat: Chat, message_text: str) -> None:
     _add_message(chat, MessageSender.USER, message_text, MessageType.FREE_INPUT)
+
+
+def _add_correction_message(chat: Chat, field_key: str, message_text: str) -> None:
+    _add_message(
+        chat,
+        MessageSender.USER,
+        f"{field_key}: {message_text}",
+        MessageType.CORRECTION,
+    )
 
 
 def _add_assistant_message(chat: Chat, message_text: str) -> None:
