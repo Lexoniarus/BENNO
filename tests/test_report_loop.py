@@ -65,6 +65,7 @@ def test_ai_analysis_can_assist_current_step_without_direct_saving(app) -> None:
                 "customer_context": "Nordlicht Maschinenbau GmbH",
                 "summary": "This must not be saved yet.",
             },
+            suggested_next_section="contacts",
             suggested_next_question="Who participated in the meeting?",
         )
     )
@@ -79,6 +80,30 @@ def test_ai_analysis_can_assist_current_step_without_direct_saving(app) -> None:
     assert ai_service.analysis_calls == 1
     assert answers["customer_context"] == "Nordlicht Maschinenbau GmbH"
     assert chat.report_draft.summary is None
+    assert chat.messages[-1].message_text == "Who participated in the meeting?"
+
+
+def test_ai_question_is_ignored_when_next_section_does_not_match(app) -> None:
+    seed_database()
+    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    chat = start_report_chat(sales_user)
+    ai_service = _FakeAiService(
+        analysis=AiMessageAnalysis(
+            intent=UserIntent.ANSWER,
+            intent_confidence=0.92,
+            target_sections=["customer_context"],
+            section_updates={"customer_context": "Nordlicht Maschinenbau GmbH"},
+            suggested_next_section="outcome",
+            suggested_next_question="What was the outcome?",
+        )
+    )
+
+    process_report_message_with_ai(
+        chat,
+        "I visited Nordlicht.",
+        ai_service,
+    )
+
     assert chat.messages[-1].message_text == "Who participated in the meeting?"
 
 

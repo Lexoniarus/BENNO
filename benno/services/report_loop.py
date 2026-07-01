@@ -459,6 +459,7 @@ def _sanitize_ai_analysis(analysis: AiMessageAnalysis) -> AiMessageAnalysis:
             for key, value in analysis.section_updates.items()
             if key in allowed_keys and isinstance(value, str) and value.strip()
         },
+        suggested_next_section=_clean_section_key(analysis.suggested_next_section),
         suggested_next_question=_clean_ai_text(analysis.suggested_next_question, 500),
     )
 
@@ -488,7 +489,7 @@ def _suggested_question(
     suggested_question = analysis.suggested_next_question
     if not suggested_question:
         return None
-    if next_step.key not in _allowed_update_keys():
+    if analysis.suggested_next_section != next_step.key:
         return None
 
     return suggested_question
@@ -524,6 +525,17 @@ def _clean_ai_text(value: str | None, max_length: int) -> str | None:
         return None
 
     return cleaned_value[:max_length]
+
+
+def _clean_section_key(value: str | None) -> str | None:
+    if value is None:
+        return None
+
+    cleaned_value = value.strip()
+    if cleaned_value not in _allowed_update_keys():
+        return None
+
+    return cleaned_value
 
 
 def _advance_step(draft: ReportDraft, current_step: ReportStep) -> ReportStep | None:

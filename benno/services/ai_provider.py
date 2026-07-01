@@ -23,6 +23,7 @@ class AiMessageAnalysis(BaseModel):
     intent_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     target_sections: list[str] = Field(default_factory=list)
     section_updates: dict[str, str] = Field(default_factory=dict)
+    suggested_next_section: str | None = None
     suggested_next_question: str | None = None
 
 
@@ -79,4 +80,7 @@ def get_ai_service() -> AiService:
     model = current_app.config.get("GEMINI_MODEL", "gemini-2.5-flash-lite")
     from benno.services.gemini_provider import GeminiService
 
-    return GeminiService(api_key=api_key, model=model)
+    try:
+        return GeminiService(api_key=api_key, model=model)
+    except AiProviderError:
+        return NullAiService()

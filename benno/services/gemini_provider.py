@@ -19,9 +19,13 @@ class GeminiService:
         except ImportError as error:
             raise AiProviderError("Google GenAI SDK is not installed.") from error
 
-        self._client = genai.Client(api_key=api_key)
-        self._types = types
+        try:
+            self._client = genai.Client(api_key=api_key)
+        except Exception as error:
+            raise AiProviderError("Gemini client initialization failed.") from error
+
         self._model = model
+        self._types = types
 
     def analyze_report_message(
         self,
@@ -115,6 +119,9 @@ customer_context, contacts, visit_reason, summary, outcome, next_action,
 offer_reference, order_reference, rating_sales_opportunity, rating_meeting_mood,
 rating_priority, rating_closing_probability, rating_need_for_action,
 rating_customer_satisfaction.
+
+Only provide suggested_next_question if suggested_next_section is exactly the
+next report section the question is about.
 
 Context:
 {context_json}

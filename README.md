@@ -33,7 +33,9 @@ flask --app benno:create_app run
 
 Open `http://127.0.0.1:5000` in a browser.
 
-Demo logins after `seed-db`:
+## Demo Logins
+
+After running `seed-db`, these mock users are available:
 
 - `admin@benno.local` / `admin-demo-password`
 - `sales@benno.local` / `sales-demo-password`
