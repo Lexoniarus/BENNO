@@ -77,10 +77,24 @@ body {
 }
 
 .topbar__brand {
+  display: inline-flex;
+  width: 154px;
+  flex: 0 0 auto;
+  align-items: center;
   color: var(--color-accent);
-  font-size: 1.2rem;
-  font-weight: 800;
   text-decoration: none;
+}
+
+.topbar__logo,
+.brand-logo {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.auth-panel__logo {
+  width: min(210px, 62vw);
+  margin-bottom: 24px;
 }
 
 .topbar__nav {

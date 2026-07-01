@@ -4,6 +4,11 @@
 
 {% block content %}
   <section class="auth-panel" aria-labelledby="login-title">
+    <img
+      class="brand-logo auth-panel__logo"
+      src="{{ url_for('static', filename='img/benno-logo.svg') }}"
+      alt="BENNO"
+    >
     <p class="hero__eyebrow">B2B field sales assistant</p>
     <h1 id="login-title">BENNO</h1>
     <p class="hero__subtitle">B2B Encounter Notes and Next-step Organizer</p>

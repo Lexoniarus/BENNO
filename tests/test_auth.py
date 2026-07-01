@@ -14,6 +14,15 @@ def test_login_page_loads(app) -> None:
 
     assert response.status_code == 200
     assert b"BENNO" in response.data
+    assert b"img/benno-logo.svg" in response.data
+
+
+def test_logo_asset_is_available(app) -> None:
+    with app.test_client() as client:
+        response = client.get("/static/img/benno-logo.svg")
+
+    assert response.status_code == 200
+    assert response.mimetype == "image/svg+xml"
 
 
 def test_valid_admin_login_redirects_to_admin_dashboard(app) -> None:

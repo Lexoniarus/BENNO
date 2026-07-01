@@ -10,7 +10,13 @@
   <body>
     {% if current_user.is_authenticated %}
       <header class="topbar">
-        <a class="topbar__brand" href="{{ url_for('main.index') }}">BENNO</a>
+        <a class="topbar__brand" href="{{ url_for('main.index') }}">
+          <img
+            class="topbar__logo"
+            src="{{ url_for('static', filename='img/benno-logo.svg') }}"
+            alt="BENNO"
+          >
+        </a>
         <nav class="topbar__nav" aria-label="Main navigation">
           {% if current_user.is_sales_rep %}
             <a href="{{ url_for('sales.dashboard') }}">Sales</a>
