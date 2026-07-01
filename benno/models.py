@@ -92,7 +92,7 @@ class GlobalSetting(db.Model, TimestampMixin):
     ai_provider = db.Column(
         db.String(50),
         nullable=False,
-        default=AiProvider.OPENAI.value,
+        default=AiProvider.GEMINI.value,
     )
 
 

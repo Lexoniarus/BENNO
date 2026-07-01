@@ -73,7 +73,7 @@ The MVP includes:
 Current scope boundaries:
 
 - The first vertical slice is text-based.
-- STT and TTS are added after the text-based OpenAI workflow can create and save a stable report.
+- STT and TTS are added after the text-based Gemini workflow can create and save a stable report.
 - The MVP uses a local placeholder CRM/ERP service before any real eNVenta integration.
 - The exact eNVenta visit report field mapping is added once the field list is available.
 - The admin area stays simple in the first slice.
@@ -126,7 +126,7 @@ Templates: Jinja
 Frontend interaction: Vanilla JavaScript
 Styling: responsive HTML/CSS
 Database: SQLite
-First LLM provider: OpenAI API
+First LLM provider: Gemini API
 Later privacy-focused provider: local OpenAI-compatible API, for example LM Studio
 CRM/ERP: local placeholder service/API
 ```
@@ -230,14 +230,15 @@ For the first vertical slice, the session language is the controlling language.
 
 ## 11. AI Provider Strategy
 
-The first vertical slice uses OpenAI as the initial real LLM provider.
+The first vertical slice uses Gemini as the initial real LLM provider.
 
-After the OpenAI-based workflow runs smoothly, the project should move toward a local provider. This local direction is primarily motivated by privacy and data protection considerations, not by a requirement to support many external providers.
+After the Gemini-based workflow runs smoothly, the project should move toward a local provider. This local direction is primarily motivated by privacy and data protection considerations, not by a requirement to support many external providers.
 
 The provider architecture should remain exchangeable. The planned provider options are:
 
 ```python
 class AiProvider(str, Enum):
+    GEMINI = "gemini"
     OPENAI = "openai"
     LOCAL = "local"
 ```
@@ -252,7 +253,7 @@ Rules:
 
 Current provider sequence:
 
-1. Build and stabilize the workflow with OpenAI.
+1. Build and stabilize the workflow with Gemini.
 2. Keep the provider abstraction compatible with local OpenAI-style APIs.
 3. Move to a local provider once the workflow is stable.
 
@@ -262,7 +263,7 @@ The project has a local-first target direction, but local LLMs are not the first
 
 The intended order is:
 
-1. Stabilize the dialog workflow with OpenAI.
+1. Stabilize the dialog workflow with Gemini.
 2. Keep the provider abstraction compatible with local OpenAI-style APIs.
 3. Add LM Studio or another local OpenAI-compatible runtime.
 4. Evaluate local model quality against the same workflow.
@@ -645,15 +646,15 @@ The following decisions define the current MVP direction:
 |---|---|
 | Backend/frontend stack | Flask, Jinja, Vanilla JavaScript, SQLite for Vertical Slice 1 |
 | Provider selection by user | Removed from sales UI; provider is an admin setting |
-| OpenAI | First real LLM provider |
-| Local provider | Planned after the OpenAI workflow is stable, using an OpenAI-compatible local API |
+| Gemini | First real LLM provider |
+| Local provider | Planned after the Gemini workflow is stable, using an OpenAI-compatible local API |
 | Ratings | Six ratings on a 1-10 scale are mandatory |
 | Task types | Use four canonical inside sales task types |
 | CRM | Placeholder CRM/ERP counterpart, not application core |
 | Database | SQLite is sufficient for the MVP, using mock tables that reflect the expected eNVenta data shape once the field list is available |
 | Admin status overview | Keep it simple in the first slice; expand later only if time allows |
 | Voice | Target layer after text workflow, not part of Vertical Slice 1 |
-| STT/TTS timing | Add and test STT/TTS after a stable text-based report can be created and saved with OpenAI |
+| STT/TTS timing | Add and test STT/TTS after a stable text-based report can be created and saved with Gemini |
 | Audio persistence | No long-term raw audio archive |
 | Language | Session language controls first slice behavior |
 
@@ -663,8 +664,8 @@ The following decisions remain open, deferred, or dependent on external input:
 
 | Topic | Current status |
 |---|---|
-| OpenAI model | Still open; decide after mentor feedback |
-| Local LLM candidates | Deferred until the OpenAI workflow is stable |
+| Gemini model | Default for Phase 5 is `gemini-2.5-flash-lite`; `gemini-3.1-flash-lite` remains a later comparison model |
+| Local LLM candidates | Deferred until the Gemini workflow is stable |
 | eNVenta visit report fields | Pending Bernd's field list, expected Friday, June 26, 2026 |
 | Placeholder CRM/ERP API contract | Pending the eNVenta field list; define the contract once the required fields are known |
 | Setup/password reset token flow | Needs clarification: decide whether the first slice needs real setup/reset tokens or only seeded demo users |
@@ -681,7 +682,7 @@ The next practical step is to define the Flask project structure for Vertical Sl
 - seed data
 - first chat turn flow
 - report draft object
-- OpenAI provider abstraction
+- Gemini provider abstraction
 - placeholder CRM/ERP service
 
 The first implementation should stay small and prove the full report lifecycle before adding audio, real CRM/ERP integration, or local LLM complexity.

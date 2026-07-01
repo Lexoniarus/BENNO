@@ -189,11 +189,11 @@ Required behavior:
 
 Done when:
 
-- A complete report can be saved without OpenAI.
+- A complete report can be saved without a real AI provider.
 - The flow from start to save can be demonstrated.
 - Corrections are not lost.
 
-## Phase 5: OpenAI Integration
+## Phase 5: Gemini Provider Integration
 
 Goal:
 
@@ -201,7 +201,7 @@ BENNO understands free text better and responds more naturally.
 
 Scope:
 
-- OpenAI provider service
+- Gemini provider service
 - controlled AI response structure
 - extraction from free user input
 - intent detection
@@ -224,7 +224,7 @@ The code still decides:
 
 Done when:
 
-- OpenAI can interpret free visit descriptions usefully.
+- Gemini can interpret free visit descriptions usefully.
 - Follow-up questions become more natural.
 - Review and final report text are understandable.
 - Backend code remains in control of saving and status transitions.
@@ -358,7 +358,7 @@ Scope:
 
 - local provider through an OpenAI-compatible API
 - for example LM Studio
-- same provider contract as OpenAI
+- same provider contract shape as the Gemini provider
 - comparison against the same demo cases
 
 Questions to test:
@@ -372,7 +372,7 @@ Questions to test:
 Done when:
 
 - The same text loop can be tested with a local provider.
-- Differences to OpenAI are documented.
+- Differences to Gemini are documented.
 - There is enough evidence to decide how far BENNO can run locally.
 
 ## Recommended Start
@@ -389,4 +389,4 @@ Then move directly to Phase 4:
 
 > A complete report loop from "New report" to "saved".
 
-This loop is the foundation. Once it works, OpenAI, voice, eNVenta field mapping, and the local provider are extensions on a stable core.
+This loop is the foundation. Once it works, Gemini, voice, eNVenta field mapping, and the local provider are extensions on a stable core.

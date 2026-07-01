@@ -1,8 +1,8 @@
 """Tests for BENNO database CLI commands."""
 
-from benno.enums import UserRole
+from benno.enums import AiProvider, UserRole
 from benno.extensions import db
-from benno.models import MockCustomer, User
+from benno.models import GlobalSetting, MockCustomer, User
 
 
 def test_init_db_command_runs_successfully(app) -> None:
@@ -24,6 +24,7 @@ def test_seed_db_command_creates_demo_data_without_duplicates(app) -> None:
     assert second_result.exit_code == 0
     assert db.session.query(User).filter_by(role=UserRole.ADMIN.value).count() == 1
     assert db.session.query(User).filter_by(role=UserRole.SALES_REP.value).count() == 1
+    assert db.session.query(GlobalSetting).one().ai_provider == AiProvider.GEMINI.value
     assert db.session.query(MockCustomer).count() == 4
 
 

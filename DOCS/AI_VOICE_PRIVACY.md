@@ -10,12 +10,12 @@ It consolidates valid content from the archived German notes while keeping only 
 
 The current provider sequence is:
 
-1. Build and stabilize the text workflow with OpenAI.
+1. Build and stabilize the text workflow with Gemini.
 2. Keep the provider abstraction compatible with OpenAI-style local APIs.
 3. Add a local provider after the workflow is stable.
 4. Compare local model behavior against the same demo scenarios.
 
-OpenAI is the first implementation provider because it gives the best chance of stabilizing the business workflow quickly.
+Gemini is the first implementation provider because the current project path and available key make it the most practical first real AI integration.
 
 The local provider direction is primarily motivated by privacy and data protection.
 
@@ -33,7 +33,7 @@ The application should be able to ask for:
 - final review wording
 - final report wording
 
-The rest of the application should not need to know whether the response came from OpenAI or a later local provider.
+The rest of the application should not need to know whether the response came from Gemini or a later local provider.
 
 ## AI Responsibility Boundary
 
@@ -63,13 +63,13 @@ Guiding principle:
 
 ## Local Provider Direction
 
-The local provider is planned after the OpenAI workflow is stable.
+The local provider is planned after the Gemini workflow is stable.
 
 Likely technical direction:
 
 - OpenAI-compatible local API
 - LM Studio or a similar local runtime
-- same provider contract as OpenAI
+- same provider contract shape as Gemini
 
 Local models may require:
 
@@ -185,7 +185,7 @@ Not persisted as long-term records:
 Main risks:
 
 - AI extraction may be unreliable for free-form text.
-- Local models may be weaker than OpenAI for structured extraction.
+- Local models may be weaker than Gemini for structured extraction.
 - Long prompts may become expensive or slow.
 - Sensitive content must not be logged unnecessarily.
 - Raw audio must not accidentally become persistent business data.
@@ -198,4 +198,4 @@ Mitigation:
 - use clear prompt contracts
 - log carefully
 - test with fixed demo scenarios
-- add local provider only after the text workflow is stable
+- add local provider only after the Gemini text workflow is stable

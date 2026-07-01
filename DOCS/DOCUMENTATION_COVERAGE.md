@@ -38,12 +38,12 @@ Use these documents for current implementation and product work:
 
 The following topics appeared in earlier notes but are not current implementation guidance:
 
-- Gemini is not part of the current MVP baseline.
+- Gemini is the first real AI provider for the current MVP baseline.
 - FastAPI and React are not the current first-slice stack.
 - Sales users do not choose the AI provider.
 - SQLite is sufficient for the MVP.
 - The first implementation starts with text, not voice.
-- Local AI is a later privacy-oriented provider step after the OpenAI workflow is stable.
+- Local AI is a later privacy-oriented provider step after the Gemini workflow is stable.
 - The exact eNVenta field mapping waits for Bernd's field list.
 - The first slice uses seeded users instead of setup/reset links.
 
@@ -57,4 +57,3 @@ German may still appear in:
 - user-facing German UI copy
 - demo conversation examples where German is intentionally tested
 - source material received from external stakeholders
-

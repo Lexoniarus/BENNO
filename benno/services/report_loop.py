@@ -26,6 +26,12 @@ from benno.models import (
     User,
     utc_now,
 )
+from benno.services.ai_provider import (
+    AiMessageAnalysis,
+    AiProviderError,
+    AiService,
+    get_ai_service,
+)
 from benno.services.mock_crm import (
     find_contacts,
     find_customers,
@@ -35,6 +41,7 @@ from benno.services.mock_crm import (
 )
 
 REVIEW_STEP = "review"
+AI_CACHE_KEY = "ai_cache"
 MUTABLE_REPORT_STATUSES = {
     ReportStatus.IN_PROGRESS.value,
     ReportStatus.READY_FOR_REVIEW.value,
@@ -163,6 +170,15 @@ def start_report_chat(sales_user: User) -> Chat:
 
 def process_report_message(chat: Chat, message_text: str) -> Chat:
     """Store a user answer and advance the deterministic report state."""
+    return process_report_message_with_ai(chat, message_text, get_ai_service())
+
+
+def process_report_message_with_ai(
+    chat: Chat,
+    message_text: str,
+    ai_service: AiService | None,
+) -> Chat:
+    """Store a user answer and advance the assisted report state."""
     draft = _require_draft(chat)
     _ensure_report_is_mutable(chat)
     normalized_message = message_text.strip()
@@ -177,9 +193,16 @@ def process_report_message(chat: Chat, message_text: str) -> Chat:
         db.session.commit()
         return chat
 
-    _apply_step_answer(draft, current_step, normalized_message)
+    analysis = _analyze_report_message(
+        draft,
+        current_step,
+        normalized_message,
+        ai_service,
+    )
+    answer_text = _answer_for_step(current_step, normalized_message, analysis)
+    _apply_step_answer(draft, current_step, answer_text)
     next_step = _advance_step(draft, current_step)
-    next_question = _next_question(chat, next_step)
+    next_question = _next_question(chat, next_step, analysis)
     _add_assistant_message(chat, next_question)
     db.session.commit()
 
@@ -219,12 +242,18 @@ def apply_report_correction(
     return chat
 
 
-def build_report_review(draft: ReportDraft) -> dict[str, Any]:
+def build_report_review(
+    draft: ReportDraft,
+    ai_service: AiService | None = None,
+) -> dict[str, Any]:
     """Build a human-readable review from a report draft."""
     draft_data = _draft_data(draft)
     answers = draft_data.get("answers", {})
+    review_text = _review_text(draft, ai_service)
+    final_report_text = _final_report_text(draft, ai_service)
 
     return {
+        "review_text": review_text,
         "sections": [
             ("Customer or Lead", _display_value(answers.get("customer_context"))),
             ("Contacts", _display_value(answers.get("contacts"))),
@@ -243,13 +272,16 @@ def build_report_review(draft: ReportDraft) -> dict[str, Any]:
             ("Ratings", _format_ratings(draft.ratings_json)),
             ("Inside Sales Tasks", _format_task_preview(draft)),
         ],
-        "final_report_text": _build_final_report_text(draft),
+        "final_report_text": final_report_text,
         "correction_fields": CORRECTION_FIELDS,
         "status": draft.report_status,
     }
 
 
-def confirm_report(chat: Chat) -> FinalReport:
+def confirm_report(
+    chat: Chat,
+    ai_service: AiService | None = None,
+) -> FinalReport:
     """Create or return the confirmed final report for a completed chat."""
     draft = _require_draft(chat)
     if chat.final_report is not None:
@@ -276,7 +308,7 @@ def confirm_report(chat: Chat) -> FinalReport:
         follow_up_date=draft.follow_up_date,
         ratings_json=dict(draft.ratings_json),
         report_language=draft.session_language,
-        final_report_text=_build_final_report_text(draft),
+        final_report_text=_final_report_text(draft, ai_service),
         status=ReportStatus.CONFIRMED.value,
         confirmed_at=utc_now(),
     )
@@ -346,6 +378,7 @@ def _apply_step_answer(
     step: ReportStep,
     message_text: str,
 ) -> None:
+    _clear_ai_cache(draft)
     draft_data = _draft_data(draft)
     answers = dict(draft_data.get("answers", {}))
     answers[step.key] = message_text
@@ -373,6 +406,124 @@ def _apply_step_answer(
         _update_rating(draft, step.key, message_text)
 
     _set_section_status(draft, step.section, _section_status_for_answer(step, draft))
+
+
+def _analyze_report_message(
+    draft: ReportDraft,
+    current_step: ReportStep,
+    message_text: str,
+    ai_service: AiService | None,
+) -> AiMessageAnalysis | None:
+    if ai_service is None:
+        return None
+
+    context = _ai_message_context(draft, current_step)
+    try:
+        analysis = ai_service.analyze_report_message(context, message_text)
+    except AiProviderError:
+        _store_ai_error(draft, "message_analysis_failed")
+        return None
+
+    if analysis is None:
+        return None
+
+    sanitized_analysis = _sanitize_ai_analysis(analysis)
+    _store_ai_analysis(draft, sanitized_analysis)
+    return sanitized_analysis
+
+
+def _ai_message_context(
+    draft: ReportDraft,
+    current_step: ReportStep,
+) -> dict[str, Any]:
+    return {
+        "current_step": current_step.key,
+        "current_question": current_step.question,
+        "missing_sections": list(draft.missing_sections_json),
+        "known_answers": dict(_draft_data(draft).get("answers", {})),
+        "ratings": dict(draft.ratings_json),
+        "allowed_section_update_keys": _allowed_update_keys(),
+    }
+
+
+def _sanitize_ai_analysis(analysis: AiMessageAnalysis) -> AiMessageAnalysis:
+    allowed_keys = set(_allowed_update_keys())
+    return AiMessageAnalysis(
+        intent=analysis.intent,
+        intent_confidence=analysis.intent_confidence,
+        target_sections=[
+            section for section in analysis.target_sections if section in allowed_keys
+        ],
+        section_updates={
+            key: value.strip()
+            for key, value in analysis.section_updates.items()
+            if key in allowed_keys and isinstance(value, str) and value.strip()
+        },
+        suggested_next_question=_clean_ai_text(analysis.suggested_next_question, 500),
+    )
+
+
+def _answer_for_step(
+    step: ReportStep,
+    message_text: str,
+    analysis: AiMessageAnalysis | None,
+) -> str:
+    if analysis is None:
+        return message_text
+
+    suggested_value = analysis.section_updates.get(step.key)
+    if not suggested_value:
+        return message_text
+
+    return suggested_value
+
+
+def _suggested_question(
+    next_step: ReportStep,
+    analysis: AiMessageAnalysis | None,
+) -> str | None:
+    if analysis is None:
+        return None
+
+    suggested_question = analysis.suggested_next_question
+    if not suggested_question:
+        return None
+    if next_step.key not in _allowed_update_keys():
+        return None
+
+    return suggested_question
+
+
+def _allowed_update_keys() -> list[str]:
+    return [step.key for step in REPORT_STEPS]
+
+
+def _store_ai_analysis(
+    draft: ReportDraft,
+    analysis: AiMessageAnalysis,
+) -> None:
+    draft.draft_data_json = {
+        **_draft_data(draft),
+        "last_ai_analysis": analysis.model_dump(mode="json"),
+    }
+
+
+def _store_ai_error(draft: ReportDraft, error_code: str) -> None:
+    draft.draft_data_json = {
+        **_draft_data(draft),
+        "last_ai_error": error_code,
+    }
+
+
+def _clean_ai_text(value: str | None, max_length: int) -> str | None:
+    if value is None:
+        return None
+
+    cleaned_value = value.strip()
+    if not cleaned_value:
+        return None
+
+    return cleaned_value[:max_length]
 
 
 def _advance_step(draft: ReportDraft, current_step: ReportStep) -> ReportStep | None:
@@ -404,12 +555,16 @@ def _step_after(current_step: ReportStep) -> ReportStep | None:
     return REPORT_STEPS[next_index]
 
 
-def _next_question(chat: Chat, next_step: ReportStep | None) -> str:
+def _next_question(
+    chat: Chat,
+    next_step: ReportStep | None,
+    analysis: AiMessageAnalysis | None,
+) -> str:
     draft = _require_draft(chat)
     if next_step is None:
         message = _review_ready_message(chat)
     else:
-        message = next_step.question
+        message = _suggested_question(next_step, analysis) or next_step.question
 
     draft.last_question = message
     return message
@@ -598,6 +753,104 @@ def _is_ready_for_review(draft: ReportDraft) -> bool:
         draft.report_status == ReportStatus.READY_FOR_REVIEW.value
         and draft.missing_sections_json == []
     )
+
+
+def _review_text(draft: ReportDraft, ai_service: AiService | None) -> str | None:
+    return _cached_ai_text(
+        draft=draft,
+        cache_key="review_text",
+        fallback_text=None,
+        ai_service=ai_service,
+        generator_name="draft_review_text",
+    )
+
+
+def _final_report_text(draft: ReportDraft, ai_service: AiService | None) -> str:
+    fallback_text = _build_final_report_text(draft)
+    generated_text = _cached_ai_text(
+        draft=draft,
+        cache_key="final_report_text",
+        fallback_text=fallback_text,
+        ai_service=ai_service,
+        generator_name="draft_final_report_text",
+    )
+
+    return generated_text or fallback_text
+
+
+def _cached_ai_text(
+    draft: ReportDraft,
+    cache_key: str,
+    fallback_text: str | None,
+    ai_service: AiService | None,
+    generator_name: str,
+) -> str | None:
+    ai_cache = _ai_cache(draft)
+    cached_text = ai_cache.get(cache_key)
+    if cached_text:
+        return cached_text
+
+    if ai_service is None:
+        return fallback_text
+
+    generator = getattr(ai_service, generator_name)
+    try:
+        generated_text = generator(_draft_context(draft))
+    except AiProviderError:
+        _store_ai_error(draft, f"{cache_key}_generation_failed")
+        return fallback_text
+
+    cleaned_text = _clean_ai_text(generated_text, 8000)
+    if not cleaned_text:
+        return fallback_text
+
+    _store_ai_cache_value(draft, cache_key, cleaned_text)
+    db.session.commit()
+    return cleaned_text
+
+
+def _ai_cache(draft: ReportDraft) -> dict[str, str]:
+    return dict(_draft_data(draft).get(AI_CACHE_KEY, {}))
+
+
+def _store_ai_cache_value(
+    draft: ReportDraft,
+    cache_key: str,
+    generated_text: str,
+) -> None:
+    draft_data = _draft_data(draft)
+    ai_cache = dict(draft_data.get(AI_CACHE_KEY, {}))
+    ai_cache[cache_key] = generated_text
+    draft.draft_data_json = {
+        **draft_data,
+        AI_CACHE_KEY: ai_cache,
+    }
+
+
+def _clear_ai_cache(draft: ReportDraft) -> None:
+    draft_data = _draft_data(draft)
+    if AI_CACHE_KEY not in draft_data:
+        return
+
+    draft_data.pop(AI_CACHE_KEY)
+    draft.draft_data_json = draft_data
+
+
+def _draft_context(draft: ReportDraft) -> dict[str, Any]:
+    answers = dict(_draft_data(draft).get("answers", {}))
+    return {
+        "customer_or_lead": answers.get("customer_context"),
+        "contacts": answers.get("contacts"),
+        "visit_reason": answers.get("visit_reason"),
+        "summary": draft.summary,
+        "outcome": draft.outcome,
+        "next_action": draft.next_action,
+        "offer_reference": answers.get("offer_reference"),
+        "order_reference": answers.get("order_reference"),
+        "ratings": dict(draft.ratings_json),
+        "inside_sales_tasks": _task_preview_titles(draft),
+        "status": draft.report_status,
+    }
 
 
 def _build_final_report_text(draft: ReportDraft) -> str:

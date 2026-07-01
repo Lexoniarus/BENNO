@@ -28,12 +28,14 @@ def seed_database() -> None:
 def _seed_global_settings() -> None:
     existing_setting = db.session.query(GlobalSetting).first()
     if existing_setting:
+        if existing_setting.ai_provider == AiProvider.OPENAI.value:
+            existing_setting.ai_provider = AiProvider.GEMINI.value
         return
 
     db.session.add(
         GlobalSetting(
             default_language=SessionLanguage.DE.value,
-            ai_provider=AiProvider.OPENAI.value,
+            ai_provider=AiProvider.GEMINI.value,
         )
     )
 

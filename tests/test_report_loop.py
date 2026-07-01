@@ -5,15 +5,19 @@ from benno.enums import (
     MessageSender,
     MessageType,
     ReportStatus,
+    UserIntent,
     UserRole,
 )
 from benno.extensions import db
 from benno.models import Chat, FinalReport, InsideSalesTask, User
 from benno.seed import seed_database
+from benno.services.ai_provider import AiMessageAnalysis, AiProviderError
 from benno.services.report_loop import (
     apply_report_correction,
+    build_report_review,
     confirm_report,
     process_report_message,
+    process_report_message_with_ai,
     start_report_chat,
 )
 
@@ -48,6 +52,55 @@ def test_service_creates_chat_draft_and_initial_question(app) -> None:
     assert "customer or lead" in chat.messages[0].message_text
 
 
+def test_ai_analysis_can_assist_current_step_without_direct_saving(app) -> None:
+    seed_database()
+    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    chat = start_report_chat(sales_user)
+    ai_service = _FakeAiService(
+        analysis=AiMessageAnalysis(
+            intent=UserIntent.ANSWER,
+            intent_confidence=0.92,
+            target_sections=["customer_context", "summary"],
+            section_updates={
+                "customer_context": "Nordlicht Maschinenbau GmbH",
+                "summary": "This must not be saved yet.",
+            },
+            suggested_next_question="Who participated in the meeting?",
+        )
+    )
+
+    process_report_message_with_ai(
+        chat,
+        "I visited Nordlicht and we discussed modernization.",
+        ai_service,
+    )
+
+    answers = chat.report_draft.draft_data_json["answers"]
+    assert ai_service.analysis_calls == 1
+    assert answers["customer_context"] == "Nordlicht Maschinenbau GmbH"
+    assert chat.report_draft.summary is None
+    assert chat.messages[-1].message_text == "Who participated in the meeting?"
+
+
+def test_ai_provider_error_falls_back_to_deterministic_answer(app) -> None:
+    seed_database()
+    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    chat = start_report_chat(sales_user)
+    ai_service = _FakeAiService(raise_analysis_error=True)
+
+    process_report_message_with_ai(
+        chat,
+        "Nordlicht Maschinenbau GmbH",
+        ai_service,
+    )
+
+    answers = chat.report_draft.draft_data_json["answers"]
+    assert answers["customer_context"] == "Nordlicht Maschinenbau GmbH"
+    assert chat.report_draft.draft_data_json["last_ai_error"] == (
+        "message_analysis_failed"
+    )
+
+
 def test_service_advances_to_review_and_confirms_once(app) -> None:
     seed_database()
     sales_user = User.query.filter_by(email="sales@benno.local").one()
@@ -69,6 +122,28 @@ def test_service_advances_to_review_and_confirms_once(app) -> None:
     assert first_report.summary == STANDARD_ANSWERS[3]
     assert first_report.related_offer is not None
     assert "Visit Report" in first_report.final_report_text
+
+
+def test_ai_review_and_final_report_text_are_cached(app) -> None:
+    seed_database()
+    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    chat = start_report_chat(sales_user)
+    ai_service = _FakeAiService(
+        review_text="AI review summary.",
+        final_report_text="AI final report text.",
+    )
+
+    for answer in STANDARD_ANSWERS:
+        process_report_message(chat, answer)
+
+    review = build_report_review(chat.report_draft, ai_service)
+    final_report = confirm_report(chat, ai_service)
+
+    assert review["review_text"] == "AI review summary."
+    assert review["final_report_text"] == "AI final report text."
+    assert final_report.final_report_text == "AI final report text."
+    assert ai_service.review_calls == 1
+    assert ai_service.final_report_calls == 1
 
 
 def test_confirmed_report_rejects_late_messages(app) -> None:
@@ -316,3 +391,39 @@ def _login(client, email: str, password: str):
 
 def _chat_id_from_redirect(location: str) -> int:
     return int(location.rsplit("/", maxsplit=1)[-1])
+
+
+class _FakeAiService:
+    def __init__(
+        self,
+        analysis: AiMessageAnalysis | None = None,
+        review_text: str | None = None,
+        final_report_text: str | None = None,
+        raise_analysis_error: bool = False,
+    ) -> None:
+        self.analysis = analysis
+        self.review_text = review_text
+        self.final_report_text = final_report_text
+        self.raise_analysis_error = raise_analysis_error
+        self.analysis_calls = 0
+        self.review_calls = 0
+        self.final_report_calls = 0
+
+    def analyze_report_message(
+        self,
+        context,
+        message_text: str,
+    ) -> AiMessageAnalysis | None:
+        self.analysis_calls += 1
+        if self.raise_analysis_error:
+            raise AiProviderError("fake provider failure")
+
+        return self.analysis
+
+    def draft_review_text(self, draft_context) -> str | None:
+        self.review_calls += 1
+        return self.review_text
+
+    def draft_final_report_text(self, draft_context) -> str | None:
+        self.final_report_calls += 1
+        return self.final_report_text

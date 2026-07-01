@@ -4,6 +4,9 @@
 class BaseConfig:
     """Base configuration shared by all environments."""
 
+    AI_PROVIDER = "gemini"
+    GEMINI_API_KEY = None
+    GEMINI_MODEL = "gemini-2.5-flash-lite"
     SECRET_KEY = "development-secret-key"
     SQLALCHEMY_DATABASE_URI = None
     SQLALCHEMY_TRACK_MODIFICATIONS = False

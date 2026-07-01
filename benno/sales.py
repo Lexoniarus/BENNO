@@ -6,6 +6,7 @@ from flask_login import current_user
 from benno.auth import sales_required
 from benno.enums import ReportStatus
 from benno.models import Chat, FinalReport
+from benno.services.ai_provider import get_ai_service
 from benno.services.report_loop import (
     apply_report_correction,
     build_report_review,
@@ -113,7 +114,7 @@ def report_review(chat_id: int):
     return render_template(
         "sales/report_review.html",
         chat=chat,
-        review=build_report_review(chat.report_draft),
+        review=build_report_review(chat.report_draft, get_ai_service()),
     )
 
 
@@ -138,7 +139,7 @@ def confirm_report_route(chat_id: int):
     """Confirm and save a report draft."""
     chat = _get_own_chat_or_404(chat_id)
     try:
-        final_report = confirm_report(chat)
+        final_report = confirm_report(chat, get_ai_service())
     except ValueError as error:
         flash(str(error), "warning")
         return redirect(url_for("sales.report_chat", chat_id=chat.id))
