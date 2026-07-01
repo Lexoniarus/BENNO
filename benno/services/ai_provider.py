@@ -84,3 +84,19 @@ def get_ai_service() -> AiService:
         return GeminiService(api_key=api_key, model=model)
     except AiProviderError:
         return NullAiService()
+
+
+def get_ai_status() -> dict[str, str]:
+    """Return a display-safe summary of the configured AI provider."""
+    if not has_app_context():
+        return {"label": "KI: Fallback ohne externen Provider", "state": "inactive"}
+
+    provider_code = current_app.config.get("AI_PROVIDER", AiProvider.GEMINI.value)
+    if provider_code != AiProvider.GEMINI.value:
+        return {"label": f"KI: {provider_code} nicht aktiv", "state": "inactive"}
+
+    model = current_app.config.get("GEMINI_MODEL", "gemini-2.5-flash-lite")
+    if not current_app.config.get("GEMINI_API_KEY"):
+        return {"label": f"KI: Gemini / {model} ohne API-Key", "state": "inactive"}
+
+    return {"label": f"KI: Gemini / {model}", "state": "active"}

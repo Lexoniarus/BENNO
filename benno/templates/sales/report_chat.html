@@ -4,9 +4,10 @@
 {% block shell_class %}app-shell--page{% endblock %}
 
 {% block content %}
-  <section class="page-section" aria-labelledby="report-chat-title">
-    <p class="hero__eyebrow">Sales workspace</p>
-    <h1 id="report-chat-title">Report Chat #{{ chat.id }}</h1>
+  <section class="page-section page-section--report" aria-labelledby="report-chat-title">
+    <p class="hero__eyebrow">Sales Workspace</p>
+    <h1 id="report-chat-title">Besuchsbericht #{{ chat.id }}</h1>
+    <p class="ai-status ai-status--{{ ai_status.state }}">{{ ai_status.label }}</p>
 
     <div class="report-layout">
       <div class="chat-panel" aria-label="Report chat messages">
@@ -19,24 +20,26 @@
       </div>
 
       <aside class="progress-panel" aria-label="Report progress">
-        <h2>Progress</h2>
+        <h2>Fortschritt</h2>
         <dl class="definition-list definition-list--compact">
           <div>
             <dt>Status</dt>
-            <dd>{{ chat.status }}</dd>
+            <dd>{{ status_labels.get(chat.status, chat.status) }}</dd>
           </div>
           <div>
-            <dt>Missing sections</dt>
+            <dt>Fehlende Bereiche</dt>
             <dd>
               {% if draft.missing_sections_json %}
-                {{ draft.missing_sections_json | join(", ") }}
+                {% for section in draft.missing_sections_json %}
+                  {{ section_labels.get(section, section) }}{% if not loop.last %}, {% endif %}
+                {% endfor %}
               {% else %}
-                Complete
+                Vollständig
               {% endif %}
             </dd>
           </div>
           <div>
-            <dt>Last question</dt>
+            <dt>Letzte Frage</dt>
             <dd>{{ draft.last_question }}</dd>
           </div>
         </dl>
@@ -46,28 +49,28 @@
     {% if ready_for_review %}
       <div class="action-row">
         <a class="button button--link" href="{{ url_for('sales.report_review', chat_id=chat.id) }}">
-          Review Report
+          Bericht prüfen
         </a>
       </div>
     {% elif chat.status == "in_progress" %}
-      <form class="form-stack" method="post" action="{{ url_for('sales.report_message', chat_id=chat.id) }}">
-        <label for="message">Your answer</label>
+      <form class="form-stack report-form" method="post" action="{{ url_for('sales.report_message', chat_id=chat.id) }}">
+        <label for="message">Deine Antwort</label>
         <textarea id="message" name="message" rows="4" required></textarea>
-        <button class="button" type="submit">Send</button>
+        <button class="button" type="submit">Senden</button>
       </form>
     {% elif chat.status == "confirmed" and chat.final_report %}
       <div class="action-row">
         <a class="button button--link" href="{{ url_for('sales.final_report_detail', report_id=chat.final_report.id) }}">
-          Open Final Report
+          Finalen Bericht öffnen
         </a>
       </div>
     {% elif chat.status == "cancelled" %}
-      <p class="empty-state">This report was cancelled.</p>
+      <p class="empty-state">Dieser Bericht wurde abgebrochen.</p>
     {% endif %}
 
     {% if chat.status in ["in_progress", "ready_for_review"] %}
       <form class="inline-form" method="post" action="{{ url_for('sales.cancel_report_route', chat_id=chat.id) }}">
-        <button class="text-button" type="submit">Cancel report</button>
+        <button class="text-button" type="submit">Bericht abbrechen</button>
       </form>
     {% endif %}
   </section>

@@ -55,28 +55,30 @@ class ReportStep:
     key: str
     section: ReportSection
     question: str
+    question_de: str
 
 
 RATING_FIELDS = (
-    ("sales_opportunity", "sales opportunity"),
-    ("meeting_mood", "meeting mood"),
-    ("priority", "priority"),
-    ("closing_probability", "closing probability"),
-    ("need_for_action", "need for action"),
-    ("customer_satisfaction", "customer satisfaction"),
+    ("sales_opportunity", "sales opportunity", "Verkaufschance"),
+    ("meeting_mood", "meeting mood", "Gesprächsstimmung"),
+    ("priority", "priority", "Priorität"),
+    ("closing_probability", "closing probability", "Abschlusswahrscheinlichkeit"),
+    ("need_for_action", "need for action", "Handlungsbedarf"),
+    ("customer_satisfaction", "customer satisfaction", "Kundenzufriedenheit"),
 )
 BASE_CORRECTION_FIELDS = (
-    ("customer_context", "Customer or Lead"),
-    ("contacts", "Contacts"),
-    ("visit_reason", "Visit Reason"),
-    ("summary", "Summary"),
-    ("outcome", "Outcome"),
-    ("next_action", "Next Action"),
-    ("offer_reference", "Offer Reference"),
-    ("order_reference", "Order Reference"),
+    ("customer_context", "Kunde oder Lead"),
+    ("contacts", "Teilnehmer"),
+    ("visit_reason", "Besuchsgrund"),
+    ("summary", "Zusammenfassung"),
+    ("outcome", "Ergebnis"),
+    ("next_action", "Nächster Schritt"),
+    ("offer_reference", "Angebotsbezug"),
+    ("order_reference", "Auftragsbezug"),
 )
 CORRECTION_FIELDS = BASE_CORRECTION_FIELDS + tuple(
-    (f"rating_{rating_key}", f"Rating: {label}") for rating_key, label in RATING_FIELDS
+    (f"rating_{rating_key}", f"Bewertung: {label_de}")
+    for rating_key, _label_en, label_de in RATING_FIELDS
 )
 
 REPORT_STEPS = (
@@ -87,49 +89,67 @@ REPORT_STEPS = (
             "Which customer or lead was this visit about? "
             "Mention if this is a new lead."
         ),
+        question_de=(
+            "Um welchen Kunden oder Lead ging es bei diesem Besuch? "
+            "Erwähne bitte, falls es ein neuer Lead ist."
+        ),
     ),
     ReportStep(
         key="contacts",
         section=ReportSection.CONTACTS,
         question="Who participated in the meeting?",
+        question_de="Wer hat an dem Gespräch teilgenommen?",
     ),
     ReportStep(
         key="visit_reason",
         section=ReportSection.VISIT_REASON,
         question="What was the main reason for the visit?",
+        question_de="Was war der Hauptgrund für den Besuch?",
     ),
     ReportStep(
         key="summary",
         section=ReportSection.SUMMARY,
         question="Please summarize the key discussion points.",
+        question_de="Fasse bitte die wichtigsten Gesprächspunkte zusammen.",
     ),
     ReportStep(
         key="outcome",
         section=ReportSection.OUTCOME,
         question="What was agreed or decided?",
+        question_de="Was wurde vereinbart oder entschieden?",
     ),
     ReportStep(
         key="next_action",
         section=ReportSection.NEXT_ACTION,
         question="What is the next action or follow-up?",
+        question_de="Was ist der nächste Schritt oder die Wiedervorlage?",
     ),
     ReportStep(
         key="offer_reference",
         section=ReportSection.OFFER_REFERENCE,
         question="Is there an offer reference? If not, answer 'none'.",
+        question_de=(
+            "Gibt es einen Angebotsbezug? Falls nicht, antworte mit 'keiner'."
+        ),
     ),
     ReportStep(
         key="order_reference",
         section=ReportSection.ORDER_REFERENCE,
         question="Is there an order reference? If not, answer 'none'.",
+        question_de=(
+            "Gibt es einen Auftragsbezug? Falls nicht, antworte mit 'keiner'."
+        ),
     ),
     *(
         ReportStep(
             key=f"rating_{rating_key}",
             section=ReportSection.RATINGS,
             question=f"Rate the {label} from 1 to 10 and add a short reason.",
+            question_de=(
+                f"Bewerte {label_de} von 1 bis 10 und ergänze eine kurze Begründung."
+            ),
         )
-        for rating_key, label in RATING_FIELDS
+        for rating_key, label, label_de in RATING_FIELDS
     ),
 )
 
@@ -137,6 +157,7 @@ REPORT_STEPS = (
 def start_report_chat(sales_user: User) -> Chat:
     """Create a new report chat and initial draft."""
     initial_step = REPORT_STEPS[0]
+    initial_question = _step_question(initial_step, sales_user.preferred_language)
     section_statuses = _initial_section_statuses()
 
     chat = Chat(
@@ -157,12 +178,12 @@ def start_report_chat(sales_user: User) -> Chat:
             "completed_steps": [],
             "answers": {},
         },
-        last_question=initial_step.question,
+        last_question=initial_question,
     )
 
     db.session.add_all([chat, draft])
     db.session.flush()
-    _add_assistant_message(chat, initial_step.question)
+    _add_assistant_message(chat, initial_question)
     db.session.commit()
 
     return chat
@@ -230,7 +251,7 @@ def apply_report_correction(
     _refresh_missing_sections(draft)
     draft.report_status = ReportStatus.READY_FOR_REVIEW.value
     chat.status = ReportStatus.READY_FOR_REVIEW.value
-    draft.last_question = "Correction saved. Please review the report again."
+    draft.last_question = "Korrektur gespeichert. Bitte prüfe den Bericht erneut."
     draft.draft_data_json = {
         **_draft_data(draft),
         "current_step": REVIEW_STEP,
@@ -255,22 +276,22 @@ def build_report_review(
     return {
         "review_text": review_text,
         "sections": [
-            ("Customer or Lead", _display_value(answers.get("customer_context"))),
-            ("Contacts", _display_value(answers.get("contacts"))),
-            ("Visit Reason", _display_value(answers.get("visit_reason"))),
-            ("Summary", _display_value(draft.summary)),
-            ("Outcome", _display_value(draft.outcome)),
-            ("Next Action", _display_value(draft.next_action)),
+            ("Kunde oder Lead", _display_value(answers.get("customer_context"))),
+            ("Teilnehmer", _display_value(answers.get("contacts"))),
+            ("Besuchsgrund", _display_value(answers.get("visit_reason"))),
+            ("Zusammenfassung", _display_value(draft.summary)),
+            ("Ergebnis", _display_value(draft.outcome)),
+            ("Nächster Schritt", _display_value(draft.next_action)),
             (
-                "Offer Reference",
-                _display_value(answers.get("offer_reference"), empty="Not relevant"),
+                "Angebotsbezug",
+                _display_value(answers.get("offer_reference"), empty="Nicht relevant"),
             ),
             (
-                "Order Reference",
-                _display_value(answers.get("order_reference"), empty="Not relevant"),
+                "Auftragsbezug",
+                _display_value(answers.get("order_reference"), empty="Nicht relevant"),
             ),
-            ("Ratings", _format_ratings(draft.ratings_json)),
-            ("Inside Sales Tasks", _format_task_preview(draft)),
+            ("Bewertungen", _format_ratings(draft.ratings_json)),
+            ("Innendienst-Aufgaben", _format_task_preview(draft)),
         ],
         "final_report_text": final_report_text,
         "correction_fields": CORRECTION_FIELDS,
@@ -438,7 +459,7 @@ def _ai_message_context(
 ) -> dict[str, Any]:
     return {
         "current_step": current_step.key,
-        "current_question": current_step.question,
+        "current_question": _step_question(current_step, draft.session_language),
         "missing_sections": list(draft.missing_sections_json),
         "known_answers": dict(_draft_data(draft).get("answers", {})),
         "ratings": dict(draft.ratings_json),
@@ -576,7 +597,10 @@ def _next_question(
     if next_step is None:
         message = _review_ready_message(chat)
     else:
-        message = _suggested_question(next_step, analysis) or next_step.question
+        message = _suggested_question(next_step, analysis) or _step_question(
+            next_step,
+            draft.session_language,
+        )
 
     draft.last_question = message
     return message
@@ -584,9 +608,16 @@ def _next_question(
 
 def _review_ready_message(chat: Chat) -> str:
     return (
-        "All required sections are complete. "
-        f"Please review the report at /sales/reports/{chat.id}/review."
+        "Alle Pflichtbereiche sind vollständig. "
+        f"Bitte prüfe den Bericht unter /sales/reports/{chat.id}/review."
     )
+
+
+def _step_question(step: ReportStep, session_language: str | None) -> str:
+    if session_language == "de":
+        return step.question_de
+
+    return step.question
 
 
 def _update_customer_context(draft: ReportDraft, message_text: str) -> None:
@@ -757,7 +788,10 @@ def _missing_sections(section_statuses: dict[str, str]) -> list[str]:
 
 
 def _all_ratings_collected(draft: ReportDraft) -> bool:
-    return all(rating_key in draft.ratings_json for rating_key, _label in RATING_FIELDS)
+    return all(
+        rating_key in draft.ratings_json
+        for rating_key, _label_en, _label_de in RATING_FIELDS
+    )
 
 
 def _is_ready_for_review(draft: ReportDraft) -> bool:
@@ -868,41 +902,41 @@ def _draft_context(draft: ReportDraft) -> dict[str, Any]:
 def _build_final_report_text(draft: ReportDraft) -> str:
     answers = _draft_data(draft).get("answers", {})
     report_lines = [
-        "Visit Report",
+        "Besuchsbericht",
         "",
-        f"Customer/Lead: {_display_value(answers.get('customer_context'))}",
-        f"Contacts: {_display_value(answers.get('contacts'))}",
-        f"Visit Reason: {_display_value(answers.get('visit_reason'))}",
+        f"Kunde/Lead: {_display_value(answers.get('customer_context'))}",
+        f"Teilnehmer: {_display_value(answers.get('contacts'))}",
+        f"Besuchsgrund: {_display_value(answers.get('visit_reason'))}",
         "",
-        f"Summary: {draft.summary or 'Not provided'}",
-        f"Outcome: {draft.outcome or 'Not provided'}",
-        f"Next Action: {draft.next_action or 'Not provided'}",
+        f"Zusammenfassung: {draft.summary or 'Nicht angegeben'}",
+        f"Ergebnis: {draft.outcome or 'Nicht angegeben'}",
+        f"Nächster Schritt: {draft.next_action or 'Nicht angegeben'}",
         "",
-        f"Ratings: {_format_ratings(draft.ratings_json)}",
+        f"Bewertungen: {_format_ratings(draft.ratings_json)}",
     ]
     return "\n".join(report_lines)
 
 
 def _format_ratings(ratings: dict[str, Any]) -> str:
     if not ratings:
-        return "Not provided"
+        return "Nicht angegeben"
 
     parts = []
-    for rating_key, label in RATING_FIELDS:
+    for rating_key, _label_en, label_de in RATING_FIELDS:
         rating = ratings.get(rating_key)
         if rating is None:
             continue
-        value = rating.get("value") or "not rated"
-        reason = rating.get("reason") or "No reason provided"
-        parts.append(f"{label}: {value}/10 ({reason})")
+        value = rating.get("value") or "nicht bewertet"
+        reason = rating.get("reason") or "Keine Begründung angegeben"
+        parts.append(f"{label_de}: {value}/10 ({reason})")
 
-    return "; ".join(parts) if parts else "Not provided"
+    return "; ".join(parts) if parts else "Nicht angegeben"
 
 
 def _format_task_preview(draft: ReportDraft) -> str:
     task_titles = _task_preview_titles(draft)
     if not task_titles:
-        return "None"
+        return "Keine"
 
     return "; ".join(task_titles)
 
@@ -992,6 +1026,7 @@ def _is_none_answer(message_text: str) -> bool:
         "na",
         "kein",
         "keine",
+        "keiner",
         "nein",
     }
 

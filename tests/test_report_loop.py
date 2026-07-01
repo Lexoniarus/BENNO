@@ -49,7 +49,7 @@ def test_service_creates_chat_draft_and_initial_question(app) -> None:
     assert chat.status == ReportStatus.IN_PROGRESS.value
     assert len(chat.messages) == 1
     assert chat.messages[0].sender == MessageSender.ASSISTANT.value
-    assert "customer or lead" in chat.messages[0].message_text
+    assert "Kunden oder Lead" in chat.messages[0].message_text
 
 
 def test_ai_analysis_can_assist_current_step_without_direct_saving(app) -> None:
@@ -66,7 +66,7 @@ def test_ai_analysis_can_assist_current_step_without_direct_saving(app) -> None:
                 "summary": "This must not be saved yet.",
             },
             suggested_next_section="contacts",
-            suggested_next_question="Who participated in the meeting?",
+            suggested_next_question="Wer hat an dem Gespräch teilgenommen?",
         )
     )
 
@@ -80,7 +80,7 @@ def test_ai_analysis_can_assist_current_step_without_direct_saving(app) -> None:
     assert ai_service.analysis_calls == 1
     assert answers["customer_context"] == "Nordlicht Maschinenbau GmbH"
     assert chat.report_draft.summary is None
-    assert chat.messages[-1].message_text == "Who participated in the meeting?"
+    assert chat.messages[-1].message_text == "Wer hat an dem Gespräch teilgenommen?"
 
 
 def test_ai_question_is_ignored_when_next_section_does_not_match(app) -> None:
@@ -104,7 +104,7 @@ def test_ai_question_is_ignored_when_next_section_does_not_match(app) -> None:
         ai_service,
     )
 
-    assert chat.messages[-1].message_text == "Who participated in the meeting?"
+    assert chat.messages[-1].message_text == "Wer hat an dem Gespräch teilgenommen?"
 
 
 def test_ai_provider_error_falls_back_to_deterministic_answer(app) -> None:
@@ -146,7 +146,7 @@ def test_service_advances_to_review_and_confirms_once(app) -> None:
     assert first_report.status == ReportStatus.CONFIRMED.value
     assert first_report.summary == STANDARD_ANSWERS[3]
     assert first_report.related_offer is not None
-    assert "Visit Report" in first_report.final_report_text
+    assert "Besuchsbericht" in first_report.final_report_text
 
 
 def test_ai_review_and_final_report_text_are_cached(app) -> None:
@@ -362,8 +362,8 @@ def test_confirmed_report_chat_links_to_final_report(app) -> None:
         chat_response = client.get(f"/sales/reports/{chat_id}")
 
     assert chat_response.status_code == 200
-    assert b"Your answer" not in chat_response.data
-    assert b"Open Final Report" in chat_response.data
+    assert b"Deine Antwort" not in chat_response.data
+    assert "Finalen Bericht öffnen".encode() in chat_response.data
 
 
 def test_review_page_is_blocked_until_sections_are_complete(app) -> None:

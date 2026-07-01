@@ -122,6 +122,7 @@ rating_customer_satisfaction.
 
 Only provide suggested_next_question if suggested_next_section is exactly the
 next report section the question is about.
+Write suggested_next_question in German.
 
 Context:
 {context_json}
@@ -134,7 +135,7 @@ User message:
 def _build_review_prompt(draft_context: dict[str, Any]) -> str:
     context_json = json.dumps(draft_context, ensure_ascii=False, default=str, indent=2)
     return f"""
-Write a short, human-readable review summary for this B2B visit report draft.
+Write a short, human-readable German review summary for this B2B visit report draft.
 Do not invent facts. Do not say that anything was saved or submitted.
 
 Draft:
@@ -146,7 +147,7 @@ def _build_final_report_prompt(draft_context: dict[str, Any]) -> str:
     context_json = json.dumps(draft_context, ensure_ascii=False, default=str, indent=2)
     return f"""
 Write the final CRM visit report text for this B2B field sales visit.
-Use clear professional English. Do not invent facts.
+Use clear professional German. Do not invent facts.
 Include customer context, participants, reason, summary, outcome, next action,
 relevant references, and sales ratings when available.
 

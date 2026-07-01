@@ -6,7 +6,7 @@ from flask_login import current_user
 from benno.auth import sales_required
 from benno.enums import ReportStatus
 from benno.models import Chat, FinalReport
-from benno.services.ai_provider import get_ai_service
+from benno.services.ai_provider import get_ai_service, get_ai_status
 from benno.services.report_loop import (
     apply_report_correction,
     build_report_review,
@@ -25,6 +25,28 @@ OPEN_REPORT_STATUSES = (
     ReportStatus.INSIDE_SALES_INPUT_REQUIRED.value,
     ReportStatus.BLOCKED.value,
 )
+REPORT_STATUS_LABELS_DE = {
+    ReportStatus.BLOCKED.value: "Blockiert",
+    ReportStatus.CANCELLED.value: "Abgebrochen",
+    ReportStatus.CONFIRMED.value: "Bestätigt",
+    ReportStatus.IN_PROGRESS.value: "In Bearbeitung",
+    ReportStatus.INSIDE_SALES_INPUT_REQUIRED.value: "Innendienst nötig",
+    ReportStatus.READY_FOR_REVIEW.value: "Bereit zur Prüfung",
+    ReportStatus.SUBMITTED.value: "Übergeben",
+}
+REPORT_SECTION_LABELS_DE = {
+    "contacts": "Teilnehmer",
+    "customer_context": "Kunde oder Lead",
+    "final_report": "Finaler Bericht",
+    "next_action": "Nächster Schritt",
+    "offer_reference": "Angebotsbezug",
+    "order_reference": "Auftragsbezug",
+    "outcome": "Ergebnis",
+    "ratings": "Bewertungen",
+    "summary": "Zusammenfassung",
+    "user_confirmation": "Bestätigung",
+    "visit_reason": "Besuchsgrund",
+}
 
 
 @sales_blueprint.get("")
@@ -81,6 +103,9 @@ def report_chat(chat_id: int):
         chat=chat,
         draft=chat.report_draft,
         ready_for_review=is_ready_for_review(chat),
+        ai_status=get_ai_status(),
+        section_labels=REPORT_SECTION_LABELS_DE,
+        status_labels=REPORT_STATUS_LABELS_DE,
     )
 
 
