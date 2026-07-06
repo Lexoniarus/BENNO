@@ -5,7 +5,32 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict, Field
+
+from benno.enums import UserIntent
 from benno.services.ai_provider import AiMessageAnalysis, AiProviderError
+
+
+class GeminiSectionUpdate(BaseModel):
+    """Provider-facing section update without free-form object keys."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    section: str | None = None
+    value: str | None = None
+
+
+class GeminiMessageAnalysis(BaseModel):
+    """Gemini-compatible structured proposal for one user message."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    intent: UserIntent = UserIntent.UNKNOWN
+    intent_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    target_sections: list[str] = Field(default_factory=list)
+    section_updates: list[GeminiSectionUpdate] = Field(default_factory=list)
+    suggested_next_section: str | None = None
+    suggested_next_question: str | None = None
 
 
 class GeminiService:
@@ -34,12 +59,12 @@ class GeminiService:
     ) -> AiMessageAnalysis | None:
         """Ask Gemini for a controlled analysis of one report message."""
         prompt = _build_analysis_prompt(context, message_text)
-        response = self._generate_structured_content(prompt, AiMessageAnalysis)
+        response = self._generate_structured_content(prompt, GeminiMessageAnalysis)
         if response is None:
             return None
 
         try:
-            return AiMessageAnalysis.model_validate(response)
+            return _convert_gemini_analysis(response)
         except ValueError as error:
             message = "Gemini returned invalid message analysis."
             raise AiProviderError(message) from error
@@ -57,8 +82,8 @@ class GeminiService:
     def _generate_structured_content(
         self,
         prompt: str,
-        response_schema: type[AiMessageAnalysis],
-    ) -> dict[str, Any] | AiMessageAnalysis | None:
+        response_schema: type[BaseModel],
+    ) -> dict[str, Any] | BaseModel | None:
         config = self._types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema=response_schema,
@@ -124,6 +149,15 @@ offer_reference, order_reference, rating_sales_opportunity, rating_meeting_mood,
 rating_priority, rating_closing_probability, rating_need_for_action,
 rating_customer_satisfaction.
 
+Return section_updates as an array of objects with exactly these fields:
+section, value.
+Example:
+[
+  {{"section": "contacts", "value": "Frau Schmidt"}},
+  {{"section": "visit_reason", "value": "Forecast"}}
+]
+Do not return section_updates as an object with dynamic section keys.
+
 Only provide suggested_next_question if suggested_next_section is exactly the
 next report section the question is about.
 Write suggested_next_question in German. Keep it short, natural, and dialog-like.
@@ -137,6 +171,32 @@ Context:
 User message:
 {message_text}
 """.strip()
+
+
+def _convert_gemini_analysis(
+    response: dict[str, Any] | BaseModel,
+) -> AiMessageAnalysis:
+    gemini_analysis = GeminiMessageAnalysis.model_validate(response)
+    section_updates = {}
+    for section_update in gemini_analysis.section_updates:
+        if not isinstance(section_update.section, str):
+            continue
+        if not isinstance(section_update.value, str):
+            continue
+
+        section = section_update.section.strip()
+        value = section_update.value.strip()
+        if section and value:
+            section_updates[section] = value
+
+    return AiMessageAnalysis(
+        intent=gemini_analysis.intent,
+        intent_confidence=gemini_analysis.intent_confidence,
+        target_sections=gemini_analysis.target_sections,
+        section_updates=section_updates,
+        suggested_next_section=gemini_analysis.suggested_next_section,
+        suggested_next_question=gemini_analysis.suggested_next_question,
+    )
 
 
 def _build_review_prompt(draft_context: dict[str, Any]) -> str:

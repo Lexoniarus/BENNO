@@ -100,6 +100,20 @@ Example:
 }
 ```
 
+Provider-facing AI responses may use a different wire shape than BENNO's internal state. For Gemini, section updates are requested as a list of explicit section/value objects:
+
+```json
+{
+  "section_updates": [
+    { "section": "customer_context", "value": "PerfSolar" },
+    { "section": "contacts", "value": "Frau Schmidt" },
+    { "section": "visit_reason", "value": "Forecast" }
+  ]
+}
+```
+
+The backend converts this into the internal section map only after validation. Unknown section names, empty values, malformed update objects, and provider errors must not break the report loop. They are ignored or handled through deterministic fallback behavior.
+
 ## Customer And Lead Context
 
 `customer_context` is mandatory.

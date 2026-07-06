@@ -35,6 +35,39 @@ The application should be able to ask for:
 
 The rest of the application should not need to know whether the response came from Gemini or a later local provider.
 
+## Gemini Structured Output Rule
+
+Gemini is used as a proposer, not as the source of truth.
+
+The Gemini Developer API should receive explicit structured-output schemas. For report section extraction, BENNO must not ask Gemini to return free-form dictionary keys such as:
+
+```json
+{
+  "section_updates": {
+    "contacts": "Frau Schmidt",
+    "visit_reason": "Forecast"
+  }
+}
+```
+
+Instead, Gemini should return section updates as a list of explicit objects:
+
+```json
+{
+  "section_updates": [
+    { "section": "contacts", "value": "Frau Schmidt" },
+    { "section": "visit_reason", "value": "Forecast" }
+  ]
+}
+```
+
+The provider may translate this provider-specific shape into BENNO's internal provider contract before the report loop receives it. This keeps the application interface stable while avoiding Gemini Developer API schema issues around free-form object properties.
+
+References:
+
+- [Gemini Structured Outputs](https://ai.google.dev/gemini-api/docs/structured-output)
+- [Gemini GenerateContent configuration](https://ai.google.dev/api/generate-content)
+
 ## AI Responsibility Boundary
 
 The AI may:

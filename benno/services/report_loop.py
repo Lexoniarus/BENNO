@@ -455,8 +455,8 @@ def _analyze_report_message(
     context = _ai_message_context(draft, current_step)
     try:
         analysis = ai_service.analyze_report_message(context, message_text)
-    except AiProviderError:
-        _store_ai_error(draft, "message_analysis_failed")
+    except AiProviderError as error:
+        _store_ai_error(draft, _ai_error_code(error))
         return None
 
     if analysis is None:
@@ -625,6 +625,28 @@ def _store_ai_error(draft: ReportDraft, error_code: str) -> None:
         **_draft_data(draft),
         "last_ai_error": error_code,
     }
+
+
+def _ai_error_code(error: AiProviderError) -> str:
+    error_text = _error_chain_text(error)
+    if "additionalproperties" in error_text or "schema" in error_text:
+        return "message_analysis_schema_failed"
+    if "rate" in error_text or "quota" in error_text:
+        return "message_analysis_rate_limited"
+    if "api key" in error_text or "authentication" in error_text:
+        return "message_analysis_auth_failed"
+
+    return "message_analysis_failed"
+
+
+def _error_chain_text(error: BaseException) -> str:
+    messages = []
+    current_error: BaseException | None = error
+    while current_error is not None:
+        messages.append(str(current_error).lower())
+        current_error = current_error.__cause__
+
+    return " ".join(messages)
 
 
 def _clean_ai_text(value: str | None, max_length: int) -> str | None:

@@ -248,6 +248,30 @@ def test_ai_provider_error_falls_back_to_deterministic_answer(app) -> None:
     )
 
 
+def test_ai_schema_error_stores_controlled_marker(app) -> None:
+    seed_database()
+    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    chat = start_report_chat(sales_user)
+    provider_error = AiProviderError("Gemini message analysis failed.")
+    provider_error.__cause__ = ValueError(
+        "additionalProperties is only supported in Gemini Enterprise "
+        "Agent Platform mode"
+    )
+    ai_service = _FakeAiService(analysis_error=provider_error)
+
+    process_report_message_with_ai(
+        chat,
+        "PerfSolar",
+        ai_service,
+    )
+
+    answers = chat.report_draft.draft_data_json["answers"]
+    assert answers["customer_context"] == "PerfSolar"
+    assert chat.report_draft.draft_data_json["last_ai_error"] == (
+        "message_analysis_schema_failed"
+    )
+
+
 def test_service_advances_to_review_and_confirms_once(app) -> None:
     seed_database()
     sales_user = User.query.filter_by(email="sales@benno.local").one()
@@ -626,11 +650,13 @@ class _FakeAiService:
         review_text: str | None = None,
         final_report_text: str | None = None,
         raise_analysis_error: bool = False,
+        analysis_error: AiProviderError | None = None,
     ) -> None:
         self.analysis = analysis
         self.review_text = review_text
         self.final_report_text = final_report_text
         self.raise_analysis_error = raise_analysis_error
+        self.analysis_error = analysis_error
         self.analysis_calls = 0
         self.review_calls = 0
         self.final_report_calls = 0
@@ -641,6 +667,8 @@ class _FakeAiService:
         message_text: str,
     ) -> AiMessageAnalysis | None:
         self.analysis_calls += 1
+        if self.analysis_error is not None:
+            raise self.analysis_error
         if self.raise_analysis_error:
             raise AiProviderError("fake provider failure")
 

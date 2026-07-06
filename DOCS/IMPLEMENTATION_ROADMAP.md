@@ -209,6 +209,10 @@ Scope:
 - review wording
 - final report text
 
+Implementation note:
+
+- Gemini Developer API structured output uses an explicit list of section/value update objects for report extraction. BENNO converts that provider-specific shape into the internal provider contract before applying validation.
+
 Important rule:
 
 The AI may suggest values, but it must not save directly.

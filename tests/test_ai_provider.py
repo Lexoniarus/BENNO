@@ -1,7 +1,18 @@
 """Tests for BENNO AI provider configuration."""
 
 from benno import create_app
-from benno.services.ai_provider import AiProviderError, NullAiService, get_ai_service
+from benno.enums import UserIntent
+from benno.services.ai_provider import (
+    AiProviderError,
+    NullAiService,
+    get_ai_service,
+    get_ai_status,
+)
+from benno.services.gemini_provider import (
+    GeminiMessageAnalysis,
+    GeminiSectionUpdate,
+    _convert_gemini_analysis,
+)
 
 
 def test_default_gemini_model_is_configured() -> None:
@@ -47,3 +58,89 @@ def test_provider_initialization_error_returns_null_service(app, monkeypatch) ->
         ai_service = get_ai_service()
 
     assert isinstance(ai_service, NullAiService)
+    assert app.config["AI_PROVIDER_LAST_ERROR"] == "Initialisierung fehlgeschlagen"
+
+
+def test_ai_status_shows_missing_gemini_sdk(app, monkeypatch) -> None:
+    app.config["GEMINI_API_KEY"] = "test-gemini-key"
+
+    monkeypatch.setattr(
+        "benno.services.ai_provider.importlib.util.find_spec",
+        lambda module_name: None if module_name == "google.genai" else object(),
+    )
+
+    with app.app_context():
+        status = get_ai_status()
+
+    assert status == {
+        "label": "KI: Gemini / gemini-2.5-flash-lite SDK fehlt",
+        "state": "inactive",
+    }
+
+
+def test_ai_status_shows_provider_initialization_error(app, monkeypatch) -> None:
+    def raise_provider_error(self, api_key: str, model: str) -> None:
+        raise AiProviderError("fake initialization failure")
+
+    monkeypatch.setattr(
+        "benno.services.gemini_provider.GeminiService.__init__",
+        raise_provider_error,
+    )
+    app.config["GEMINI_API_KEY"] = "test-gemini-key"
+
+    with app.app_context():
+        get_ai_service()
+        status = get_ai_status()
+
+    assert status == {
+        "label": (
+            "KI: Gemini / gemini-2.5-flash-lite nicht verfügbar "
+            "(Initialisierung fehlgeschlagen)"
+        ),
+        "state": "inactive",
+    }
+
+
+def test_gemini_section_update_list_converts_to_internal_dict() -> None:
+    gemini_analysis = GeminiMessageAnalysis(
+        intent=UserIntent.ADDITIONAL_INFO,
+        intent_confidence=0.93,
+        target_sections=["customer_context", "contacts", "visit_reason"],
+        section_updates=[
+            GeminiSectionUpdate(section="customer_context", value="PerfSolar"),
+            GeminiSectionUpdate(section="contacts", value="Frau Müller"),
+            GeminiSectionUpdate(section="visit_reason", value="Forecast"),
+        ],
+        suggested_next_section="summary",
+        suggested_next_question="Was waren die wichtigsten Gesprächspunkte?",
+    )
+
+    analysis = _convert_gemini_analysis(gemini_analysis)
+
+    assert analysis.intent == UserIntent.ADDITIONAL_INFO
+    assert analysis.intent_confidence == 0.93
+    assert analysis.section_updates == {
+        "customer_context": "PerfSolar",
+        "contacts": "Frau Müller",
+        "visit_reason": "Forecast",
+    }
+    assert analysis.suggested_next_section == "summary"
+    assert analysis.suggested_next_question == (
+        "Was waren die wichtigsten Gesprächspunkte?"
+    )
+
+
+def test_gemini_section_update_conversion_ignores_malformed_empty_values() -> None:
+    gemini_analysis = GeminiMessageAnalysis(
+        section_updates=[
+            GeminiSectionUpdate(section="contacts", value="Frau Schmidt"),
+            GeminiSectionUpdate(section="contacts", value=""),
+            GeminiSectionUpdate(section="contacts", value="Herr Walther"),
+            GeminiSectionUpdate(section=None, value="No section"),
+            GeminiSectionUpdate(section="summary", value=None),
+        ],
+    )
+
+    analysis = _convert_gemini_analysis(gemini_analysis)
+
+    assert analysis.section_updates == {"contacts": "Herr Walther"}
