@@ -38,6 +38,9 @@ class AiService(Protocol):
     ) -> AiMessageAnalysis | None:
         """Return a structured proposal for one report message."""
 
+    def draft_next_question(self, question_context: dict[str, Any]) -> str | None:
+        """Return optional wording for the next assistant question."""
+
     def draft_review_text(self, draft_context: dict[str, Any]) -> str | None:
         """Return optional wording for the human review."""
 
@@ -54,6 +57,10 @@ class NullAiService:
         message_text: str,
     ) -> AiMessageAnalysis | None:
         """Return no analysis."""
+        return None
+
+    def draft_next_question(self, question_context: dict[str, Any]) -> str | None:
+        """Return no assistant question wording."""
         return None
 
     def draft_review_text(self, draft_context: dict[str, Any]) -> str | None:

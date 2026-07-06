@@ -33,106 +33,10 @@ class GeminiMessageAnalysis(BaseModel):
     suggested_next_question: str | None = None
 
 
-class GeminiService:
-    """Small wrapper around the Google GenAI SDK."""
-
-    def __init__(self, api_key: str, model: str) -> None:
-        """Create a Gemini provider for BENNO."""
-        try:
-            from google import genai
-            from google.genai import types
-        except ImportError as error:
-            raise AiProviderError("Google GenAI SDK is not installed.") from error
-
-        try:
-            self._client = genai.Client(api_key=api_key)
-        except Exception as error:
-            raise AiProviderError("Gemini client initialization failed.") from error
-
-        self._model = model
-        self._types = types
-
-    def analyze_report_message(
-        self,
-        context: dict[str, Any],
-        message_text: str,
-    ) -> AiMessageAnalysis | None:
-        """Ask Gemini for a controlled analysis of one report message."""
-        prompt = _build_analysis_prompt(context, message_text)
-        response = self._generate_structured_content(prompt, GeminiMessageAnalysis)
-        if response is None:
-            return None
-
-        try:
-            return _convert_gemini_analysis(response)
-        except ValueError as error:
-            message = "Gemini returned invalid message analysis."
-            raise AiProviderError(message) from error
-
-    def draft_review_text(self, draft_context: dict[str, Any]) -> str | None:
-        """Ask Gemini for concise review wording."""
-        prompt = _build_review_prompt(draft_context)
-        return self._generate_text(prompt)
-
-    def draft_final_report_text(self, draft_context: dict[str, Any]) -> str | None:
-        """Ask Gemini for a final visit report text."""
-        prompt = _build_final_report_prompt(draft_context)
-        return self._generate_text(prompt)
-
-    def _generate_structured_content(
-        self,
-        prompt: str,
-        response_schema: type[BaseModel],
-    ) -> dict[str, Any] | BaseModel | None:
-        config = self._types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=response_schema,
-            temperature=0.1,
-        )
-        try:
-            response = self._client.models.generate_content(
-                model=self._model,
-                contents=prompt,
-                config=config,
-            )
-        except Exception as error:
-            raise AiProviderError("Gemini message analysis failed.") from error
-
-        parsed_response = getattr(response, "parsed", None)
-        if parsed_response is not None:
-            return parsed_response
-
-        response_text = getattr(response, "text", None)
-        if not response_text:
-            return None
-
-        try:
-            return json.loads(response_text)
-        except json.JSONDecodeError as error:
-            raise AiProviderError("Gemini returned malformed JSON.") from error
-
-    def _generate_text(self, prompt: str) -> str | None:
-        try:
-            response = self._client.models.generate_content(
-                model=self._model,
-                contents=prompt,
-            )
-        except Exception as error:
-            raise AiProviderError("Gemini text generation failed.") from error
-
-        response_text = getattr(response, "text", None)
-        if response_text is None:
-            return None
-
-        normalized_text = response_text.strip()
-        return normalized_text or None
-
-
-def _build_analysis_prompt(context: dict[str, Any], message_text: str) -> str:
-    context_json = json.dumps(context, ensure_ascii=False, default=str, indent=2)
-    return f"""
+ANALYSIS_SYSTEM_INSTRUCTION = """
 You support BENNO, a B2B visit report assistant.
 
+You are the extractor and observer role.
 Return only the structured response requested by the schema.
 You may interpret and propose values, but the application validates and decides.
 Extract every explicitly mentioned allowed section, not only the current one.
@@ -160,8 +64,8 @@ Return section_updates as an array of objects with exactly these fields:
 section, value.
 Example:
 [
-  {{"section": "contacts", "value": "Frau Schmidt"}},
-  {{"section": "visit_reason", "value": "Forecast"}}
+  {"section": "contacts", "value": "Frau Schmidt"},
+  {"section": "visit_reason", "value": "Forecast"}
 ]
 Do not return section_updates as an object with dynamic section keys.
 
@@ -179,19 +83,190 @@ German extraction examples:
 - "Priorität 7, Stimmung gut, Abschluss noch zu früh" ->
   rating_priority = "7"; rating_meeting_mood = "gut";
   rating_closing_probability = "zu früh".
+""".strip()
 
-Only provide suggested_next_question if suggested_next_section is exactly the
-next report section the question is about.
-Write suggested_next_question in German. Keep it short, natural, and dialog-like.
-Ask exactly one next question. You may briefly acknowledge already detected
-information before the question. Do not invent facts or pretend anything was
-saved.
+NEXT_QUESTION_SYSTEM_INSTRUCTION = """
+You support BENNO, a B2B visit report assistant.
 
+You are the conversation role.
+Write only the next German assistant message for the sales user.
+Use the validated backend state, not untrusted guesses.
+Ask exactly one concise question or combined question.
+Use next_step as the target of the message.
+Do not ask for every future missing field.
+If next_step is not a rating step, ask only about next_step.
+If next_step is a rating step, ask for all missing ratings in one natural block.
+Do not invent facts, do not claim that anything was saved, and do not mention JSON.
+If only one field is missing, ask only for that field.
+Keep the tone professional, friendly, and brief.
+""".strip()
+
+REVIEW_SYSTEM_INSTRUCTION = """
+You support BENNO, a B2B visit report assistant.
+
+Write concise German review wording from validated draft data.
+Do not invent facts. Do not say that anything was saved or submitted.
+""".strip()
+
+FINAL_REPORT_SYSTEM_INSTRUCTION = """
+You support BENNO, a B2B visit report assistant.
+
+Write clear professional German CRM visit report text from validated draft data.
+Do not invent facts.
+""".strip()
+
+
+class GeminiService:
+    """Small wrapper around the Google GenAI SDK."""
+
+    def __init__(self, api_key: str, model: str) -> None:
+        """Create a Gemini provider for BENNO."""
+        try:
+            from google import genai
+            from google.genai import types
+        except ImportError as error:
+            raise AiProviderError("Google GenAI SDK is not installed.") from error
+
+        try:
+            self._client = genai.Client(api_key=api_key)
+        except Exception as error:
+            raise AiProviderError("Gemini client initialization failed.") from error
+
+        self._model = model
+        self._types = types
+
+    def analyze_report_message(
+        self,
+        context: dict[str, Any],
+        message_text: str,
+    ) -> AiMessageAnalysis | None:
+        """Ask Gemini for a controlled analysis of one report message."""
+        prompt = _build_analysis_content(context, message_text)
+        response = self._generate_structured_content(
+            prompt=prompt,
+            response_schema=GeminiMessageAnalysis,
+            system_instruction=ANALYSIS_SYSTEM_INSTRUCTION,
+            temperature=0.1,
+        )
+        if response is None:
+            return None
+
+        try:
+            return _convert_gemini_analysis(response)
+        except ValueError as error:
+            message = "Gemini returned invalid message analysis."
+            raise AiProviderError(message) from error
+
+    def draft_next_question(self, question_context: dict[str, Any]) -> str | None:
+        """Ask Gemini for the next conversational assistant question."""
+        prompt = _build_next_question_prompt(question_context)
+        return self._generate_text(
+            prompt=prompt,
+            system_instruction=NEXT_QUESTION_SYSTEM_INSTRUCTION,
+            temperature=0.3,
+        )
+
+    def draft_review_text(self, draft_context: dict[str, Any]) -> str | None:
+        """Ask Gemini for concise review wording."""
+        prompt = _build_review_prompt(draft_context)
+        return self._generate_text(
+            prompt=prompt,
+            system_instruction=REVIEW_SYSTEM_INSTRUCTION,
+            temperature=0.2,
+        )
+
+    def draft_final_report_text(self, draft_context: dict[str, Any]) -> str | None:
+        """Ask Gemini for a final visit report text."""
+        prompt = _build_final_report_prompt(draft_context)
+        return self._generate_text(
+            prompt=prompt,
+            system_instruction=FINAL_REPORT_SYSTEM_INSTRUCTION,
+            temperature=0.2,
+        )
+
+    def _generate_structured_content(
+        self,
+        prompt: str,
+        response_schema: type[BaseModel],
+        system_instruction: str,
+        temperature: float,
+    ) -> dict[str, Any] | BaseModel | None:
+        config = self._types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=response_schema,
+            system_instruction=system_instruction,
+            temperature=temperature,
+        )
+        try:
+            response = self._client.models.generate_content(
+                model=self._model,
+                contents=prompt,
+                config=config,
+            )
+        except Exception as error:
+            raise AiProviderError("Gemini message analysis failed.") from error
+
+        parsed_response = getattr(response, "parsed", None)
+        if parsed_response is not None:
+            return parsed_response
+
+        response_text = getattr(response, "text", None)
+        if not response_text:
+            return None
+
+        try:
+            return json.loads(response_text)
+        except json.JSONDecodeError as error:
+            raise AiProviderError("Gemini returned malformed JSON.") from error
+
+    def _generate_text(
+        self,
+        prompt: str,
+        system_instruction: str,
+        temperature: float,
+    ) -> str | None:
+        config = self._types.GenerateContentConfig(
+            system_instruction=system_instruction,
+            temperature=temperature,
+        )
+        try:
+            response = self._client.models.generate_content(
+                model=self._model,
+                contents=prompt,
+                config=config,
+            )
+        except Exception as error:
+            raise AiProviderError("Gemini text generation failed.") from error
+
+        response_text = getattr(response, "text", None)
+        if response_text is None:
+            return None
+
+        normalized_text = response_text.strip()
+        return normalized_text or None
+
+
+def _build_analysis_content(context: dict[str, Any], message_text: str) -> str:
+    context_json = json.dumps(context, ensure_ascii=False, default=str, indent=2)
+    return f"""
 Context:
 {context_json}
 
 User message:
 {message_text}
+""".strip()
+
+
+def _build_next_question_prompt(question_context: dict[str, Any]) -> str:
+    context_json = json.dumps(
+        question_context,
+        ensure_ascii=False,
+        default=str,
+        indent=2,
+    )
+    return f"""
+Validated conversation state:
+{context_json}
 """.strip()
 
 

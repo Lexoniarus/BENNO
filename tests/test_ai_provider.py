@@ -9,8 +9,12 @@ from benno.services.ai_provider import (
     get_ai_status,
 )
 from benno.services.gemini_provider import (
+    ANALYSIS_SYSTEM_INSTRUCTION,
+    NEXT_QUESTION_SYSTEM_INSTRUCTION,
     GeminiMessageAnalysis,
     GeminiSectionUpdate,
+    _build_analysis_content,
+    _build_next_question_prompt,
     _convert_gemini_analysis,
 )
 
@@ -144,3 +148,30 @@ def test_gemini_section_update_conversion_ignores_malformed_empty_values() -> No
     analysis = _convert_gemini_analysis(gemini_analysis)
 
     assert analysis.section_updates == {"contacts": "Herr Walther"}
+
+
+def test_gemini_analysis_uses_system_instruction_separate_from_content() -> None:
+    content = _build_analysis_content(
+        {"current_step": "customer_context"},
+        "Ich war bei PerfSolar.",
+    )
+
+    assert "You support BENNO" in ANALYSIS_SYSTEM_INSTRUCTION
+    assert "extractor and observer role" in ANALYSIS_SYSTEM_INSTRUCTION
+    assert "Context:" in content
+    assert "Ich war bei PerfSolar." in content
+    assert "You support BENNO" not in content
+
+
+def test_gemini_next_question_prompt_uses_conversation_system_instruction() -> None:
+    prompt = _build_next_question_prompt(
+        {
+            "next_step": "contacts",
+            "known_answers": {"customer_context": "PerfSolar"},
+        }
+    )
+
+    assert "conversation role" in NEXT_QUESTION_SYSTEM_INSTRUCTION
+    assert "Use next_step as the target" in NEXT_QUESTION_SYSTEM_INSTRUCTION
+    assert "Validated conversation state:" in prompt
+    assert "PerfSolar" in prompt

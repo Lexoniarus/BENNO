@@ -176,6 +176,17 @@ Examples:
 
 The backend remains responsible for deciding what is accepted, skipped, or still missing. Gemini may propose bundled updates, but unknown sections, empty values, and unsafe overwrites are ignored.
 
+## LLM Role Separation
+
+The Gemini integration uses two logical roles:
+
+- extractor / observer: reads the current user message and proposes structured updates through a schema
+- conversation assistant: receives the validated draft state and writes the next short German assistant question
+
+Stable role rules are passed as Gemini system instructions. Dynamic state such as the current step, known answers, missing fields, ratings, and the latest user message is passed as content.
+
+The conversation assistant does not decide what is saved. It only words the next question after the backend has validated and applied allowed updates.
+
 ## Final Review Loop
 
 The final review is block-based and human-readable.

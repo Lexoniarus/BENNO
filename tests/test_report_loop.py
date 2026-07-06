@@ -86,6 +86,27 @@ def test_ai_analysis_can_apply_multiple_open_sections(app) -> None:
     assert chat.messages[-1].message_text == "Wer hat an dem Gespräch teilgenommen?"
 
 
+def test_ai_question_writer_uses_validated_next_step(app) -> None:
+    seed_database()
+    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    chat = start_report_chat(sales_user)
+    ai_service = _FakeAiService(
+        analysis=AiMessageAnalysis(
+            intent=UserIntent.ANSWER,
+            intent_confidence=0.92,
+            target_sections=["customer_context"],
+            section_updates={"customer_context": "PerfSolar"},
+        ),
+        next_question_text="Mit wem hast du bei PerfSolar gesprochen?",
+    )
+
+    process_report_message_with_ai(chat, "Ich war bei PerfSolar.", ai_service)
+
+    assert ai_service.next_question_calls == 1
+    assert ai_service.last_question_context["next_step"] == "contacts"
+    assert chat.messages[-1].message_text == "Mit wem hast du bei PerfSolar gesprochen?"
+
+
 def test_ai_extracts_perfsolar_sections_and_preserves_umlaut(app) -> None:
     seed_database()
     sales_user = User.query.filter_by(email="sales@benno.local").one()
@@ -878,17 +899,21 @@ class _FakeAiService:
         analysis: AiMessageAnalysis | None = None,
         review_text: str | None = None,
         final_report_text: str | None = None,
+        next_question_text: str | None = None,
         raise_analysis_error: bool = False,
         analysis_error: AiProviderError | None = None,
     ) -> None:
         self.analysis = analysis
         self.review_text = review_text
         self.final_report_text = final_report_text
+        self.next_question_text = next_question_text
         self.raise_analysis_error = raise_analysis_error
         self.analysis_error = analysis_error
         self.analysis_calls = 0
+        self.next_question_calls = 0
         self.review_calls = 0
         self.final_report_calls = 0
+        self.last_question_context = None
 
     def analyze_report_message(
         self,
@@ -902,6 +927,11 @@ class _FakeAiService:
             raise AiProviderError("fake provider failure")
 
         return self.analysis
+
+    def draft_next_question(self, question_context) -> str | None:
+        self.next_question_calls += 1
+        self.last_question_context = question_context
+        return self.next_question_text
 
     def draft_review_text(self, draft_context) -> str | None:
         self.review_calls += 1
