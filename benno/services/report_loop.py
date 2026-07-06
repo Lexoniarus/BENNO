@@ -159,6 +159,7 @@ def start_report_chat(sales_user: User) -> Chat:
     """Create a new report chat and initial draft."""
     initial_step = REPORT_STEPS[0]
     initial_question = _step_question(initial_step, sales_user.preferred_language)
+    initial_message = _initial_report_message(sales_user, initial_question)
     section_statuses = _initial_section_statuses()
 
     chat = Chat(
@@ -179,12 +180,12 @@ def start_report_chat(sales_user: User) -> Chat:
             "completed_steps": [],
             "answers": {},
         },
-        last_question=initial_question,
+        last_question=initial_message,
     )
 
     db.session.add_all([chat, draft])
     db.session.flush()
-    _add_assistant_message(chat, initial_question)
+    _add_assistant_message(chat, initial_message)
     db.session.commit()
 
     return chat
@@ -233,6 +234,14 @@ def process_report_message_with_ai(
     db.session.commit()
 
     return chat
+
+
+def _initial_report_message(sales_user: User, initial_question: str) -> str:
+    username = sales_user.username or "du"
+    return (
+        f"Hallo {username}, ich bin bereit für deinen Besuchsbericht. "
+        f"{initial_question}"
+    )
 
 
 def apply_report_correction(

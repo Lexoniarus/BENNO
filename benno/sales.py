@@ -69,7 +69,10 @@ def open_reports():
     """Render the current user's open report chats."""
     chats = _own_open_chats_query().order_by(Chat.updated_at.desc()).all()
 
-    return render_template("sales/open_reports.html", chats=chats)
+    return render_template(
+        "sales/open_reports.html",
+        report_rows=_build_open_report_rows(chats),
+    )
 
 
 @sales_blueprint.get("/reports/completed")
@@ -233,3 +236,61 @@ def _get_own_final_report_or_404(report_id: int) -> FinalReport:
         abort(404)
 
     return final_report
+
+
+def _build_open_report_rows(chats: list[Chat]) -> list[dict[str, object]]:
+    return [_build_open_report_row(chat) for chat in chats]
+
+
+def _build_open_report_row(chat: Chat) -> dict[str, object]:
+    draft = chat.report_draft
+    answers = dict(draft.draft_data_json.get("answers", {})) if draft else {}
+    return {
+        "chat": chat,
+        "customer_label": _first_present_text(
+            answers.get("customer_context"),
+            getattr(getattr(draft, "customer", None), "name", None),
+            getattr(getattr(draft, "lead", None), "name", None),
+            fallback="Noch kein Kunde erkannt",
+        ),
+        "topic_label": _first_present_text(
+            answers.get("visit_reason"),
+            getattr(draft, "summary", None),
+            fallback="Noch kein Thema erkannt",
+        ),
+        "progress_label": _open_report_progress_label(draft),
+        "status_label": REPORT_STATUS_LABELS_DE.get(chat.status, chat.status),
+        "last_question": getattr(draft, "last_question", None),
+    }
+
+
+def _open_report_progress_label(draft) -> str:
+    if draft is None:
+        return "Noch kein Fortschritt"
+
+    section_statuses = dict(draft.section_statuses_json or {})
+    total_sections = len(
+        [
+            section
+            for section in section_statuses
+            if section not in {"final_report", "user_confirmation"}
+        ]
+    )
+    missing_sections = len(draft.missing_sections_json or [])
+    completed_sections = max(total_sections - missing_sections, 0)
+    if total_sections == 0:
+        return "Noch kein Fortschritt"
+
+    return f"{completed_sections}/{total_sections} Bereiche"
+
+
+def _first_present_text(*values, fallback: str) -> str:
+    for value in values:
+        if value is None:
+            continue
+
+        text = str(value).strip()
+        if text:
+            return text
+
+    return fallback

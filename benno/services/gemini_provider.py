@@ -126,7 +126,10 @@ rating_customer_satisfaction.
 
 Only provide suggested_next_question if suggested_next_section is exactly the
 next report section the question is about.
-Write suggested_next_question in German.
+Write suggested_next_question in German. Keep it short, natural, and dialog-like.
+Ask exactly one next question. You may briefly acknowledge already detected
+information before the question. Do not invent facts or pretend anything was
+saved.
 
 Context:
 {context_json}

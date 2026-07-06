@@ -49,6 +49,7 @@ def test_service_creates_chat_draft_and_initial_question(app) -> None:
     assert chat.status == ReportStatus.IN_PROGRESS.value
     assert len(chat.messages) == 1
     assert chat.messages[0].sender == MessageSender.ASSISTANT.value
+    assert "BENNO Sales Rep" in chat.messages[0].message_text
     assert "Kunden oder Lead" in chat.messages[0].message_text
 
 
@@ -446,6 +447,25 @@ def test_report_web_flow_creates_confirmed_final_report(app) -> None:
     assert b"Confirm and Save" in review_response.data
     assert confirm_response.status_code == 302
     assert final_report.status == ReportStatus.CONFIRMED.value
+
+
+def test_open_reports_show_customer_and_topic_context(app) -> None:
+    seed_database()
+    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    chat = start_report_chat(sales_user)
+    process_report_message(chat, "Nordlicht Maschinenbau GmbH")
+    process_report_message(chat, "Mara Stein")
+    process_report_message(chat, "Offer follow-up for conveyor modernization")
+
+    with app.test_client() as client:
+        _login(client, "sales@benno.local", "sales-demo-password")
+        response = client.get("/sales/reports/open")
+
+    assert response.status_code == 200
+    assert f'data-chat-id="{chat.id}"'.encode() in response.data
+    assert b"Nordlicht Maschinenbau GmbH" in response.data
+    assert b"Offer follow-up for conveyor modernization" in response.data
+    assert b"Bereiche" in response.data
 
 
 def test_report_message_route_preserves_raw_user_message(app) -> None:

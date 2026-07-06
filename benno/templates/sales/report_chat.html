@@ -10,7 +10,7 @@
     <p class="ai-status ai-status--{{ ai_status.state }}">{{ ai_status.label }}</p>
 
     <div class="report-layout">
-      <div class="chat-panel" aria-label="Report chat messages">
+      <div class="chat-panel" data-chat-panel aria-label="Report chat messages">
         {% for message in chat.messages %}
           <article class="chat-message chat-message--{{ message.sender }}">
             <span>{{ message.sender }}</span>
@@ -53,7 +53,7 @@
         </a>
       </div>
     {% elif chat.status == "in_progress" %}
-      <form class="form-stack report-form" method="post" action="{{ url_for('sales.report_message', chat_id=chat.id) }}">
+      <form class="form-stack report-form" data-report-form method="post" action="{{ url_for('sales.report_message', chat_id=chat.id) }}">
         <label for="message">Deine Antwort</label>
         <textarea id="message" name="message" rows="4" required></textarea>
         <button class="button" type="submit">Senden</button>
