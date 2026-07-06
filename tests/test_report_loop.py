@@ -88,7 +88,6 @@ def test_ai_analysis_can_apply_multiple_open_sections(app) -> None:
     assert chat.report_draft.summary == "Modernisierung wurde besprochen."
     assert ai_service.next_question_calls == 0
     assert chat.messages[-1].message_text == "Wer hat an dem Gespräch teilgenommen?"
-    assert ai_service.next_question_calls == 0
 
 
 def test_ai_analysis_suggested_question_uses_validated_next_step(app) -> None:
