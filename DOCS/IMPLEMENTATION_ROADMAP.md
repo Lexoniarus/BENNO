@@ -249,6 +249,25 @@ Questions to resolve:
 - Which fields are written back?
 - Which information creates reminders or inside sales tasks?
 
+Field classification rule:
+
+Do not treat every visible eNVenta screen field as a BENNO dialog question.
+
+Classify fields first:
+
+- user-provided report content
+- AI-assisted derived values
+- CRM/eNVenta master data
+- BENNO login or user context
+- eNVenta system metadata
+
+Known eNVenta system metadata examples:
+
+- `Erfassung` is set by eNVenta when the record is created.
+- `Änderung` is set by eNVenta when the record is changed.
+
+BENNO should not ask for or write these fields. They may be read-only integration metadata later.
+
 The placeholder CRM service should then define:
 
 - search customer

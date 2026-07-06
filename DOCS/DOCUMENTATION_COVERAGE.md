@@ -18,6 +18,7 @@ Use these documents for current implementation and product work:
 | `CODING_STANDARDS.md` | Coding quality, naming, and architecture standards |
 | `CONVERSATION_FLOW.md` | Dialog behavior, report sections, intents, correction, review |
 | `DATA_MODEL.md` | Database areas, draft/report/task model, mock CRM structure |
+| `ENVENTA_FIELD_NOTES.md` | First eNVenta visit report field observations and source classification |
 | `USER_ADMIN_SETTINGS.md` | Users, roles, admin scope, language and provider settings |
 | `AI_VOICE_PRIVACY.md` | Provider strategy, voice layer, local provider direction, privacy |
 
@@ -44,7 +45,7 @@ The following topics appeared in earlier notes but are not current implementatio
 - SQLite is sufficient for the MVP.
 - The first implementation starts with text, not voice.
 - Local AI is a later privacy-oriented provider step after the Gemini workflow is stable.
-- The exact eNVenta field mapping waits for Bernd's field list.
+- The exact eNVenta field mapping waits for Bernd's field list and must distinguish user input, derivation, master data, login context, and eNVenta system metadata.
 - The first slice uses seeded users instead of setup/reset links.
 
 ## Documentation Rule Going Forward
