@@ -462,7 +462,7 @@ def _analyze_report_message(
     if analysis is None:
         return None
 
-    sanitized_analysis = _sanitize_ai_analysis(analysis)
+    sanitized_analysis = _sanitize_ai_analysis(analysis, message_text)
     _store_ai_analysis(draft, sanitized_analysis)
     return sanitized_analysis
 
@@ -481,22 +481,80 @@ def _ai_message_context(
     }
 
 
-def _sanitize_ai_analysis(analysis: AiMessageAnalysis) -> AiMessageAnalysis:
+def _sanitize_ai_analysis(
+    analysis: AiMessageAnalysis,
+    message_text: str,
+) -> AiMessageAnalysis:
     allowed_keys = set(_allowed_update_keys())
+    section_updates = {
+        key: value.strip()
+        for key, value in analysis.section_updates.items()
+        if key in allowed_keys and isinstance(value, str) and value.strip()
+    }
+    target_sections = [
+        section for section in analysis.target_sections if section in allowed_keys
+    ]
+    _add_explicit_visit_reason_clue(
+        section_updates,
+        target_sections,
+        analysis,
+        message_text,
+    )
+
     return AiMessageAnalysis(
         intent=analysis.intent,
         intent_confidence=analysis.intent_confidence,
-        target_sections=[
-            section for section in analysis.target_sections if section in allowed_keys
-        ],
-        section_updates={
-            key: value.strip()
-            for key, value in analysis.section_updates.items()
-            if key in allowed_keys and isinstance(value, str) and value.strip()
-        },
+        target_sections=target_sections,
+        section_updates=section_updates,
         suggested_next_section=_clean_section_key(analysis.suggested_next_section),
         suggested_next_question=_clean_ai_text(analysis.suggested_next_question, 500),
     )
+
+
+def _add_explicit_visit_reason_clue(
+    section_updates: dict[str, str],
+    target_sections: list[str],
+    analysis: AiMessageAnalysis,
+    message_text: str,
+) -> None:
+    if analysis.intent == UserIntent.CORRECTION:
+        return
+    if section_updates.get("visit_reason"):
+        return
+
+    visit_reason = _extract_explicit_visit_reason(message_text)
+    if visit_reason is None:
+        return
+
+    section_updates["visit_reason"] = visit_reason
+    if "visit_reason" not in target_sections:
+        target_sections.append("visit_reason")
+
+
+def _extract_explicit_visit_reason(message_text: str) -> str | None:
+    patterns = (
+        r"\b(?:über|ueber)\s+(?:eine[nmr]?|den|die|das)?\s*(?P<topic>.+?)\s+"
+        r"(?:gesprochen|unterhalten|geredet)\b",
+        r"\b(?:wegen|zum thema)\s+(?P<topic>[^.?!,;]+)",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, message_text, re.IGNORECASE)
+        if match is None:
+            continue
+
+        topic = _clean_explicit_visit_reason(match.group("topic"))
+        if topic:
+            return topic
+
+    return None
+
+
+def _clean_explicit_visit_reason(value: str) -> str | None:
+    cleaned_value = re.sub(r"\s+", " ", value).strip(" .,!?:;")
+    if not cleaned_value:
+        return None
+
+    return cleaned_value[:200]
 
 
 def _apply_assisted_answers(

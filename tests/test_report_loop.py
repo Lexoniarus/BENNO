@@ -123,6 +123,44 @@ def test_ai_extracts_perfsolar_sections_and_preserves_umlaut(app) -> None:
     assert chat.messages[-1].message_text == summary_question
 
 
+def test_explicit_visit_reason_clue_fills_ai_missed_topic(app) -> None:
+    seed_database()
+    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    chat = start_report_chat(sales_user)
+    ai_service = _FakeAiService(
+        analysis=AiMessageAnalysis(
+            intent=UserIntent.ANSWER,
+            intent_confidence=0.94,
+            target_sections=["customer_context", "contacts"],
+            section_updates={
+                "customer_context": "PerfSolar",
+                "contacts": "Frau M\u00fcller",
+            },
+            suggested_next_section="visit_reason",
+            suggested_next_question=(
+                "Was war der konkrete Grund f\u00fcr deinen Besuch bei PerfSolar?"
+            ),
+        )
+    )
+
+    process_report_message_with_ai(
+        chat,
+        (
+            "Ich war in K\u00f6ln bei PerfSolar und habe mit Frau M\u00fcller "
+            "\u00fcber eine m\u00f6gliche Kooperation gesprochen."
+        ),
+        ai_service,
+    )
+
+    answers = chat.report_draft.draft_data_json["answers"]
+    assert answers["customer_context"] == "PerfSolar"
+    assert answers["contacts"] == "Frau M\u00fcller"
+    assert answers["visit_reason"] == "m\u00f6gliche Kooperation"
+    assert "visit_reason" not in chat.report_draft.missing_sections_json
+    assert chat.report_draft.draft_data_json["current_step"] == "summary"
+    assert "Gespr" in chat.messages[-1].message_text
+
+
 def test_ai_question_is_ignored_when_next_section_does_not_match(app) -> None:
     seed_database()
     sales_user = User.query.filter_by(email="sales@benno.local").one()

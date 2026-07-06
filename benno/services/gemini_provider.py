@@ -158,6 +158,13 @@ Example:
 ]
 Do not return section_updates as an object with dynamic section keys.
 
+German extraction examples:
+- "Ich war bei PerfSolar" -> customer_context = "PerfSolar".
+- "mit Frau Müller" -> contacts = "Frau Müller".
+- "über den Forecast gesprochen" -> visit_reason = "Forecast".
+- "über eine mögliche Kooperation gesprochen" -> visit_reason = "mögliche Kooperation".
+- "Wir haben uns über den Forecast unterhalten" -> visit_reason = "Forecast".
+
 Only provide suggested_next_question if suggested_next_section is exactly the
 next report section the question is about.
 Write suggested_next_question in German. Keep it short, natural, and dialog-like.
