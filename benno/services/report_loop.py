@@ -246,7 +246,7 @@ def process_report_message_with_ai(
         analysis,
     )
     next_step = _advance_after_applied_steps(draft, applied_steps)
-    next_question = _next_question(chat, next_step, analysis, ai_service)
+    next_question = _next_question(chat, next_step, analysis)
     _add_assistant_message(chat, next_question)
     db.session.commit()
 
@@ -972,13 +972,10 @@ def _next_question(
     chat: Chat,
     next_step: ReportStep | None,
     analysis: AiMessageAnalysis | None,
-    ai_service: AiService | None,
 ) -> str:
     draft = _require_draft(chat)
     if next_step is None:
         message = _review_ready_message(chat)
-    elif ai_question := _ai_next_question(draft, next_step, ai_service):
-        message = ai_question
     elif next_step.section == ReportSection.RATINGS:
         message = _rating_question(draft)
     else:
@@ -989,25 +986,6 @@ def _next_question(
 
     draft.last_question = message
     return message
-
-
-def _ai_next_question(
-    draft: ReportDraft,
-    next_step: ReportStep,
-    ai_service: AiService | None,
-) -> str | None:
-    if ai_service is None:
-        return None
-
-    try:
-        question = ai_service.draft_next_question(
-            _next_question_context(draft, next_step)
-        )
-    except AiProviderError:
-        _store_ai_error(draft, "next_question_generation_failed")
-        return None
-
-    return _clean_ai_text(question, 500)
 
 
 def _next_question_context(

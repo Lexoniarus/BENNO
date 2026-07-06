@@ -187,9 +187,11 @@ Stable role rules are passed as Gemini system instructions. Dynamic state such a
 
 The conversation assistant does not decide what is saved. It only words the next question after the backend has validated and applied allowed updates.
 
+During the Phase 5 report loop, BENNO uses at most one Gemini call per user message. The structured extraction response may include a suggested next German question, but the backend only uses it when the suggested section matches the backend-computed next step. Otherwise, BENNO falls back to its deterministic German question templates.
+
 ## Report Requirements Context
 
-Every Gemini extraction and next-question call receives a `report_requirements` checklist.
+Gemini-facing extraction and question-drafting contexts include a `report_requirements` checklist.
 
 Each checklist item contains:
 

@@ -57,6 +57,11 @@ next_action if the next action is still missing.
 Ratings may be answered together. Extract every explicitly stated rating clue
 into the matching rating_* section. If the user says a rating is too early,
 keep that wording as the value instead of inventing a number.
+Also propose the next useful German assistant question in suggested_next_question.
+Set suggested_next_section to the requirement key that should be asked next after
+your proposed section_updates are applied. Ask only for one next requirement, or
+one compact rating block when ratings are next. If no useful suggestion is safe,
+leave suggested_next_question empty.
 
 Allowed intents:
 answer, correction, additional_info, confirmation, rejection, repeat, cancel, unknown.

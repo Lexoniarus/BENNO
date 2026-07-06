@@ -215,6 +215,7 @@ Implementation note:
 - The Phase 5 loop should use Gemini as an assisted conversation layer, not just as extraction on top of a rigid form. Clear lead/no-offer signals, follow-up actions, and grouped ratings should be handled without unnecessary extra questions.
 - Gemini calls should separate stable system instructions from dynamic content. The extractor role uses structured output; the conversation role receives the validated draft state and only words the next question.
 - Gemini receives an explicit `report_requirements` checklist in extraction and next-question contexts, so it can see all required, completed, skipped, and partially completed report fields from the beginning.
+- Normal report turns use at most one Gemini call per user message. The backend may use the extractor's same-call suggested question when it matches the computed next step; otherwise deterministic questions keep the loop inside rate limits.
 
 Important rule:
 

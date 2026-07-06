@@ -86,10 +86,12 @@ def test_ai_analysis_can_apply_multiple_open_sections(app) -> None:
     assert answers["customer_context"] == "Nordlicht Maschinenbau GmbH"
     assert answers["summary"] == "Modernisierung wurde besprochen."
     assert chat.report_draft.summary == "Modernisierung wurde besprochen."
+    assert ai_service.next_question_calls == 0
     assert chat.messages[-1].message_text == "Wer hat an dem Gespräch teilgenommen?"
+    assert ai_service.next_question_calls == 0
 
 
-def test_ai_question_writer_uses_validated_next_step(app) -> None:
+def test_ai_analysis_suggested_question_uses_validated_next_step(app) -> None:
     seed_database()
     sales_user = User.query.filter_by(email="sales@benno.local").one()
     chat = start_report_chat(sales_user)
@@ -99,14 +101,16 @@ def test_ai_question_writer_uses_validated_next_step(app) -> None:
             intent_confidence=0.92,
             target_sections=["customer_context"],
             section_updates={"customer_context": "PerfSolar"},
+            suggested_next_section="contacts",
+            suggested_next_question="Mit wem hast du bei PerfSolar gesprochen?",
         ),
-        next_question_text="Mit wem hast du bei PerfSolar gesprochen?",
     )
 
     process_report_message_with_ai(chat, "Ich war bei PerfSolar.", ai_service)
 
-    assert ai_service.next_question_calls == 1
-    assert ai_service.last_question_context["next_step"] == "contacts"
+    assert ai_service.analysis_calls == 1
+    assert ai_service.next_question_calls == 0
+    assert ai_service.last_question_context is None
     assert chat.messages[-1].message_text == "Mit wem hast du bei PerfSolar gesprochen?"
 
 
@@ -355,6 +359,8 @@ def test_combined_rating_answer_can_fill_multiple_rating_fields(app) -> None:
     assert ratings["sales_opportunity"]["reason"] == "bisher gar nicht"
     assert ratings["meeting_mood"]["reason"] == "ganz nett"
     assert ratings["priority"]["value"] == 7
+    assert ai_service.analysis_calls == 1
+    assert ai_service.next_question_calls == 0
     assert chat.report_draft.draft_data_json["current_step"] == (
         "rating_closing_probability"
     )
