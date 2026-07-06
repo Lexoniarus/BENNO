@@ -139,6 +139,13 @@ Extract every explicitly mentioned allowed section, not only the current one.
 Preserve German spelling exactly, including ä, ö, ü, Ä, Ö, Ü, and ß.
 Do not rewrite umlauts as ae, oe, ue, or ss.
 Do not infer unstated outcomes, next actions, ratings, offers, or orders.
+If the user explicitly says there is no offer, no order, or the account is a lead,
+use "keiner" for offer_reference and order_reference when appropriate.
+If the user mentions inside sales calling or following up, extract that as
+next_action if the next action is still missing.
+Ratings may be answered together. Extract every explicitly stated rating clue
+into the matching rating_* section. If the user says a rating is too early,
+keep that wording as the value instead of inventing a number.
 
 Allowed intents:
 answer, correction, additional_info, confirmation, rejection, repeat, cancel, unknown.
@@ -164,6 +171,14 @@ German extraction examples:
 - "über den Forecast gesprochen" -> visit_reason = "Forecast".
 - "über eine mögliche Kooperation gesprochen" -> visit_reason = "mögliche Kooperation".
 - "Wir haben uns über den Forecast unterhalten" -> visit_reason = "Forecast".
+- "Sie wollen Muster und wir reden in 2 Wochen drüber" ->
+  outcome = "Kunde möchte Muster"; next_action = "Gespräch in 2 Wochen".
+- "nee die sind Lead, da muss der Innendienst nochmal anrufen" ->
+  offer_reference = "keiner"; order_reference = "keiner";
+  next_action = "Innendienst soll nochmal anrufen".
+- "Priorität 7, Stimmung gut, Abschluss noch zu früh" ->
+  rating_priority = "7"; rating_meeting_mood = "gut";
+  rating_closing_probability = "zu früh".
 
 Only provide suggested_next_question if suggested_next_section is exactly the
 next report section the question is about.

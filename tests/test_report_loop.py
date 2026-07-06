@@ -1,6 +1,7 @@
 """Tests for the deterministic Phase 4 report loop."""
 
 from benno.enums import (
+    CustomerContextType,
     InsideSalesTaskType,
     MessageSender,
     MessageType,
@@ -159,6 +160,116 @@ def test_explicit_visit_reason_clue_fills_ai_missed_topic(app) -> None:
     assert "visit_reason" not in chat.report_draft.missing_sections_json
     assert chat.report_draft.draft_data_json["current_step"] == "summary"
     assert "Gespr" in chat.messages[-1].message_text
+
+
+def test_lead_flow_skips_offer_order_and_moves_to_combined_ratings(app) -> None:
+    chat = _build_perfsolar_flow_until_ratings()
+    draft = chat.report_draft
+    answers = draft.draft_data_json["answers"]
+
+    assert answers["customer_context"] == "PerfSolar"
+    assert answers["contacts"] == "Frau M\u00fcller"
+    assert answers["visit_reason"] == "m\u00f6gliche Kooperation"
+    assert answers["summary"] == (
+        "Diskussion \u00fcber eine m\u00f6gliche Pr\u00e4senz mit Mustern "
+        "am Stand auf der InterSolar"
+    )
+    assert answers["outcome"] == "Kunde m\u00f6chte Muster"
+    assert answers["next_action"] == "Gespr\u00e4ch in 2 Wochen"
+    assert answers["offer_reference"] == "keiner"
+    assert answers["order_reference"] == "keiner"
+    assert draft.customer_context_type == CustomerContextType.NEW_LEAD.value
+    assert draft.draft_data_json["inside_sales_follow_up_requested"] is True
+    assert draft.draft_data_json["current_step"] == "rating_sales_opportunity"
+    assert "Angebotsbezug" not in chat.messages[-1].message_text
+    assert "Auftragsbezug" not in chat.messages[-1].message_text
+    assert "Verkaufschance" in chat.messages[-1].message_text
+    assert "Kundenzufriedenheit" in chat.messages[-1].message_text
+
+
+def test_combined_rating_answer_can_fill_multiple_rating_fields(app) -> None:
+    chat = _build_perfsolar_flow_until_ratings()
+    ai_service = _FakeAiService(
+        analysis=AiMessageAnalysis(
+            intent=UserIntent.ANSWER,
+            intent_confidence=0.9,
+            target_sections=[
+                "rating_sales_opportunity",
+                "rating_meeting_mood",
+                "rating_priority",
+            ],
+            section_updates={
+                "rating_sales_opportunity": "bisher gar nicht",
+                "rating_meeting_mood": "ganz nett",
+                "rating_priority": "7",
+            },
+        )
+    )
+
+    process_report_message_with_ai(
+        chat,
+        "Verkaufschance bisher gar nicht, Stimmung ganz nett, Priorit\u00e4t 7.",
+        ai_service,
+    )
+
+    ratings = chat.report_draft.ratings_json
+    assert ratings["sales_opportunity"]["value"] is None
+    assert ratings["sales_opportunity"]["reason"] == "bisher gar nicht"
+    assert ratings["meeting_mood"]["reason"] == "ganz nett"
+    assert ratings["priority"]["value"] == 7
+    assert chat.report_draft.draft_data_json["current_step"] == (
+        "rating_closing_probability"
+    )
+    assert "Abschlusswahrscheinlichkeit" in chat.messages[-1].message_text
+    assert "Handlungsbedarf" in chat.messages[-1].message_text
+    assert "Kundenzufriedenheit" in chat.messages[-1].message_text
+    assert "rating_closing_probability" in chat.report_draft.missing_sections_json
+
+
+def test_combined_rating_answer_can_finish_report_and_create_tasks(app) -> None:
+    chat = _build_perfsolar_flow_until_ratings()
+    ai_service = _FakeAiService(
+        analysis=AiMessageAnalysis(
+            intent=UserIntent.ANSWER,
+            intent_confidence=0.91,
+            target_sections=[
+                "rating_sales_opportunity",
+                "rating_meeting_mood",
+                "rating_priority",
+                "rating_closing_probability",
+                "rating_need_for_action",
+                "rating_customer_satisfaction",
+            ],
+            section_updates={
+                "rating_sales_opportunity": "bisher gar nicht",
+                "rating_meeting_mood": "ganz nett",
+                "rating_priority": "7",
+                "rating_closing_probability": "zu fr\u00fch um das zu sagen",
+                "rating_need_for_action": "Innendienst muss sich melden",
+                "rating_customer_satisfaction": "wirkte zufrieden",
+            },
+        )
+    )
+
+    process_report_message_with_ai(
+        chat,
+        (
+            "Verkaufschance bisher gar nicht, Stimmung ganz nett, Priorit\u00e4t 7, "
+            "Abschluss zu fr\u00fch, Handlungsbedarf Innendienst, Kunde zufrieden."
+        ),
+        ai_service,
+    )
+    final_report = confirm_report(chat)
+    task_types = {task.task_type for task in final_report.inside_sales_tasks}
+
+    assert chat.status == ReportStatus.CONFIRMED.value
+    assert final_report.status == ReportStatus.CONFIRMED.value
+    assert final_report.ratings_json["closing_probability"]["value"] is None
+    assert final_report.ratings_json["closing_probability"]["reason"] == (
+        "zu fr\u00fch um das zu sagen"
+    )
+    assert InsideSalesTaskType.COMPLETE_MASTER_DATA.value in task_types
+    assert InsideSalesTaskType.FOLLOW_UP_CALL.value in task_types
 
 
 def test_ai_question_is_ignored_when_next_section_does_not_match(app) -> None:
@@ -679,6 +790,86 @@ def _login(client, email: str, password: str):
 
 def _chat_id_from_redirect(location: str) -> int:
     return int(location.rsplit("/", maxsplit=1)[-1])
+
+
+def _build_perfsolar_flow_until_ratings() -> Chat:
+    seed_database()
+    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    chat = start_report_chat(sales_user)
+
+    process_report_message_with_ai(
+        chat,
+        (
+            "Ich war in K\u00f6ln bei PerfSolar und habe mit Frau M\u00fcller "
+            "\u00fcber eine m\u00f6gliche Kooperation gesprochen."
+        ),
+        _FakeAiService(
+            analysis=AiMessageAnalysis(
+                intent=UserIntent.ADDITIONAL_INFO,
+                intent_confidence=0.95,
+                target_sections=["customer_context", "contacts", "visit_reason"],
+                section_updates={
+                    "customer_context": "PerfSolar",
+                    "contacts": "Frau M\u00fcller",
+                    "visit_reason": "m\u00f6gliche Kooperation",
+                },
+                suggested_next_section="summary",
+                suggested_next_question=(
+                    "Was genau wurde bei dem Gespr\u00e4ch besprochen?"
+                ),
+            )
+        ),
+    )
+    process_report_message_with_ai(
+        chat,
+        "Ob wir uns bei der InterSolar vielleicht mit Muster auf Ihren Stand stellen",
+        _FakeAiService(
+            analysis=AiMessageAnalysis(
+                intent=UserIntent.ANSWER,
+                intent_confidence=0.93,
+                target_sections=["summary"],
+                section_updates={
+                    "summary": (
+                        "Diskussion \u00fcber eine m\u00f6gliche Pr\u00e4senz "
+                        "mit Mustern am Stand auf der InterSolar"
+                    )
+                },
+                suggested_next_section="outcome",
+                suggested_next_question="Was ist das Ergebnis dieses Gespr\u00e4chs?",
+            )
+        ),
+    )
+    process_report_message_with_ai(
+        chat,
+        "Sie wollen Muster und wir reden in 2 Wochen dr\u00fcber",
+        _FakeAiService(
+            analysis=AiMessageAnalysis(
+                intent=UserIntent.ANSWER,
+                intent_confidence=0.92,
+                target_sections=["outcome", "next_action"],
+                section_updates={
+                    "outcome": "Kunde m\u00f6chte Muster",
+                    "next_action": "Gespr\u00e4ch in 2 Wochen",
+                },
+                suggested_next_section="offer_reference",
+                suggested_next_question="Gibt es dazu eine Angebotsnummer?",
+            )
+        ),
+    )
+    process_report_message_with_ai(
+        chat,
+        "nee die sind Lead, da muss der Innendienst nochmal anrufen",
+        _FakeAiService(
+            analysis=AiMessageAnalysis(
+                intent=UserIntent.ANSWER,
+                intent_confidence=0.88,
+                target_sections=[],
+                section_updates={},
+            )
+        ),
+    )
+
+    return chat
 
 
 class _FakeAiService:

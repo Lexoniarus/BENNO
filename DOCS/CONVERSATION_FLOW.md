@@ -160,6 +160,22 @@ BENNO should infer ratings from the conversation where possible, explain them br
 
 The final report text should be consistent with the ratings. It does not need to mechanically repeat every numeric value.
 
+## Assisted Flow Bundling
+
+The Gemini-assisted text loop should feel like a guided conversation, not a rigid field form.
+
+If one user message clearly contains several report facts, BENNO should capture all valid sections at once and move to the next genuinely missing item.
+
+Examples:
+
+- A message can fill customer or lead, contact, and visit reason together.
+- An outcome message can also contain the next follow-up action.
+- A lead/no-offer statement can mark offer and order references as not applicable.
+- An inside-sales follow-up statement can create a follow-up signal for later task creation.
+- Ratings can be answered as one combined assessment instead of six isolated form questions.
+
+The backend remains responsible for deciding what is accepted, skipped, or still missing. Gemini may propose bundled updates, but unknown sections, empty values, and unsafe overwrites are ignored.
+
 ## Final Review Loop
 
 The final review is block-based and human-readable.

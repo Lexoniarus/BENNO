@@ -43,6 +43,7 @@ from benno.services.mock_crm import (
 
 REVIEW_STEP = "review"
 AI_CACHE_KEY = "ai_cache"
+INSIDE_SALES_FOLLOW_UP_KEY = "inside_sales_follow_up_requested"
 MUTABLE_REPORT_STATUSES = {
     ReportStatus.IN_PROGRESS.value,
     ReportStatus.READY_FOR_REVIEW.value,
@@ -475,8 +476,16 @@ def _ai_message_context(
         "current_step": current_step.key,
         "current_question": _step_question(current_step, draft.session_language),
         "missing_sections": list(draft.missing_sections_json),
+        "missing_step_keys": _missing_step_keys(draft),
+        "missing_rating_keys": _missing_rating_keys(draft),
         "known_answers": dict(_draft_data(draft).get("answers", {})),
         "ratings": dict(draft.ratings_json),
+        "customer_context_type": draft.customer_context_type,
+        "flow_hints": {
+            "lead_can_skip_offer_and_order": True,
+            "inside_sales_follow_up_can_update_next_action": True,
+            "ratings_can_be_answered_together": True,
+        },
         "allowed_section_update_keys": _allowed_update_keys(),
     }
 
@@ -578,6 +587,14 @@ def _apply_assisted_answers(
         _apply_step_answer(draft, step, analysis.section_updates[step.key])
         applied_steps.append(step)
 
+    _apply_flow_shortcuts(
+        draft,
+        current_step,
+        message_text,
+        completed_before_message,
+        applied_steps,
+    )
+
     return applied_steps
 
 
@@ -586,6 +603,11 @@ def _answer_for_step(
     message_text: str,
     analysis: AiMessageAnalysis | None,
 ) -> str | None:
+    if step.key in {"offer_reference", "order_reference"} and _is_no_reference_message(
+        message_text
+    ):
+        return "keiner"
+
     if analysis is None:
         return message_text
 
@@ -596,6 +618,104 @@ def _answer_for_step(
         return message_text
 
     return suggested_value
+
+
+def _apply_flow_shortcuts(
+    draft: ReportDraft,
+    current_step: ReportStep,
+    message_text: str,
+    completed_before_message: set[str],
+    applied_steps: list[ReportStep],
+) -> None:
+    _apply_lead_context_signal(draft, message_text)
+    _apply_inside_sales_follow_up_signal(draft, current_step, message_text)
+    _apply_no_offer_order_shortcut(
+        draft,
+        current_step,
+        message_text,
+        completed_before_message,
+        applied_steps,
+    )
+    _apply_follow_up_shortcut(
+        draft,
+        current_step,
+        message_text,
+        completed_before_message,
+        applied_steps,
+    )
+
+
+def _apply_lead_context_signal(draft: ReportDraft, message_text: str) -> None:
+    if not _mentions_lead(message_text):
+        return
+    if draft.customer_id is not None:
+        return
+
+    draft.customer_context_type = CustomerContextType.NEW_LEAD.value
+    draft.validation_status = ValidationStatus.CONFIRMED_NEW.value
+
+
+def _apply_inside_sales_follow_up_signal(
+    draft: ReportDraft,
+    current_step: ReportStep,
+    message_text: str,
+) -> None:
+    if not _mentions_inside_sales_follow_up(message_text):
+        return
+
+    draft.draft_data_json = {
+        **_draft_data(draft),
+        INSIDE_SALES_FOLLOW_UP_KEY: True,
+    }
+
+
+def _apply_no_offer_order_shortcut(
+    draft: ReportDraft,
+    current_step: ReportStep,
+    message_text: str,
+    completed_before_message: set[str],
+    applied_steps: list[ReportStep],
+) -> None:
+    if current_step.key not in {"offer_reference", "order_reference"}:
+        return
+    if not _is_no_reference_message(message_text):
+        return
+
+    for step_key in ("offer_reference", "order_reference"):
+        step = _step_by_key(step_key)
+        if step.key in completed_before_message:
+            continue
+        if any(applied_step.key == step.key for applied_step in applied_steps):
+            continue
+
+        _apply_step_answer(draft, step, "keiner")
+        applied_steps.append(step)
+
+
+def _apply_follow_up_shortcut(
+    draft: ReportDraft,
+    current_step: ReportStep,
+    message_text: str,
+    completed_before_message: set[str],
+    applied_steps: list[ReportStep],
+) -> None:
+    if current_step.key not in {"summary", "outcome"}:
+        return
+    if current_step.key == "next_action":
+        return
+    if "next_action" in completed_before_message:
+        return
+    if any(applied_step.key == "next_action" for applied_step in applied_steps):
+        return
+    if not _looks_like_follow_up_action(message_text):
+        return
+
+    next_action_step = _step_by_key("next_action")
+    if _step_index(next_action_step) <= _step_index(current_step):
+        return
+
+    _apply_step_answer(draft, next_action_step, message_text)
+    applied_steps.append(next_action_step)
 
 
 def _additional_ai_steps(
@@ -666,6 +786,10 @@ def _suggested_question(
 
 def _allowed_update_keys() -> list[str]:
     return [step.key for step in REPORT_STEPS]
+
+
+def _step_by_key(step_key: str) -> ReportStep:
+    return next(step for step in REPORT_STEPS if step.key == step_key)
 
 
 def _store_ai_analysis(
@@ -774,6 +898,8 @@ def _next_question(
     draft = _require_draft(chat)
     if next_step is None:
         message = _review_ready_message(chat)
+    elif next_step.section == ReportSection.RATINGS:
+        message = _rating_question(draft)
     else:
         message = _suggested_question(next_step, analysis) or _step_question(
             next_step,
@@ -796,6 +922,37 @@ def _step_question(step: ReportStep, session_language: str | None) -> str:
         return step.question_de
 
     return step.question
+
+
+def _rating_question(draft: ReportDraft) -> str:
+    missing_labels = _missing_rating_labels(draft)
+    if len(missing_labels) == len(RATING_FIELDS):
+        return (
+            "Wie schätzt du den Termin insgesamt ein? Nenne gern kurz "
+            "Verkaufschance, Stimmung, Priorität, Abschlusswahrscheinlichkeit, "
+            "Handlungsbedarf und Kundenzufriedenheit. Zahlen von 1 bis 10 sind "
+            "hilfreich, aber wenn etwas noch zu früh ist, sag das einfach dazu."
+        )
+
+    if len(missing_labels) == 1:
+        return (
+            "Eine Bewertung fehlt noch: "
+            f"{missing_labels[0]}. Wie schätzt du das ein?"
+        )
+
+    return (
+        "Ein paar Bewertungen fehlen noch: "
+        f"{', '.join(missing_labels)}. Kannst du sie kurz einschätzen?"
+    )
+
+
+def _missing_rating_labels(draft: ReportDraft) -> list[str]:
+    missing_keys = set(_missing_rating_keys(draft))
+    return [
+        label_de
+        for rating_key, _label_en, label_de in RATING_FIELDS
+        if rating_key in missing_keys
+    ]
 
 
 def _update_customer_context(draft: ReportDraft, message_text: str) -> None:
@@ -949,7 +1106,7 @@ def _set_section_status(
 
 
 def _refresh_missing_sections(draft: ReportDraft) -> None:
-    draft.missing_sections_json = _missing_sections(draft.section_statuses_json)
+    draft.missing_sections_json = _missing_sections_for_draft(draft)
 
 
 def _missing_sections(section_statuses: dict[str, str]) -> list[str]:
@@ -963,6 +1120,31 @@ def _missing_sections(section_statuses: dict[str, str]) -> list[str]:
             ReportSection.USER_CONFIRMATION.value,
         }
     ]
+
+
+def _missing_sections_for_draft(draft: ReportDraft) -> list[str]:
+    missing_sections = _missing_sections(draft.section_statuses_json)
+    if ReportSection.RATINGS.value not in missing_sections:
+        missing_sections.extend(_missing_rating_step_keys(draft))
+
+    return missing_sections
+
+
+def _missing_step_keys(draft: ReportDraft) -> list[str]:
+    completed_steps = set(_draft_data(draft).get("completed_steps", []))
+    return [step.key for step in REPORT_STEPS if step.key not in completed_steps]
+
+
+def _missing_rating_keys(draft: ReportDraft) -> list[str]:
+    return [
+        rating_key
+        for rating_key, _label_en, _label_de in RATING_FIELDS
+        if rating_key not in draft.ratings_json
+    ]
+
+
+def _missing_rating_step_keys(draft: ReportDraft) -> list[str]:
+    return [f"rating_{rating_key}" for rating_key in _missing_rating_keys(draft)]
 
 
 def _all_ratings_collected(draft: ReportDraft) -> bool:
@@ -1175,6 +1357,15 @@ def _task_definitions(draft: ReportDraft) -> list[tuple[str, str, str]]:
             )
         )
 
+    if _draft_data(draft).get(INSIDE_SALES_FOLLOW_UP_KEY):
+        definitions.append(
+            (
+                "Inside sales follow-up",
+                InsideSalesTaskType.FOLLOW_UP_CALL.value,
+                "Inside sales should follow up on the mentioned next step.",
+            )
+        )
+
     return definitions
 
 
@@ -1209,8 +1400,53 @@ def _is_none_answer(message_text: str) -> bool:
     }
 
 
+def _is_no_reference_message(message_text: str) -> bool:
+    normalized_text = message_text.strip().lower()
+    if _is_none_answer(normalized_text):
+        return True
+    if normalized_text.startswith(("nee", "nein", "no ")):
+        return True
+
+    return _mentions_lead(message_text) and not _looks_like_reference(normalized_text)
+
+
+def _looks_like_reference(normalized_text: str) -> bool:
+    reference_pattern = r"\b(?:off|ang|angebot|auftrag|ord)[-_ ]?\d+\b"
+    return bool(re.search(reference_pattern, normalized_text))
+
+
 def _mentions_new(normalized_text: str) -> bool:
     return any(keyword in normalized_text for keyword in ("new", "neu", "unknown"))
+
+
+def _mentions_lead(message_text: str) -> bool:
+    return "lead" in message_text.lower()
+
+
+def _mentions_inside_sales_follow_up(message_text: str) -> bool:
+    normalized_text = message_text.lower()
+    return "innendienst" in normalized_text and any(
+        keyword in normalized_text for keyword in ("anrufen", "melden", "follow")
+    )
+
+
+def _looks_like_follow_up_action(message_text: str) -> bool:
+    normalized_text = message_text.lower()
+    return any(
+        keyword in normalized_text
+        for keyword in (
+            "wiedervorlage",
+            "melden",
+            "anrufen",
+            "nachfassen",
+            "follow-up",
+            "follow up",
+            "in 2 wochen",
+            "in zwei wochen",
+            "nächste woche",
+            "naechste woche",
+        )
+    )
 
 
 def _is_unclear_answer(normalized_text: str) -> bool:

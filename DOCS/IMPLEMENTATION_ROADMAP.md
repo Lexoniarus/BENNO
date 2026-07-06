@@ -212,6 +212,7 @@ Scope:
 Implementation note:
 
 - Gemini Developer API structured output uses an explicit list of section/value update objects for report extraction. BENNO converts that provider-specific shape into the internal provider contract before applying validation.
+- The Phase 5 loop should use Gemini as an assisted conversation layer, not just as extraction on top of a rigid form. Clear lead/no-offer signals, follow-up actions, and grouped ratings should be handled without unnecessary extra questions.
 
 Important rule:
 
