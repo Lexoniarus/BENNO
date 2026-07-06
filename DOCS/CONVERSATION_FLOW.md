@@ -187,6 +187,26 @@ Stable role rules are passed as Gemini system instructions. Dynamic state such a
 
 The conversation assistant does not decide what is saved. It only words the next question after the backend has validated and applied allowed updates.
 
+## Report Requirements Context
+
+Every Gemini extraction and next-question call receives a `report_requirements` checklist.
+
+Each checklist item contains:
+
+- `key`
+- German `label`
+- `status`: `missing`, `completed`, `not_applicable`, or `partially_completed`
+- `required`
+- `current_value`
+- `question`
+- `section`
+
+The checklist includes all report requirements from the beginning, including all rating fields. This lets Gemini compare a free user message against the full target shape instead of only the current deterministic step.
+
+The extractor must use this checklist to detect when one message satisfies several requirements at once. The conversation role must use the checklist to avoid asking again for requirements that are already completed or not applicable.
+
+The checklist is context only. It is not persisted as a separate database object, and it does not replace backend validation.
+
 ## Final Review Loop
 
 The final review is block-based and human-readable.

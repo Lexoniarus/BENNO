@@ -82,6 +82,22 @@ CORRECTION_FIELDS = BASE_CORRECTION_FIELDS + tuple(
     (f"rating_{rating_key}", f"Bewertung: {label_de}")
     for rating_key, _label_en, label_de in RATING_FIELDS
 )
+REQUIREMENT_LABELS = {
+    "customer_context": "Kunde oder Lead",
+    "contacts": "Teilnehmer",
+    "visit_reason": "Besuchsgrund",
+    "summary": "Zusammenfassung",
+    "outcome": "Ergebnis",
+    "next_action": "N\u00e4chster Schritt",
+    "offer_reference": "Angebotsbezug",
+    "order_reference": "Auftragsbezug",
+    "rating_sales_opportunity": "Verkaufschance",
+    "rating_meeting_mood": "Gespr\u00e4chsstimmung",
+    "rating_priority": "Priorit\u00e4t",
+    "rating_closing_probability": "Abschlusswahrscheinlichkeit",
+    "rating_need_for_action": "Handlungsbedarf",
+    "rating_customer_satisfaction": "Kundenzufriedenheit",
+}
 
 REPORT_STEPS = (
     ReportStep(
@@ -475,6 +491,7 @@ def _ai_message_context(
     return {
         "current_step": current_step.key,
         "current_question": _step_question(current_step, draft.session_language),
+        "report_requirements": _report_requirements(draft),
         "missing_sections": list(draft.missing_sections_json),
         "missing_step_keys": _missing_step_keys(draft),
         "missing_rating_keys": _missing_rating_keys(draft),
@@ -788,6 +805,67 @@ def _allowed_update_keys() -> list[str]:
     return [step.key for step in REPORT_STEPS]
 
 
+def _report_requirements(draft: ReportDraft) -> list[dict[str, Any]]:
+    completed_steps = set(_draft_data(draft).get("completed_steps", []))
+    answers = dict(_draft_data(draft).get("answers", {}))
+    return [
+        {
+            "key": step.key,
+            "label": REQUIREMENT_LABELS[step.key],
+            "status": _requirement_status(draft, step, completed_steps, answers),
+            "required": True,
+            "current_value": _requirement_current_value(draft, step, answers),
+            "question": _requirement_question(draft, step),
+            "section": step.section.value,
+        }
+        for step in REPORT_STEPS
+    ]
+
+
+def _requirement_status(
+    draft: ReportDraft,
+    step: ReportStep,
+    completed_steps: set[str],
+    answers: dict[str, Any],
+) -> str:
+    if step.section == ReportSection.RATINGS:
+        rating_key = step.key.removeprefix("rating_")
+        if rating_key in draft.ratings_json:
+            return "completed"
+        if draft.ratings_json:
+            return "partially_completed"
+        return "missing"
+
+    if step.key in {"offer_reference", "order_reference"} and _is_none_answer(
+        str(answers.get(step.key, ""))
+    ):
+        return "not_applicable"
+
+    if step.key in completed_steps:
+        return "completed"
+
+    return "missing"
+
+
+def _requirement_current_value(
+    draft: ReportDraft,
+    step: ReportStep,
+    answers: dict[str, Any],
+) -> Any:
+    if step.section == ReportSection.RATINGS:
+        rating = draft.ratings_json.get(step.key.removeprefix("rating_"))
+        return dict(rating) if rating is not None else None
+
+    return answers.get(step.key)
+
+
+def _requirement_question(draft: ReportDraft, step: ReportStep) -> str:
+    if step.section == ReportSection.RATINGS:
+        return _rating_question(draft)
+
+    return _step_question(step, draft.session_language)
+
+
 def _step_by_key(step_key: str) -> ReportStep:
     return next(step for step in REPORT_STEPS if step.key == step_key)
 
@@ -939,6 +1017,7 @@ def _next_question_context(
     return {
         "next_step": next_step.key,
         "fallback_question": _step_question(next_step, draft.session_language),
+        "report_requirements": _report_requirements(draft),
         "missing_sections": list(draft.missing_sections_json),
         "missing_step_keys": _missing_step_keys(draft),
         "missing_rating_keys": _missing_rating_keys(draft),
