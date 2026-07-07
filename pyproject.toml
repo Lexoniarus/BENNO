@@ -12,6 +12,8 @@ dependencies = [
     "Flask>=3.0",
     "Flask-Login>=0.6",
     "Flask-SQLAlchemy>=3.1",
+    "google-genai>=1.0",
+    "pydantic>=2.0",
     "python-dotenv>=1.0",
 ]
 
@@ -28,6 +30,7 @@ include = ["benno*"]
 [tool.setuptools.package-data]
 benno = [
     "static/css/*.css",
+    "static/img/*.svg",
     "static/js/*.js",
     "templates/admin/*.html",
     "templates/auth/*.html",

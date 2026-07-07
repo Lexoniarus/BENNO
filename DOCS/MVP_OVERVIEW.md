@@ -243,7 +243,7 @@ is the report actually saved.
 
 ## Privacy Direction
 
-OpenAI is used for the first stable implementation because it allows the report workflow to be tested faster and more reliably.
+Gemini is used for the first stable implementation because it is the current practical provider choice for testing the report workflow with a real AI service.
 
 Once the workflow works, the project should evaluate how much can be run locally. That means the AI should run on controlled infrastructure or through a local interface wherever possible, instead of sending sensitive content to external services long term.
 

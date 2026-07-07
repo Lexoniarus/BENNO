@@ -100,6 +100,7 @@ AI provider configuration is an admin topic.
 
 Planned providers:
 
+- `gemini`
 - `openai`
 - `local`
 
@@ -109,7 +110,7 @@ Rules:
 - There is a global default provider.
 - A user may have an optional provider override.
 - Concrete model settings are not normal user settings.
-- Local provider support comes after the OpenAI workflow is stable.
+- Local provider support comes after the Gemini workflow is stable.
 
 Resolution at chat start:
 

@@ -32,8 +32,26 @@ def _configure_app(app: Flask, config_name: str | None) -> None:
     selected_name = config_name or os.environ.get("BENNO_ENV", "development")
     config_class = CONFIG_BY_NAME.get(str(selected_name), DevelopmentConfig)
     app.config.from_object(config_class)
+    _configure_ai(app)
     _configure_secret_key(app)
     _configure_database(app)
+
+
+def _configure_ai(app: Flask) -> None:
+    if app.config.get("TESTING"):
+        return
+
+    configured_provider = os.environ.get("AI_PROVIDER")
+    if configured_provider:
+        app.config["AI_PROVIDER"] = configured_provider
+
+    configured_gemini_key = os.environ.get("GEMINI_API_KEY")
+    if configured_gemini_key:
+        app.config["GEMINI_API_KEY"] = configured_gemini_key
+
+    configured_gemini_model = os.environ.get("GEMINI_MODEL")
+    if configured_gemini_model:
+        app.config["GEMINI_MODEL"] = configured_gemini_model
 
 
 def _configure_secret_key(app: Flask) -> None:

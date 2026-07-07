@@ -3,9 +3,9 @@
 BENNO means **B2B Encounter Notes and Next-step Organizer**.
 
 BENNO is a guided visit report assistant for B2B field sales. The current
-project phase builds the local Flask foundation before data models, login,
-report workflows, OpenAI integration, voice, and eNVenta field mapping are
-added in later phases.
+project phase builds the first Gemini-assisted report workflow on top of the
+local Flask foundation, login, data model, and mock CRM/ERP data. Voice,
+eNVenta field mapping, and local AI are planned for later phases.
 
 ## Local Setup
 
@@ -33,7 +33,9 @@ flask --app benno:create_app run
 
 Open `http://127.0.0.1:5000` in a browser.
 
-Demo logins after `seed-db`:
+## Demo Logins
+
+After running `seed-db`, these mock users are available:
 
 - `admin@benno.local` / `admin-demo-password`
 - `sales@benno.local` / `sales-demo-password`

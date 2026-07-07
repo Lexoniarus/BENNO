@@ -189,11 +189,11 @@ Required behavior:
 
 Done when:
 
-- A complete report can be saved without OpenAI.
+- A complete report can be saved without a real AI provider.
 - The flow from start to save can be demonstrated.
 - Corrections are not lost.
 
-## Phase 5: OpenAI Integration
+## Phase 5: Gemini Provider Integration
 
 Goal:
 
@@ -201,13 +201,21 @@ BENNO understands free text better and responds more naturally.
 
 Scope:
 
-- OpenAI provider service
+- Gemini provider service
 - controlled AI response structure
 - extraction from free user input
 - intent detection
 - suggestion for next question
 - review wording
 - final report text
+
+Implementation note:
+
+- Gemini Developer API structured output uses an explicit list of section/value update objects for report extraction. BENNO converts that provider-specific shape into the internal provider contract before applying validation.
+- The Phase 5 loop should use Gemini as an assisted conversation layer, not just as extraction on top of a rigid form. Clear lead/no-offer signals, follow-up actions, and grouped ratings should be handled without unnecessary extra questions.
+- Gemini calls should separate stable system instructions from dynamic content. The extractor role uses structured output; the conversation role receives the validated draft state and only words the next question.
+- Gemini receives an explicit `report_requirements` checklist in extraction and next-question contexts, so it can see all required, completed, skipped, and partially completed report fields from the beginning.
+- Normal report turns use at most one Gemini call per user message. The backend may use the extractor's same-call suggested question when it matches the computed next step; otherwise deterministic questions keep the loop inside rate limits.
 
 Important rule:
 
@@ -224,7 +232,7 @@ The code still decides:
 
 Done when:
 
-- OpenAI can interpret free visit descriptions usefully.
+- Gemini can interpret free visit descriptions usefully.
 - Follow-up questions become more natural.
 - Review and final report text are understandable.
 - Backend code remains in control of saving and status transitions.
@@ -248,6 +256,25 @@ Questions to resolve:
 - Which values must BENNO ask for?
 - Which fields are written back?
 - Which information creates reminders or inside sales tasks?
+
+Field classification rule:
+
+Do not treat every visible eNVenta screen field as a BENNO dialog question.
+
+Classify fields first:
+
+- user-provided report content
+- AI-assisted derived values
+- CRM/eNVenta master data
+- BENNO login or user context
+- eNVenta system metadata
+
+Known eNVenta system metadata examples:
+
+- `Erfassung` is set by eNVenta when the record is created.
+- `Änderung` is set by eNVenta when the record is changed.
+
+BENNO should not ask for or write these fields. They may be read-only integration metadata later.
 
 The placeholder CRM service should then define:
 
@@ -358,7 +385,7 @@ Scope:
 
 - local provider through an OpenAI-compatible API
 - for example LM Studio
-- same provider contract as OpenAI
+- same provider contract shape as the Gemini provider
 - comparison against the same demo cases
 
 Questions to test:
@@ -372,7 +399,7 @@ Questions to test:
 Done when:
 
 - The same text loop can be tested with a local provider.
-- Differences to OpenAI are documented.
+- Differences to Gemini are documented.
 - There is enough evidence to decide how far BENNO can run locally.
 
 ## Recommended Start
@@ -389,4 +416,4 @@ Then move directly to Phase 4:
 
 > A complete report loop from "New report" to "saved".
 
-This loop is the foundation. Once it works, OpenAI, voice, eNVenta field mapping, and the local provider are extensions on a stable core.
+This loop is the foundation. Once it works, Gemini, voice, eNVenta field mapping, and the local provider are extensions on a stable core.

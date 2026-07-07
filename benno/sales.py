@@ -6,6 +6,7 @@ from flask_login import current_user
 from benno.auth import sales_required
 from benno.enums import ReportStatus
 from benno.models import Chat, FinalReport
+from benno.services.ai_provider import get_ai_service, get_ai_status
 from benno.services.report_loop import (
     apply_report_correction,
     build_report_review,
@@ -24,6 +25,28 @@ OPEN_REPORT_STATUSES = (
     ReportStatus.INSIDE_SALES_INPUT_REQUIRED.value,
     ReportStatus.BLOCKED.value,
 )
+REPORT_STATUS_LABELS_DE = {
+    ReportStatus.BLOCKED.value: "Blockiert",
+    ReportStatus.CANCELLED.value: "Abgebrochen",
+    ReportStatus.CONFIRMED.value: "Bestätigt",
+    ReportStatus.IN_PROGRESS.value: "In Bearbeitung",
+    ReportStatus.INSIDE_SALES_INPUT_REQUIRED.value: "Innendienst nötig",
+    ReportStatus.READY_FOR_REVIEW.value: "Bereit zur Prüfung",
+    ReportStatus.SUBMITTED.value: "Übergeben",
+}
+REPORT_SECTION_LABELS_DE = {
+    "contacts": "Teilnehmer",
+    "customer_context": "Kunde oder Lead",
+    "final_report": "Finaler Bericht",
+    "next_action": "Nächster Schritt",
+    "offer_reference": "Angebotsbezug",
+    "order_reference": "Auftragsbezug",
+    "outcome": "Ergebnis",
+    "ratings": "Bewertungen",
+    "summary": "Zusammenfassung",
+    "user_confirmation": "Bestätigung",
+    "visit_reason": "Besuchsgrund",
+}
 
 
 @sales_blueprint.get("")
@@ -46,7 +69,10 @@ def open_reports():
     """Render the current user's open report chats."""
     chats = _own_open_chats_query().order_by(Chat.updated_at.desc()).all()
 
-    return render_template("sales/open_reports.html", chats=chats)
+    return render_template(
+        "sales/open_reports.html",
+        report_rows=_build_open_report_rows(chats),
+    )
 
 
 @sales_blueprint.get("/reports/completed")
@@ -80,6 +106,9 @@ def report_chat(chat_id: int):
         chat=chat,
         draft=chat.report_draft,
         ready_for_review=is_ready_for_review(chat),
+        ai_status=get_ai_status(),
+        section_labels=REPORT_SECTION_LABELS_DE,
+        status_labels=REPORT_STATUS_LABELS_DE,
     )
 
 
@@ -88,8 +117,8 @@ def report_chat(chat_id: int):
 def report_message(chat_id: int):
     """Store a user message and advance the report chat."""
     chat = _get_own_chat_or_404(chat_id)
-    message_text = request.form.get("message", "").strip()
-    if not message_text:
+    message_text = request.form.get("message", "")
+    if not message_text.strip():
         flash("Please enter a message before sending.", "warning")
         return redirect(url_for("sales.report_chat", chat_id=chat.id))
 
@@ -113,7 +142,7 @@ def report_review(chat_id: int):
     return render_template(
         "sales/report_review.html",
         chat=chat,
-        review=build_report_review(chat.report_draft),
+        review=build_report_review(chat.report_draft, get_ai_service()),
     )
 
 
@@ -138,7 +167,7 @@ def confirm_report_route(chat_id: int):
     """Confirm and save a report draft."""
     chat = _get_own_chat_or_404(chat_id)
     try:
-        final_report = confirm_report(chat)
+        final_report = confirm_report(chat, get_ai_service())
     except ValueError as error:
         flash(str(error), "warning")
         return redirect(url_for("sales.report_chat", chat_id=chat.id))
@@ -207,3 +236,61 @@ def _get_own_final_report_or_404(report_id: int) -> FinalReport:
         abort(404)
 
     return final_report
+
+
+def _build_open_report_rows(chats: list[Chat]) -> list[dict[str, object]]:
+    return [_build_open_report_row(chat) for chat in chats]
+
+
+def _build_open_report_row(chat: Chat) -> dict[str, object]:
+    draft = chat.report_draft
+    answers = dict(draft.draft_data_json.get("answers", {})) if draft else {}
+    return {
+        "chat": chat,
+        "customer_label": _first_present_text(
+            answers.get("customer_context"),
+            getattr(getattr(draft, "customer", None), "name", None),
+            getattr(getattr(draft, "lead", None), "name", None),
+            fallback="Noch kein Kunde erkannt",
+        ),
+        "topic_label": _first_present_text(
+            answers.get("visit_reason"),
+            getattr(draft, "summary", None),
+            fallback="Noch kein Thema erkannt",
+        ),
+        "progress_label": _open_report_progress_label(draft),
+        "status_label": REPORT_STATUS_LABELS_DE.get(chat.status, chat.status),
+        "last_question": getattr(draft, "last_question", None),
+    }
+
+
+def _open_report_progress_label(draft) -> str:
+    if draft is None:
+        return "Noch kein Fortschritt"
+
+    section_statuses = dict(draft.section_statuses_json or {})
+    total_sections = len(
+        [
+            section
+            for section in section_statuses
+            if section not in {"final_report", "user_confirmation"}
+        ]
+    )
+    missing_sections = len(draft.missing_sections_json or [])
+    completed_sections = max(total_sections - missing_sections, 0)
+    if total_sections == 0:
+        return "Noch kein Fortschritt"
+
+    return f"{completed_sections}/{total_sections} Bereiche"
+
+
+def _first_present_text(*values, fallback: str) -> str:
+    for value in values:
+        if value is None:
+            continue
+
+        text = str(value).strip()
+        if text:
+            return text
+
+    return fallback

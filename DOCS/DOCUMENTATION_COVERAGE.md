@@ -18,6 +18,7 @@ Use these documents for current implementation and product work:
 | `CODING_STANDARDS.md` | Coding quality, naming, and architecture standards |
 | `CONVERSATION_FLOW.md` | Dialog behavior, report sections, intents, correction, review |
 | `DATA_MODEL.md` | Database areas, draft/report/task model, mock CRM structure |
+| `ENVENTA_FIELD_NOTES.md` | First eNVenta visit report field observations and source classification |
 | `USER_ADMIN_SETTINGS.md` | Users, roles, admin scope, language and provider settings |
 | `AI_VOICE_PRIVACY.md` | Provider strategy, voice layer, local provider direction, privacy |
 
@@ -38,13 +39,13 @@ Use these documents for current implementation and product work:
 
 The following topics appeared in earlier notes but are not current implementation guidance:
 
-- Gemini is not part of the current MVP baseline.
+- Gemini is the first real AI provider for the current MVP baseline.
 - FastAPI and React are not the current first-slice stack.
 - Sales users do not choose the AI provider.
 - SQLite is sufficient for the MVP.
 - The first implementation starts with text, not voice.
-- Local AI is a later privacy-oriented provider step after the OpenAI workflow is stable.
-- The exact eNVenta field mapping waits for Bernd's field list.
+- Local AI is a later privacy-oriented provider step after the Gemini workflow is stable.
+- The exact eNVenta field mapping waits for Bernd's field list and must distinguish user input, derivation, master data, login context, and eNVenta system metadata.
 - The first slice uses seeded users instead of setup/reset links.
 
 ## Documentation Rule Going Forward
@@ -57,4 +58,3 @@ German may still appear in:
 - user-facing German UI copy
 - demo conversation examples where German is intentionally tested
 - source material received from external stakeholders
-

@@ -6,8 +6,22 @@ from enum import StrEnum
 class AiProvider(StrEnum):
     """Supported AI provider codes."""
 
+    GEMINI = "gemini"
     OPENAI = "openai"
     LOCAL = "local"
+
+
+class UserIntent(StrEnum):
+    """Allowed intent labels for interpreted user messages."""
+
+    ANSWER = "answer"
+    CORRECTION = "correction"
+    ADDITIONAL_INFO = "additional_info"
+    CONFIRMATION = "confirmation"
+    REJECTION = "rejection"
+    REPEAT = "repeat"
+    CANCEL = "cancel"
+    UNKNOWN = "unknown"
 
 
 class CustomerContextType(StrEnum):

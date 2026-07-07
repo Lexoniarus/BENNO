@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="benno-logo-v3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 248 50.2" role="img" aria-labelledby="title desc">
+  <title id="title">Benno logo</title>
+  <desc id="desc">A Benno wordmark closely following the supplied yellow and navy reference style.</desc>
+  <defs>
+    <style>
+      .st0 { fill: none; }
+      .st1 { fill: #ebe566; }
+      .st2 { fill: #143347; }
+      .st3 { fill: #ffffff; }
+      .mark {
+        font-family: "Nimbus Sans", "Arial", sans-serif;
+        font-size: 47px;
+        font-weight: 700;
+        letter-spacing: -1.8px;
+      }
+      .word {
+        font-family: "Nimbus Sans", "Arial", sans-serif;
+        font-size: 45px;
+        font-weight: 700;
+        letter-spacing: -1.6px;
+      }
+    </style>
+  </defs>
+  <g id="Logo">
+    <path class="st1" d="M63.8,0H.1v50.2h63.7c13.9,0,25.1-11.2,25.1-25.1S77.7,0,63.8,0h0Z"/>
+    <text class="st2 mark" x="45.8" y="41.1">B</text>
+    <text class="st3 word" x="92.8" y="41.1">enno</text>
+  </g>
+  <g id="BoundingBox">
+    <rect class="st0" x=".1" y="0" width="247.9" height="50.2"/>
+  </g>
+</svg>

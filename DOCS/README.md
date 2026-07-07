@@ -14,10 +14,11 @@ Recommended reading order:
 4. `CODING_STANDARDS.md` for code quality, naming, and architecture rules
 5. `CONVERSATION_FLOW.md` for report-state and dialog behavior
 6. `DATA_MODEL.md` for database and mock CRM structure
-7. `USER_ADMIN_SETTINGS.md` for login, role, language, and admin behavior
-8. `AI_VOICE_PRIVACY.md` for provider, voice, and privacy direction
-9. `DOCUMENTATION_COVERAGE.md` for the mapping from archived German notes to current English docs
-10. `archive_de/` only when historical German concept context is needed
+7. `ENVENTA_FIELD_NOTES.md` for the first eNVenta visit report field observations and source classification
+8. `USER_ADMIN_SETTINGS.md` for login, role, language, and admin behavior
+9. `AI_VOICE_PRIVACY.md` for provider, voice, and privacy direction
+10. `DOCUMENTATION_COVERAGE.md` for the mapping from archived German notes to current English docs
+11. `archive_de/` only when historical German concept context is needed
 
 Archived documents:
 

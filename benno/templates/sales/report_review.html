@@ -8,6 +8,13 @@
     <p class="hero__eyebrow">Sales workspace</p>
     <h1 id="report-review-title">Report Review</h1>
 
+    {% if review.review_text %}
+      <article class="review-block review-block--wide">
+        <span>Review Summary</span>
+        <p>{{ review.review_text }}</p>
+      </article>
+    {% endif %}
+
     <div class="review-grid">
       {% for label, value in review.sections %}
         <article class="review-block">

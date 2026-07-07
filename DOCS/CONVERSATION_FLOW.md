@@ -100,6 +100,20 @@ Example:
 }
 ```
 
+Provider-facing AI responses may use a different wire shape than BENNO's internal state. For Gemini, section updates are requested as a list of explicit section/value objects:
+
+```json
+{
+  "section_updates": [
+    { "section": "customer_context", "value": "PerfSolar" },
+    { "section": "contacts", "value": "Frau Schmidt" },
+    { "section": "visit_reason", "value": "Forecast" }
+  ]
+}
+```
+
+The backend converts this into the internal section map only after validation. Unknown section names, empty values, malformed update objects, and provider errors must not break the report loop. They are ignored or handled through deterministic fallback behavior.
+
 ## Customer And Lead Context
 
 `customer_context` is mandatory.
@@ -145,6 +159,55 @@ BENNO uses six rating values on a scale from 1 to 10:
 BENNO should infer ratings from the conversation where possible, explain them briefly, and allow the user to confirm or correct them.
 
 The final report text should be consistent with the ratings. It does not need to mechanically repeat every numeric value.
+
+## Assisted Flow Bundling
+
+The Gemini-assisted text loop should feel like a guided conversation, not a rigid field form.
+
+If one user message clearly contains several report facts, BENNO should capture all valid sections at once and move to the next genuinely missing item.
+
+Examples:
+
+- A message can fill customer or lead, contact, and visit reason together.
+- An outcome message can also contain the next follow-up action.
+- A lead/no-offer statement can mark offer and order references as not applicable.
+- An inside-sales follow-up statement can create a follow-up signal for later task creation.
+- Ratings can be answered as one combined assessment instead of six isolated form questions.
+
+The backend remains responsible for deciding what is accepted, skipped, or still missing. Gemini may propose bundled updates, but unknown sections, empty values, and unsafe overwrites are ignored.
+
+## LLM Role Separation
+
+The Gemini integration uses two logical roles:
+
+- extractor / observer: reads the current user message and proposes structured updates through a schema
+- conversation assistant: receives the validated draft state and writes the next short German assistant question
+
+Stable role rules are passed as Gemini system instructions. Dynamic state such as the current step, known answers, missing fields, ratings, and the latest user message is passed as content.
+
+The conversation assistant does not decide what is saved. It only words the next question after the backend has validated and applied allowed updates.
+
+During the Phase 5 report loop, BENNO uses at most one Gemini call per user message. The structured extraction response may include a suggested next German question, but the backend only uses it when the suggested section matches the backend-computed next step. Otherwise, BENNO falls back to its deterministic German question templates.
+
+## Report Requirements Context
+
+Gemini-facing extraction and question-drafting contexts include a `report_requirements` checklist.
+
+Each checklist item contains:
+
+- `key`
+- German `label`
+- `status`: `missing`, `completed`, `not_applicable`, or `partially_completed`
+- `required`
+- `current_value`
+- `question`
+- `section`
+
+The checklist includes all report requirements from the beginning, including all rating fields. This lets Gemini compare a free user message against the full target shape instead of only the current deterministic step.
+
+The extractor must use this checklist to detect when one message satisfies several requirements at once. The conversation role must use the checklist to avoid asking again for requirements that are already completed or not applicable.
+
+The checklist is context only. It is not persisted as a separate database object, and it does not replace backend validation.
 
 ## Final Review Loop
 
