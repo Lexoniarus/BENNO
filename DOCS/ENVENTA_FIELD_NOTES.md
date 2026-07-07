@@ -73,6 +73,85 @@ structured handoff target with these groups:
 The MVP should not implement `visit_rhythm`, supplier-specific behavior, or a
 full eNVenta screen clone.
 
+## MVP Working Mapping Table
+
+This table is the current Phase 6 working contract. It is derived from the
+screenshots and user clarification, not from a real eNVenta API schema.
+
+| eNVenta label | BENNO field | Source | Required for MVP | Ask user? | Writeback relevance |
+|---|---|---|---|---|---|
+| `Besuchsart` | `visit_type` | User input or AI derivation | Yes | Ask if missing | Yes |
+| `AKL-Nummer` | `account_id` | Account/AKL lookup | Yes | Search/select, do not ask as raw ID | Yes |
+| `Suchname` | `account_search_name` | Account/AKL lookup | Yes | Search/select, do not ask as separate field | Yes |
+| `Ansprechpartner` | `contact_id` / `contact_name` | Contact lookup or user input | Yes | Ask if unclear or new | Yes |
+| `Anschrift` | `account_address` | Account/AKL lookup | No | No | Likely read-only or derived |
+| `Adressrestriktion` | `address_restriction` | Account/AKL metadata | No | No | Likely read-only |
+| `Vertreter` | `field_sales_user_id` | BENNO login or user mapping | Yes | No | Yes |
+| `Sachbearbeiter` | `responsible_user_id` | Responsible user lookup/config | Conditional | Ask/select only for follow-up ownership | Yes for tasks/reminders |
+| `Besuchsdatum` | `visit_date` | Default/user correction | Yes | Only if not today or needs correction | Yes |
+| `Besuchszeit` | `visit_time` | Default/user correction | No | Only if relevant | Optional |
+| `Status` | `visit_report_status` | BENNO state | Yes | No | Yes |
+| `Berichtsstatus` | `report_status` | BENNO state | Yes | No | Yes |
+| `Ziel/Thema` | `visit_topic` | User input or AI derivation | Yes | Ask if missing | Yes |
+| `Info` | `summary` | User input or AI derivation | Yes | Ask if missing | Yes |
+| `Vereinbarung` | `outcome` / `next_action` | User input or AI derivation | Yes | Ask if missing | Yes |
+| `Stärke` | `strengths` | User input or AI derivation | No | Optional, do not block report | Optional |
+| `Schwäche` | `weaknesses` | User input or AI derivation | No | Optional, do not block report | Optional |
+| `Zufriedenheit` | `customer_satisfaction_rating` | User input or AI derivation | Yes | Ask if missing | Yes |
+| `Techn. Attrakt.` | `technical_attractiveness_rating` | User input or AI derivation | Yes | Ask if missing | Yes |
+| `Kaufm. Attrakt.` | `commercial_attractiveness_rating` | User input or AI derivation | Yes | Ask if missing | Yes |
+| `Priorität` | `priority_rating` | User input or AI derivation | Yes | Ask if missing | Yes |
+| `Termin ab` | `next_appointment_date` | User input or AI derivation | Conditional | Ask if follow-up/appointment exists | Yes |
+| `Besuchsrhythmus` | - | Out of scope | No | No | No |
+| `Angebote` | `offer_reference` / `offer_id` | Offer lookup or user mention | Conditional | Ask if mentioned or relevant | Yes |
+| `Aufträge` | `order_reference` / `order_id` | Order lookup or user mention | Conditional | Ask if mentioned or relevant | Yes |
+| `Wiedervorlagen` | `reminders` | Generated from next action or user input | Conditional | Ask if follow-up needs scheduling | Yes |
+| `Teilnehmer` / `Name` | `participants` | User input/contact lookup | Yes | Ask if missing | Yes |
+| `Teilnehmer` / `Bemerkung` | `participant_notes` | User input or AI derivation | No | Optional | Optional |
+| `Projekte` | `project_reference` | Project lookup/user mention | No | Optional | Optional |
+| `Erfassung` | `created_metadata` | eNVenta system metadata | No | No | No, read-only later |
+| `Änderung` | `updated_metadata` | eNVenta system metadata | No | No | No, read-only later |
+
+## MVP Required Fields
+
+BENNO should treat a visit report as complete for the Phase 6 MVP only when
+these fields are available or explicitly marked not applicable:
+
+| BENNO field | Requirement |
+|---|---|
+| `visit_type` | Required. Must be one of `in_person`, `virtual`, or `phone`. |
+| `account_id` or `account_name` | Required. Existing account lookup, existing lead lookup, or new lead text is acceptable for the MVP. |
+| `contact_id` or `contact_name` | Required. Existing contact, new contact text, or participant name is acceptable. |
+| `field_sales_user_id` | Required from BENNO login/user mapping. |
+| `visit_date` | Required. Default may be today's date, but it must be stored. |
+| `visit_report_status` / `report_status` | Required from BENNO workflow state. |
+| `visit_topic` | Required. Captures `Ziel/Thema`. |
+| `summary` | Required. Captures `Info`. |
+| `outcome` | Required. Captures the result or agreement. |
+| `next_action` | Required. Captures the next step or explicit statement that no next action exists. |
+| `customer_satisfaction_rating` | Required, 1 to 10 or explicit "not assessable yet" reason. |
+| `technical_attractiveness_rating` | Required, 1 to 10 or explicit "not assessable yet" reason. |
+| `commercial_attractiveness_rating` | Required, 1 to 10 or explicit "not assessable yet" reason. |
+| `priority_rating` | Required, 1 to 10 or explicit "not assessable yet" reason. |
+
+Conditional required fields:
+
+- `offer_reference` / `offer_id` is required only when an offer is mentioned or the visit is explicitly about an offer. Otherwise it may be `not_applicable`.
+- `order_reference` / `order_id` is required only when an order is mentioned or the visit is explicitly about an order. Otherwise it may be `not_applicable`.
+- `next_appointment_date` is required only when a concrete next appointment, reminder, or callback date is agreed.
+- `responsible_user_id` is required only when a reminder or inside-sales task needs a responsible owner.
+
+Optional MVP fields:
+
+- `visit_time`
+- `duration`
+- `strengths`
+- `weaknesses`
+- `participant_notes`
+- `project_reference`
+- `account_address`
+- `address_restriction`
+
 ### User-Provided Report Content
 
 These fields are likely report content and may be collected through BENNO's guided dialog:

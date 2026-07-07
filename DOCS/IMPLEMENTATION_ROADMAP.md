@@ -286,6 +286,7 @@ Phase 6 field decisions already clarified:
 - Offers and orders may appear in one eNVenta table but must remain separate BENNO document types.
 - AKL is the shared address/customer/supplier/lead domain; contacts are linked to AKL/account records.
 - The placeholder contract should include reminders, field sales users, responsible users, accounts, contacts, offers, and orders.
+- The working mapping table and MVP required fields are maintained in `DOCS/ENVENTA_FIELD_NOTES.md`.
 
 The placeholder CRM service should then define:
 
