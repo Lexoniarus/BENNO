@@ -122,6 +122,10 @@ fields. The earlier six BENNO ratings from the Phase 4/5 text loop are legacy
 working fields and should be replaced or explicitly mapped during the Phase 6
 implementation.
 
+The mock CRM/eNVenta visit report write target should contain these four
+ratings as its only rating fields. They are not an additional layer on top of
+the old BENNO rating set.
+
 | BENNO field | Requirement |
 |---|---|
 | `visit_type` | Required. Must be one of `in_person`, `virtual`, or `phone`. |

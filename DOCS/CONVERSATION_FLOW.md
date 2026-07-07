@@ -32,7 +32,7 @@ The report draft is organized into these sections:
 | `next_action` | Next step, follow-up, or reminder date |
 | `offer_reference` | Offer reference, if relevant |
 | `order_reference` | Order reference, if relevant |
-| `ratings` | Six sales evaluation values and short explanations |
+| `ratings` | eNVenta-aligned rating values and short explanations |
 | `final_report` | Written final visit report |
 | `user_confirmation` | Explicit final confirmation |
 

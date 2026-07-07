@@ -36,8 +36,10 @@ The MVP needs these data areas:
 | `mock_contacts` | Placeholder CRM contact data |
 | `mock_offers` | Placeholder offer references |
 | `mock_orders` | Placeholder order references |
+| `mock_visit_reports` | Placeholder eNVenta visit report write target |
 
-The exact eNVenta visit report fields will be added after Bernd's field list is available.
+Phase 6 adds the eNVenta-oriented visit report write shape based on Bernd's
+screenshots and the clarified MVP mapping.
 
 ## Main Relationships
 
@@ -178,6 +180,26 @@ Minimum fields:
 - `created_at`
 
 The final eNVenta-specific fields are added later.
+
+## Mock eNVenta Visit Reports
+
+Phase 6 should add or emulate a mock CRM/eNVenta visit report write target.
+This is the local placeholder table or structured save result that represents
+what BENNO would later write toward eNVenta.
+
+The mock visit report target should use the Phase 6 eNVenta field mapping, not
+the earlier Phase 4/5 BENNO-only report shape.
+
+Required target rating fields:
+
+- `customer_satisfaction_rating`
+- `technical_attractiveness_rating`
+- `commercial_attractiveness_rating`
+- `priority_rating`
+
+These four fields replace the earlier six internal BENNO rating fields as the
+target contract. The old fields should not be kept in parallel in the mock
+eNVenta visit report target.
 
 ## Inside Sales Tasks
 
