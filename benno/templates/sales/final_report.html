@@ -1,38 +1,76 @@
 {% extends "base.html" %}
 
-{% block title %}Final Report - BENNO{% endblock %}
+{% block title %}Besuchsbericht - BENNO{% endblock %}
 {% block shell_class %}app-shell--page{% endblock %}
 
 {% block content %}
   <section class="page-section" aria-labelledby="final-report-title">
     <p class="hero__eyebrow">Sales workspace</p>
-    <h1 id="final-report-title">Final Report #{{ report.id }}</h1>
+    <h1 id="final-report-title">
+      {% if report.mock_visit_report %}
+        Besuchsbericht {{ report.mock_visit_report.visit_report_number }}
+      {% else %}
+        Besuchsbericht #{{ report.id }}
+      {% endif %}
+    </h1>
 
     <dl class="definition-list">
+      {% if report.mock_visit_report %}
+        <div>
+          <dt>Kunde/Lead</dt>
+          <dd>{{ report.mock_visit_report.account_search_name or "Nicht erkannt" }}</dd>
+        </div>
+        <div>
+          <dt>Ziel/Thema</dt>
+          <dd>{{ report.mock_visit_report.target_topic }}</dd>
+        </div>
+        <div>
+          <dt>Info</dt>
+          <dd>{{ report.mock_visit_report.info_text }}</dd>
+        </div>
+        <div>
+          <dt>Vereinbarung</dt>
+          <dd>{{ report.mock_visit_report.agreement_text }}</dd>
+        </div>
+        <div>
+          <dt>Stärke</dt>
+          <dd>{{ report.mock_visit_report.strength_text or "Nicht angegeben" }}</dd>
+        </div>
+        <div>
+          <dt>Schwäche</dt>
+          <dd>{{ report.mock_visit_report.weakness_text or "Nicht angegeben" }}</dd>
+        </div>
+      {% endif %}
       <div>
         <dt>Status</dt>
         <dd>{{ report.status }}</dd>
       </div>
       <div>
-        <dt>Summary</dt>
+        <dt>Interne Zusammenfassung</dt>
         <dd>{{ report.summary }}</dd>
       </div>
       <div>
-        <dt>Outcome</dt>
-        <dd>{{ report.outcome or "Not provided" }}</dd>
+        <dt>Interne Vereinbarung</dt>
+        <dd>{{ report.outcome or "Nicht angegeben" }}</dd>
       </div>
       <div>
-        <dt>Next Action</dt>
-        <dd>{{ report.next_action or "Not provided" }}</dd>
+        <dt>Nächster Schritt</dt>
+        <dd>{{ report.next_action or "Nicht angegeben" }}</dd>
       </div>
       <div>
-        <dt>Inside Sales Tasks</dt>
-        <dd>{{ report.inside_sales_tasks | length }}</dd>
+        <dt>Wiedervorlagen</dt>
+        <dd>
+          {% if report.mock_visit_report %}
+            {{ report.mock_visit_report.reminders | length }}
+          {% else %}
+            0
+          {% endif %}
+        </dd>
       </div>
     </dl>
 
     <article class="review-block review-block--wide">
-      <span>Final Report Text</span>
+      <span>Finaler Berichtstext</span>
       <pre>{{ report.final_report_text }}</pre>
     </article>
   </section>

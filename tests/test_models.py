@@ -7,16 +7,14 @@ from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from benno.enums import (
-    CustomerContextType,
-    InsideSalesTaskType,
+    AccountType,
     MessageSender,
     MessageType,
-    ReasonCode,
-    ReportSection,
+    ReminderOwnerType,
     ReportStatus,
-    SectionStatus,
     SessionLanguage,
     UserRole,
+    VisitReportStatus,
     VisitType,
 )
 from benno.extensions import db
@@ -24,11 +22,14 @@ from benno.models import (
     Chat,
     ChatMessage,
     FinalReport,
-    InsideSalesTask,
+    MockAccount,
     MockContact,
-    MockCustomer,
+    MockCrmUser,
+    MockFieldSalesRepresentative,
     MockOffer,
     MockOrder,
+    MockReminder,
+    MockVisitReport,
     ReportDraft,
     User,
 )
@@ -39,7 +40,9 @@ def test_core_tables_are_created(app) -> None:
 
     assert "users" in inspector.get_table_names()
     assert "report_drafts" in inspector.get_table_names()
-    assert "mock_customers" in inspector.get_table_names()
+    assert "mock_accounts" in inspector.get_table_names()
+    assert "mock_visit_reports" in inspector.get_table_names()
+    assert "mock_reminders" in inspector.get_table_names()
 
 
 def test_user_can_be_saved_with_role_and_password_hash(app) -> None:
@@ -72,26 +75,25 @@ def test_sqlite_foreign_keys_are_enforced(app) -> None:
 
 def test_chat_message_and_report_draft_can_be_saved(app) -> None:
     user = _create_sales_user()
+    account = _create_account()
     chat = Chat(sales_user=user, session_language=SessionLanguage.DE.value)
     message = ChatMessage(
         chat=chat,
         sender=MessageSender.USER.value,
-        message_text="Customer visit summary.",
+        message_text="Besuch bei Demo Account.",
         message_type=MessageType.FREE_INPUT.value,
     )
     draft = ReportDraft(
         chat=chat,
         sales_user=user,
+        account=account,
         report_status=ReportStatus.IN_PROGRESS.value,
         session_language=SessionLanguage.DE.value,
-        customer_context_type=CustomerContextType.EXISTING_CUSTOMER.value,
-        section_statuses_json={
-            ReportSection.CUSTOMER_CONTEXT.value: SectionStatus.DETECTED.value,
-        },
-        missing_sections_json=[ReportSection.SUMMARY.value],
-        ratings_json={"priority": {"value": 7, "reason": "Follow-up needed."}},
-        draft_data_json={"customer_name": "Demo Customer"},
-        last_question="What was agreed as the next step?",
+        section_statuses_json={},
+        missing_sections_json=["info_text"],
+        ratings_json={"priority_rating": {"value": 7, "reason": "Important."}},
+        draft_data_json={"answers": {"visit_context": "Demo Account"}},
+        last_question="Was wurde besprochen?",
     )
 
     db.session.add_all([chat, message, draft])
@@ -99,63 +101,25 @@ def test_chat_message_and_report_draft_can_be_saved(app) -> None:
 
     saved_chat = db.session.get(Chat, chat.id)
     assert saved_chat is not None
-    assert saved_chat.messages[0].message_text == "Customer visit summary."
-    assert saved_chat.report_draft.missing_sections_json == [
-        ReportSection.SUMMARY.value
-    ]
+    assert saved_chat.messages[0].message_text == "Besuch bei Demo Account."
+    assert saved_chat.report_draft.account.account_number == "AKL-K-TEST"
 
 
-def test_final_report_and_inside_sales_task_can_be_linked(app) -> None:
-    user = _create_sales_user()
-    customer = _create_customer()
-    chat = Chat(sales_user=user, session_language=SessionLanguage.DE.value)
-    final_report = FinalReport(
-        chat=chat,
-        sales_user=user,
-        customer=customer,
-        visit_date=date(2026, 6, 26),
-        visit_type=VisitType.ON_SITE.value,
-        reason_code=ReasonCode.OFFER_FOLLOW_UP.value,
-        summary="The customer reviewed the offer.",
-        outcome="The offer remains relevant.",
-        next_action="Inside sales should clarify missing master data.",
-        ratings_json={"priority": {"value": 8, "reason": "Offer is time-sensitive."}},
-        report_language=SessionLanguage.DE.value,
-        final_report_text="Confirmed visit report text.",
-        status=ReportStatus.INSIDE_SALES_INPUT_REQUIRED.value,
-    )
-    task = InsideSalesTask(
-        final_report=final_report,
-        task_type=InsideSalesTaskType.COMPLETE_MASTER_DATA.value,
-        title="Complete contact data",
-        description="The contact person is new and must be checked.",
-        detected_contact_name="New Contact",
-        related_customer=customer,
-    )
-
-    db.session.add_all([chat, final_report, task])
-    db.session.commit()
-
-    saved_report = db.session.get(FinalReport, final_report.id)
-    assert saved_report is not None
-    assert saved_report.inside_sales_tasks[0].title == "Complete contact data"
-
-
-def test_mock_customer_relationships_work(app) -> None:
-    customer = _create_customer()
+def test_phase_6_mock_account_relationships_work(app) -> None:
+    account = _create_account()
     contact = MockContact(
-        customer=customer,
+        account=account,
         external_contact_id="CONT-TEST",
         full_name="Demo Contact",
     )
     offer = MockOffer(
-        customer=customer,
+        account=account,
         external_offer_id="OFF-TEST",
         title="Demo offer",
         status="open",
     )
     order = MockOrder(
-        customer=customer,
+        account=account,
         external_order_id="ORD-TEST",
         title="Demo order",
         status="active",
@@ -164,11 +128,88 @@ def test_mock_customer_relationships_work(app) -> None:
     db.session.add_all([contact, offer, order])
     db.session.commit()
 
-    saved_customer = db.session.get(MockCustomer, customer.id)
-    assert saved_customer is not None
-    assert saved_customer.contacts[0].full_name == "Demo Contact"
-    assert saved_customer.offers[0].external_offer_id == "OFF-TEST"
-    assert saved_customer.orders[0].external_order_id == "ORD-TEST"
+    saved_account = db.session.get(MockAccount, account.id)
+    assert saved_account is not None
+    assert saved_account.contacts[0].full_name == "Demo Contact"
+    assert saved_account.offers[0].external_offer_id == "OFF-TEST"
+    assert saved_account.orders[0].external_order_id == "ORD-TEST"
+
+
+def test_crm_users_and_field_sales_representatives_are_independent(app) -> None:
+    crm_user = MockCrmUser(
+        username="inside.test",
+        display_name="Inside Test",
+        email="inside@example.invalid",
+    )
+    representative = MockFieldSalesRepresentative(
+        representative_number="REP-TEST",
+        display_name="Rep Test",
+        email="rep@example.invalid",
+    )
+
+    db.session.add_all([crm_user, representative])
+    db.session.commit()
+
+    assert db.session.query(MockCrmUser).count() == 1
+    assert db.session.query(MockFieldSalesRepresentative).count() == 1
+
+
+def test_mock_visit_report_and_reminder_can_be_linked_by_report_number(app) -> None:
+    user = _create_sales_user()
+    account = _create_account()
+    crm_user = MockCrmUser(username="inside", display_name="Inside Sales")
+    representative = MockFieldSalesRepresentative(
+        representative_number="REP-001",
+        display_name="Sales Rep",
+    )
+    chat = Chat(sales_user=user, session_language=SessionLanguage.DE.value)
+    final_report = FinalReport(
+        chat=chat,
+        sales_user=user,
+        account=account,
+        visit_date=date(2026, 7, 7),
+        visit_type=VisitType.IN_PERSON.value,
+        summary="Demo summary",
+        ratings_json={},
+        report_language=SessionLanguage.DE.value,
+        final_report_text="Confirmed report",
+        status=ReportStatus.CONFIRMED.value,
+    )
+    visit_report = MockVisitReport(
+        visit_report_number="VR-TEST",
+        final_report=final_report,
+        visit_type=VisitType.IN_PERSON.value,
+        visit_report_status=VisitReportStatus.CLOSED.value,
+        report_status=VisitReportStatus.CLOSED.value,
+        account=account,
+        account_number=account.account_number,
+        account_type=account.account_type,
+        account_search_name=account.search_name,
+        field_sales_representative=representative,
+        responsible_user=crm_user,
+        visit_date=date(2026, 7, 7),
+        target_topic="Demo topic",
+        info_text="Demo info",
+        agreement_text="Demo agreement",
+    )
+    reminder = MockReminder(
+        visit_report=visit_report,
+        due_date=date(2026, 7, 14),
+        owner_type=ReminderOwnerType.CRM_USER.value,
+        owner_id=1,
+        created_by_user=user,
+        message="Please follow up.",
+    )
+
+    db.session.add_all(
+        [crm_user, representative, chat, final_report, visit_report, reminder]
+    )
+    db.session.commit()
+
+    saved_visit_report = db.session.get(MockVisitReport, visit_report.id)
+    assert saved_visit_report.visit_report_status == VisitReportStatus.CLOSED.value
+    assert saved_visit_report.report_status == VisitReportStatus.CLOSED.value
+    assert saved_visit_report.reminders[0].message == "Please follow up."
 
 
 def _create_sales_user() -> User:
@@ -184,13 +225,14 @@ def _create_sales_user() -> User:
     return user
 
 
-def _create_customer() -> MockCustomer:
-    customer = MockCustomer(
-        external_customer_id="CUST-TEST",
-        name="Demo Customer GmbH",
-        city="Berlin",
-        industry="Testing",
+def _create_account() -> MockAccount:
+    account = MockAccount(
+        account_number="AKL-K-TEST",
+        account_type=AccountType.CUSTOMER.value,
+        search_name="DEMO",
+        display_name="Demo Account GmbH",
+        address_text="Berlin",
     )
-    db.session.add(customer)
+    db.session.add(account)
     db.session.flush()
-    return customer
+    return account

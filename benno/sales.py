@@ -28,24 +28,31 @@ OPEN_REPORT_STATUSES = (
 REPORT_STATUS_LABELS_DE = {
     ReportStatus.BLOCKED.value: "Blockiert",
     ReportStatus.CANCELLED.value: "Abgebrochen",
-    ReportStatus.CONFIRMED.value: "Bestätigt",
+    ReportStatus.CONFIRMED.value: "Best\u00e4tigt",
     ReportStatus.IN_PROGRESS.value: "In Bearbeitung",
-    ReportStatus.INSIDE_SALES_INPUT_REQUIRED.value: "Innendienst nötig",
-    ReportStatus.READY_FOR_REVIEW.value: "Bereit zur Prüfung",
-    ReportStatus.SUBMITTED.value: "Übergeben",
+    ReportStatus.INSIDE_SALES_INPUT_REQUIRED.value: "Innendienst n\u00f6tig",
+    ReportStatus.READY_FOR_REVIEW.value: "Bereit zur Pr\u00fcfung",
+    ReportStatus.SUBMITTED.value: "\u00dcbergeben",
 }
 REPORT_SECTION_LABELS_DE = {
     "contacts": "Teilnehmer",
     "customer_context": "Kunde oder Lead",
     "final_report": "Finaler Bericht",
-    "next_action": "Nächster Schritt",
+    "info_text": "Info",
+    "next_action": "N\u00e4chster Schritt",
+    "next_appointment_date": "Termin ab",
     "offer_reference": "Angebotsbezug",
     "order_reference": "Auftragsbezug",
-    "outcome": "Ergebnis",
+    "outcome": "Vereinbarung",
     "ratings": "Bewertungen",
-    "summary": "Zusammenfassung",
-    "user_confirmation": "Bestätigung",
-    "visit_reason": "Besuchsgrund",
+    "reminders": "Wiedervorlagen",
+    "strengths": "St\u00e4rke",
+    "summary": "Info",
+    "user_confirmation": "Best\u00e4tigung",
+    "visit_date": "Besuchsdatum",
+    "visit_reason": "Ziel/Thema",
+    "visit_type": "Besuchsart",
+    "weaknesses": "Schw\u00e4che",
 }
 
 
@@ -248,13 +255,13 @@ def _build_open_report_row(chat: Chat) -> dict[str, object]:
     return {
         "chat": chat,
         "customer_label": _first_present_text(
-            answers.get("customer_context"),
-            getattr(getattr(draft, "customer", None), "name", None),
-            getattr(getattr(draft, "lead", None), "name", None),
+            answers.get("visit_context"),
+            getattr(getattr(draft, "account", None), "display_name", None),
+            getattr(getattr(draft, "account", None), "search_name", None),
             fallback="Noch kein Kunde erkannt",
         ),
         "topic_label": _first_present_text(
-            answers.get("visit_reason"),
+            answers.get("target_topic"),
             getattr(draft, "summary", None),
             fallback="Noch kein Thema erkannt",
         ),

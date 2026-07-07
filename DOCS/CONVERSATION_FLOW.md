@@ -91,15 +91,21 @@ The report draft is organized into these sections:
 
 | Section | Purpose |
 |---|---|
-| `customer_context` | Existing customer, existing lead, new lead, new address, or unclear context |
-| `contacts` | Contact persons or meeting participants |
-| `visit_reason` | Reason for the visit |
-| `summary` | Main meeting summary |
-| `outcome` | Result, agreement, or meeting outcome |
+| `visit_context` | Existing AKL account, known address/lead, new lead, or unclear context |
+| `visit_type` | Personal, virtual, or phone visit |
+| `participants` | Contact persons or meeting participants |
+| `visit_date` | Date of the visit |
+| `target_topic` | eNVenta `Ziel/Thema` |
+| `info_text` | eNVenta `Info` free text |
+| `agreement_text` | eNVenta `Vereinbarung` free text |
 | `next_action` | Next step, follow-up, or reminder date |
+| `next_appointment_date` | eNVenta `Termin ab`, when relevant |
 | `offer_reference` | Offer reference, if relevant |
 | `order_reference` | Order reference, if relevant |
+| `strength_text` | eNVenta `Stärke`, derived or asked briefly |
+| `weakness_text` | eNVenta `Schwäche`, derived or asked briefly |
 | `ratings` | eNVenta-aligned rating values and short explanations |
+| `reminders` | Optional follow-up reminder for CRM users or field sales representatives |
 | `final_report` | Written final visit report |
 | `user_confirmation` | Explicit final confirmation |
 
@@ -163,7 +169,7 @@ Example:
 {
   "intent": "additional_info",
   "intent_confidence": 0.78,
-  "target_sections": ["summary", "next_action", "ratings"]
+  "target_sections": ["info_text", "next_action", "ratings"]
 }
 ```
 
@@ -172,31 +178,33 @@ Provider-facing AI responses may use a different wire shape than BENNO's interna
 ```json
 {
   "section_updates": [
-    { "section": "customer_context", "value": "PerfSolar" },
-    { "section": "contacts", "value": "Frau Schmidt" },
-    { "section": "visit_reason", "value": "Forecast" }
+    { "section": "visit_context", "value": "PerfSolar" },
+    { "section": "participants", "value": "Frau Schmidt" },
+    { "section": "target_topic", "value": "Forecast" }
   ]
 }
 ```
 
 The backend converts this into the internal section map only after validation. Unknown section names, empty values, malformed update objects, and provider errors must not break the report loop. They are ignored or handled through deterministic fallback behavior.
 
-## Customer And Lead Context
+## Account And Visit Context
 
-`customer_context` is mandatory.
+`visit_context` is mandatory.
 
 BENNO distinguishes:
 
 | Context | Meaning |
 |---|---|
-| `existing_customer` | Customer is known and can be referenced |
-| `existing_lead` | Lead or address is known and can be referenced |
+| `existing_customer` | AKL account of type `K` is known and can be referenced |
+| `existing_lead` | AKL account of type `A` is known and can be referenced |
 | `new_lead` | New lead or address was mentioned and must not be created automatically |
 | `unclear` | BENNO cannot decide and must ask |
 
-New customers, leads, addresses, or contacts must not be created automatically. BENNO may capture the information, but master data review is handled through an inside sales task.
+New accounts, contacts, offers, or orders must not be created automatically.
+BENNO may capture the information as report text. Follow-up work is handled
+through a `MockReminder` or later review work, not by writing master data.
 
-## Contacts
+## Participants
 
 The report must contain who participated in the meeting.
 
@@ -206,7 +214,9 @@ The contact may be:
 - a newly mentioned person
 - an unclear person that needs review
 
-If a contact is new or cannot be validated, BENNO does not create a master data record. It creates or proposes an inside sales task instead.
+If a contact is new or cannot be validated, BENNO does not create a master data
+record. The information stays in the report and can trigger review or reminder
+work.
 
 ## Ratings
 
@@ -297,16 +307,18 @@ set. This confirmation step can be deterministic; it does not need an LLM call.
 It should include:
 
 - customer or lead context
-- contacts or participants
-- visit reason
-- summary
-- outcome or agreement
+- participants
+- visit type and visit date
+- target topic
+- info text
+- agreement text
 - next action and follow-up
 - offer reference, if relevant
 - order reference, if relevant
+- strengths and weaknesses, if captured or derived
 - ratings with short explanations
 - final written report
-- inside sales tasks, if any
+- reminders, if any
 - report status
 
 No final report may be saved or submitted without explicit user confirmation.

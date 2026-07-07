@@ -44,8 +44,8 @@ The Gemini Developer API should receive explicit structured-output schemas. For 
 ```json
 {
   "section_updates": {
-    "contacts": "Frau Schmidt",
-    "visit_reason": "Forecast"
+    "participants": "Frau Schmidt",
+    "target_topic": "Forecast"
   }
 }
 ```
@@ -55,8 +55,8 @@ Instead, Gemini should return section updates as a list of explicit objects:
 ```json
 {
   "section_updates": [
-    { "section": "contacts", "value": "Frau Schmidt" },
-    { "section": "visit_reason", "value": "Forecast" }
+    { "section": "participants", "value": "Frau Schmidt" },
+    { "section": "target_topic", "value": "Forecast" }
   ]
 }
 ```
@@ -88,7 +88,7 @@ The application must:
 - enforce explicit confirmation
 - decide whether saving is allowed
 - write to the database
-- create inside sales tasks
+- create mock reminders
 
 Guiding principle:
 
@@ -204,7 +204,7 @@ Persisted MVP data:
 - final confirmed visit report
 - user context
 - mock CRM/ERP references
-- inside sales tasks
+- mock reminders
 
 Not persisted as long-term records:
 

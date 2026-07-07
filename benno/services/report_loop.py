@@ -1,4 +1,4 @@
-"""Deterministic text report loop for Phase 4."""
+"""Deterministic and AI-assisted visit report loop for Phase 6."""
 
 import re
 from dataclasses import dataclass
@@ -6,23 +6,27 @@ from datetime import date
 from typing import Any
 
 from benno.enums import (
+    AccountType,
     CustomerContextType,
-    InsideSalesTaskType,
     MessageSender,
     MessageType,
     ReasonCode,
+    ReminderOwnerType,
     ReportSection,
     ReportStatus,
     SectionStatus,
     UserIntent,
     ValidationStatus,
+    VisitReportStatus,
+    VisitType,
 )
 from benno.extensions import db
 from benno.models import (
     Chat,
     ChatMessage,
     FinalReport,
-    InsideSalesTask,
+    MockReminder,
+    MockVisitReport,
     ReportDraft,
     User,
     utc_now,
@@ -34,16 +38,25 @@ from benno.services.ai_provider import (
     get_ai_service,
 )
 from benno.services.mock_crm import (
+    create_mock_reminder,
     find_contacts,
-    find_customers,
-    find_leads,
     find_offers,
     find_orders,
+    list_crm_users,
+    list_field_sales_representatives,
+    save_mock_visit_report,
+    search_accounts,
 )
 
 REVIEW_STEP = "review"
 AI_CACHE_KEY = "ai_cache"
 INSIDE_SALES_FOLLOW_UP_KEY = "inside_sales_follow_up_requested"
+OPTIONAL_STEP_KEYS = {"strength_text", "weakness_text", "reminders"}
+OPTIONAL_REPORT_SECTIONS = {
+    ReportSection.STRENGTHS.value,
+    ReportSection.WEAKNESSES.value,
+    ReportSection.REMINDERS.value,
+}
 MUTABLE_REPORT_STATUSES = {
     ReportStatus.IN_PROGRESS.value,
     ReportStatus.READY_FOR_REVIEW.value,
@@ -52,7 +65,7 @@ MUTABLE_REPORT_STATUSES = {
 
 @dataclass(frozen=True)
 class ReportStep:
-    """One deterministic question in the Phase 4 report loop."""
+    """One deterministic question in the Phase 6 report loop."""
 
     key: str
     section: ReportSection
@@ -61,113 +74,168 @@ class ReportStep:
 
 
 RATING_FIELDS = (
-    ("sales_opportunity", "sales opportunity", "Verkaufschance"),
-    ("meeting_mood", "meeting mood", "Gesprächsstimmung"),
-    ("priority", "priority", "Priorität"),
-    ("closing_probability", "closing probability", "Abschlusswahrscheinlichkeit"),
-    ("need_for_action", "need for action", "Handlungsbedarf"),
-    ("customer_satisfaction", "customer satisfaction", "Kundenzufriedenheit"),
+    ("customer_satisfaction_rating", "customer satisfaction", "Zufriedenheit"),
+    (
+        "technical_attractiveness_rating",
+        "technical attractiveness",
+        "Technische Attraktivit\u00e4t",
+    ),
+    (
+        "commercial_attractiveness_rating",
+        "commercial attractiveness",
+        "Kaufm\u00e4nnische Attraktivit\u00e4t",
+    ),
+    ("priority_rating", "priority", "Priorit\u00e4t"),
 )
 BASE_CORRECTION_FIELDS = (
-    ("customer_context", "Kunde oder Lead"),
-    ("contacts", "Teilnehmer"),
-    ("visit_reason", "Besuchsgrund"),
-    ("summary", "Zusammenfassung"),
-    ("outcome", "Ergebnis"),
-    ("next_action", "Nächster Schritt"),
+    ("visit_context", "Besuchskontext"),
+    ("visit_type", "Besuchsart"),
+    ("participants", "Teilnehmer"),
+    ("visit_date", "Besuchsdatum"),
+    ("target_topic", "Ziel/Thema"),
+    ("info_text", "Info"),
+    ("agreement_text", "Vereinbarung"),
+    ("next_action", "N\u00e4chster Schritt"),
+    ("next_appointment_date", "Termin ab"),
     ("offer_reference", "Angebotsbezug"),
     ("order_reference", "Auftragsbezug"),
+    ("strength_text", "St\u00e4rke"),
+    ("weakness_text", "Schw\u00e4che"),
+    ("ratings", "Bewertungen"),
+    ("reminders", "Wiedervorlagen"),
 )
-CORRECTION_FIELDS = BASE_CORRECTION_FIELDS + tuple(
-    (f"rating_{rating_key}", f"Bewertung: {label_de}")
-    for rating_key, _label_en, label_de in RATING_FIELDS
-)
+CORRECTION_FIELDS = BASE_CORRECTION_FIELDS
 REQUIREMENT_LABELS = {
-    "customer_context": "Kunde oder Lead",
-    "contacts": "Teilnehmer",
-    "visit_reason": "Besuchsgrund",
-    "summary": "Zusammenfassung",
-    "outcome": "Ergebnis",
+    "visit_context": "Besuchskontext",
+    "visit_type": "Besuchsart",
+    "participants": "Teilnehmer",
+    "visit_date": "Besuchsdatum",
+    "target_topic": "Ziel/Thema",
+    "info_text": "Info",
+    "agreement_text": "Vereinbarung",
     "next_action": "N\u00e4chster Schritt",
+    "next_appointment_date": "Termin ab",
     "offer_reference": "Angebotsbezug",
     "order_reference": "Auftragsbezug",
-    "rating_sales_opportunity": "Verkaufschance",
-    "rating_meeting_mood": "Gespr\u00e4chsstimmung",
-    "rating_priority": "Priorit\u00e4t",
-    "rating_closing_probability": "Abschlusswahrscheinlichkeit",
-    "rating_need_for_action": "Handlungsbedarf",
-    "rating_customer_satisfaction": "Kundenzufriedenheit",
+    "strength_text": "St\u00e4rke",
+    "weakness_text": "Schw\u00e4che",
+    "ratings": "Bewertungen",
+    "reminders": "Wiedervorlagen",
 }
 
 REPORT_STEPS = (
     ReportStep(
-        key="customer_context",
+        key="visit_context",
         section=ReportSection.CUSTOMER_CONTEXT,
-        question=(
-            "Which customer or lead was this visit about? "
-            "Mention if this is a new lead."
-        ),
-        question_de=(
-            "Um welchen Kunden oder Lead ging es bei diesem Besuch? "
-            "Erwähne bitte, falls es ein neuer Lead ist."
-        ),
+        question="Which customer, lead, or contact was this visit about?",
+        question_de="Um welchen Kunden, Lead oder Kontakt ging es bei dem Besuch?",
     ),
     ReportStep(
-        key="contacts",
+        key="visit_type",
+        section=ReportSection.VISIT_TYPE,
+        question="Was the visit in person, virtual, or by phone?",
+        question_de="War der Besuch pers\u00f6nlich, virtuell oder telefonisch?",
+    ),
+    ReportStep(
+        key="participants",
         section=ReportSection.CONTACTS,
         question="Who participated in the meeting?",
-        question_de="Wer hat an dem Gespräch teilgenommen?",
+        question_de="Wer hat an dem Gespr\u00e4ch teilgenommen?",
     ),
     ReportStep(
-        key="visit_reason",
+        key="visit_date",
+        section=ReportSection.VISIT_DATE,
+        question="Was the visit today or on another date?",
+        question_de="War der Besuch heute oder an einem anderen Datum?",
+    ),
+    ReportStep(
+        key="target_topic",
         section=ReportSection.VISIT_REASON,
-        question="What was the main reason for the visit?",
-        question_de="Was war der Hauptgrund für den Besuch?",
+        question="What was the goal or main topic of the visit?",
+        question_de="Was war das Ziel oder Hauptthema des Besuchs?",
     ),
     ReportStep(
-        key="summary",
+        key="info_text",
         section=ReportSection.SUMMARY,
-        question="Please summarize the key discussion points.",
-        question_de="Fasse bitte die wichtigsten Gesprächspunkte zusammen.",
+        question="What was discussed? You can describe it freely.",
+        question_de="Was wurde besprochen? Du kannst es frei erz\u00e4hlen.",
     ),
     ReportStep(
-        key="outcome",
+        key="agreement_text",
         section=ReportSection.OUTCOME,
         question="What was agreed or decided?",
-        question_de="Was wurde vereinbart oder entschieden?",
+        question_de="Was wurde konkret vereinbart oder entschieden?",
     ),
     ReportStep(
         key="next_action",
         section=ReportSection.NEXT_ACTION,
-        question="What is the next action or follow-up?",
-        question_de="Was ist der nächste Schritt oder die Wiedervorlage?",
+        question="What is the next step, and who should own it?",
+        question_de=(
+            "Was ist der n\u00e4chste Schritt, " "und wer soll ihn \u00fcbernehmen?"
+        ),
+    ),
+    ReportStep(
+        key="next_appointment_date",
+        section=ReportSection.NEXT_APPOINTMENT_DATE,
+        question="Is there a concrete follow-up appointment or reminder date?",
+        question_de="Gibt es einen konkreten Folgetermin oder Wiedervorlage-Termin?",
     ),
     ReportStep(
         key="offer_reference",
         section=ReportSection.OFFER_REFERENCE,
-        question="Is there an offer reference? If not, answer 'none'.",
+        question="Is there an offer or offer number? If not, answer 'none'.",
         question_de=(
-            "Gibt es einen Angebotsbezug? Falls nicht, antworte mit 'keiner'."
+            "Gibt es dazu ein Angebot oder eine Angebotsnummer? "
+            "Falls nicht, antworte mit 'keine'."
         ),
     ),
     ReportStep(
         key="order_reference",
         section=ReportSection.ORDER_REFERENCE,
-        question="Is there an order reference? If not, answer 'none'.",
+        question="Is there an order or order number? If not, answer 'none'.",
         question_de=(
-            "Gibt es einen Auftragsbezug? Falls nicht, antworte mit 'keiner'."
+            "Gibt es dazu einen Auftrag oder eine Auftragsnummer? "
+            "Falls nicht, antworte mit 'keine'."
         ),
     ),
-    *(
-        ReportStep(
-            key=f"rating_{rating_key}",
-            section=ReportSection.RATINGS,
-            question=f"Rate the {label} from 1 to 10 and add a short reason.",
-            question_de=(
-                f"Bewerte {label_de} von 1 bis 10 und ergänze eine kurze Begründung."
-            ),
-        )
-        for rating_key, label, label_de in RATING_FIELDS
+    ReportStep(
+        key="strength_text",
+        section=ReportSection.STRENGTHS,
+        question="Are there notable strengths or positive points?",
+        question_de=(
+            "Gibt es aus deiner Sicht besondere St\u00e4rken " "oder positive Punkte?"
+        ),
+    ),
+    ReportStep(
+        key="weakness_text",
+        section=ReportSection.WEAKNESSES,
+        question="Are there risks, objections, or weaknesses to record?",
+        question_de=(
+            "Gibt es Risiken, Einw\u00e4nde oder Schw\u00e4chen, "
+            "die festgehalten werden sollen?"
+        ),
+    ),
+    ReportStep(
+        key="ratings",
+        section=ReportSection.RATINGS,
+        question=(
+            "Rate customer satisfaction, technical attractiveness, commercial "
+            "attractiveness, and priority from 1 to 10."
+        ),
+        question_de=(
+            "Wie bewertest du Zufriedenheit, technische Attraktivit\u00e4t, "
+            "kaufm\u00e4nnische Attraktivit\u00e4t und Priorit\u00e4t "
+            "jeweils von 1 bis 10?"
+        ),
+    ),
+    ReportStep(
+        key="reminders",
+        section=ReportSection.REMINDERS,
+        question="Should this create a follow-up reminder?",
+        question_de=(
+            "Soll daraus eine Wiedervorlage entstehen? Falls ja: f\u00fcr wen, "
+            "bis wann und mit welcher Nachricht?"
+        ),
     ),
 )
 
@@ -307,12 +375,21 @@ def build_report_review(
     return {
         "review_text": review_text,
         "sections": [
-            ("Kunde oder Lead", _display_value(answers.get("customer_context"))),
-            ("Teilnehmer", _display_value(answers.get("contacts"))),
-            ("Besuchsgrund", _display_value(answers.get("visit_reason"))),
-            ("Zusammenfassung", _display_value(draft.summary)),
-            ("Ergebnis", _display_value(draft.outcome)),
+            ("Kunde/Lead/Kontakt", _display_value(answers.get("visit_context"))),
+            ("Besuchsart", _display_value(draft.visit_type)),
+            ("Teilnehmer", _display_value(answers.get("participants"))),
+            ("Besuchsdatum", _display_value(draft.visit_date)),
+            ("Ziel/Thema", _display_value(answers.get("target_topic"))),
+            ("Info", _display_value(draft.summary)),
+            ("Vereinbarung", _display_value(draft.outcome)),
             ("Nächster Schritt", _display_value(draft.next_action)),
+            (
+                "Termin ab",
+                _display_value(
+                    answers.get("next_appointment_date"),
+                    empty="Nicht relevant",
+                ),
+            ),
             (
                 "Angebotsbezug",
                 _display_value(answers.get("offer_reference"), empty="Nicht relevant"),
@@ -321,8 +398,16 @@ def build_report_review(
                 "Auftragsbezug",
                 _display_value(answers.get("order_reference"), empty="Nicht relevant"),
             ),
+            (
+                "Stärke",
+                _display_value(answers.get("strength_text"), empty="Nicht angegeben"),
+            ),
+            (
+                "Schwäche",
+                _display_value(answers.get("weakness_text"), empty="Nicht angegeben"),
+            ),
             ("Bewertungen", _format_ratings(draft.ratings_json)),
-            ("Innendienst-Aufgaben", _format_task_preview(draft)),
+            ("Wiedervorlagen", _format_task_preview(draft)),
         ],
         "final_report_text": final_report_text,
         "correction_fields": CORRECTION_FIELDS,
@@ -345,6 +430,7 @@ def confirm_report(
     final_report = FinalReport(
         chat=chat,
         sales_user=chat.sales_user,
+        account_id=draft.account_id,
         customer_id=draft.customer_id,
         lead_id=draft.lead_id,
         contact_id=draft.contact_id,
@@ -367,8 +453,11 @@ def confirm_report(
     db.session.add(final_report)
     db.session.flush()
 
-    for task in _build_inside_sales_tasks(draft, final_report):
-        db.session.add(task)
+    mock_visit_report = save_mock_visit_report(
+        final_report.id,
+        _mock_visit_report_payload(draft, final_report),
+    )
+    _create_mock_reminders(draft, mock_visit_report)
 
     chat.status = ReportStatus.CONFIRMED.value
     draft.report_status = ReportStatus.CONFIRMED.value
@@ -437,25 +526,39 @@ def _apply_step_answer(
     draft_data["answers"] = answers
     draft.draft_data_json = draft_data
 
-    if step.key == "customer_context":
-        _update_customer_context(draft, message_text)
-    elif step.key == "contacts":
+    if step.key == "visit_context":
+        _update_visit_context(draft, message_text)
+    elif step.key == "visit_type":
+        _update_visit_type(draft, message_text)
+    elif step.key == "participants":
         _update_contacts(draft, message_text)
-    elif step.key == "visit_reason":
+    elif step.key == "visit_date":
+        draft.visit_date = _parse_iso_date(message_text) or date.today()
+    elif step.key == "target_topic":
         draft.reason_code = _classify_reason(message_text)
-    elif step.key == "summary":
+    elif step.key == "info_text":
         draft.summary = message_text
-    elif step.key == "outcome":
+    elif step.key == "agreement_text":
         draft.outcome = message_text
     elif step.key == "next_action":
         draft.next_action = message_text
+        draft.follow_up_date = _parse_iso_date(message_text)
+    elif step.key == "next_appointment_date":
         draft.follow_up_date = _parse_iso_date(message_text)
     elif step.key == "offer_reference":
         _update_offer_reference(draft, message_text)
     elif step.key == "order_reference":
         _update_order_reference(draft, message_text)
-    elif step.key.startswith("rating_"):
-        _update_rating(draft, step.key, message_text)
+    elif step.key == "strength_text":
+        draft_data["strength_text"] = message_text
+        draft.draft_data_json = draft_data
+    elif step.key == "weakness_text":
+        draft_data["weakness_text"] = message_text
+        draft.draft_data_json = draft_data
+    elif step.key == "ratings":
+        _update_ratings(draft, message_text)
+    elif step.key == "reminders":
+        _update_reminder_signal(draft, message_text)
 
     _set_section_status(draft, step.section, _section_status_for_answer(step, draft))
 
@@ -545,16 +648,16 @@ def _add_explicit_visit_reason_clue(
 ) -> None:
     if analysis.intent == UserIntent.CORRECTION:
         return
-    if section_updates.get("visit_reason"):
+    if section_updates.get("target_topic"):
         return
 
     visit_reason = _extract_explicit_visit_reason(message_text)
     if visit_reason is None:
         return
 
-    section_updates["visit_reason"] = visit_reason
-    if "visit_reason" not in target_sections:
-        target_sections.append("visit_reason")
+    section_updates["target_topic"] = visit_reason
+    if "target_topic" not in target_sections:
+        target_sections.append("target_topic")
 
 
 def _extract_explicit_visit_reason(message_text: str) -> str | None:
@@ -665,7 +768,7 @@ def _apply_flow_shortcuts(
 def _apply_lead_context_signal(draft: ReportDraft, message_text: str) -> None:
     if not _mentions_lead(message_text):
         return
-    if draft.customer_id is not None:
+    if draft.account_id is not None:
         return
 
     draft.customer_context_type = CustomerContextType.NEW_LEAD.value
@@ -716,7 +819,7 @@ def _apply_follow_up_shortcut(
     completed_before_message: set[str],
     applied_steps: list[ReportStep],
 ) -> None:
-    if current_step.key not in {"summary", "outcome"}:
+    if current_step.key not in {"info_text", "agreement_text"}:
         return
     if current_step.key == "next_action":
         return
@@ -813,7 +916,7 @@ def _report_requirements(draft: ReportDraft) -> list[dict[str, Any]]:
             "key": step.key,
             "label": REQUIREMENT_LABELS[step.key],
             "status": _requirement_status(draft, step, completed_steps, answers),
-            "required": True,
+            "required": _requirement_required(step),
             "current_value": _requirement_current_value(draft, step, answers),
             "question": _requirement_question(draft, step),
             "section": step.section.value,
@@ -822,27 +925,43 @@ def _report_requirements(draft: ReportDraft) -> list[dict[str, Any]]:
     ]
 
 
+def _requirement_required(step: ReportStep) -> bool:
+    return step.key not in {
+        "next_appointment_date",
+        "offer_reference",
+        "order_reference",
+        "strength_text",
+        "weakness_text",
+        "reminders",
+    }
+
+
 def _requirement_status(
     draft: ReportDraft,
     step: ReportStep,
     completed_steps: set[str],
     answers: dict[str, Any],
 ) -> str:
-    if step.section == ReportSection.RATINGS:
-        rating_key = step.key.removeprefix("rating_")
-        if rating_key in draft.ratings_json:
+    if step.key == "ratings":
+        if _all_ratings_collected(draft):
             return "completed"
         if draft.ratings_json:
             return "partially_completed"
         return "missing"
 
-    if step.key in {"offer_reference", "order_reference"} and _is_none_answer(
-        str(answers.get(step.key, ""))
-    ):
+    if step.key in {
+        "next_appointment_date",
+        "offer_reference",
+        "order_reference",
+        "reminders",
+    } and _is_none_answer(str(answers.get(step.key, ""))):
         return "not_applicable"
 
     if step.key in completed_steps:
         return "completed"
+
+    if step.key in OPTIONAL_STEP_KEYS:
+        return "missing"
 
     return "missing"
 
@@ -852,9 +971,8 @@ def _requirement_current_value(
     step: ReportStep,
     answers: dict[str, Any],
 ) -> Any:
-    if step.section == ReportSection.RATINGS:
-        rating = draft.ratings_json.get(step.key.removeprefix("rating_"))
-        return dict(rating) if rating is not None else None
+    if step.key == "ratings":
+        return dict(draft.ratings_json) if draft.ratings_json else None
 
     return answers.get(step.key)
 
@@ -958,7 +1076,11 @@ def _advance_after_applied_steps(
 def _first_incomplete_step(completed_steps: list[str]) -> ReportStep | None:
     completed_step_set = set(completed_steps)
     return next(
-        (step for step in REPORT_STEPS if step.key not in completed_step_set),
+        (
+            step
+            for step in REPORT_STEPS
+            if step.key not in completed_step_set and step.key not in OPTIONAL_STEP_KEYS
+        ),
         None,
     )
 
@@ -1024,21 +1146,20 @@ def _rating_question(draft: ReportDraft) -> str:
     missing_labels = _missing_rating_labels(draft)
     if len(missing_labels) == len(RATING_FIELDS):
         return (
-            "Wie schätzt du den Termin insgesamt ein? Nenne gern kurz "
-            "Verkaufschance, Stimmung, Priorität, Abschlusswahrscheinlichkeit, "
-            "Handlungsbedarf und Kundenzufriedenheit. Zahlen von 1 bis 10 sind "
-            "hilfreich, aber wenn etwas noch zu früh ist, sag das einfach dazu."
+            "Wie bewertest du Zufriedenheit, technische Attraktivität, "
+            "kaufmännische Attraktivität und Priorität jeweils von 1 bis 10? "
+            "Wenn etwas noch nicht bewertbar ist, sag das kurz dazu."
         )
 
     if len(missing_labels) == 1:
         return (
             "Eine Bewertung fehlt noch: "
-            f"{missing_labels[0]}. Wie schätzt du das ein?"
+            f"{missing_labels[0]}. Wie schätzt du das von 1 bis 10 ein?"
         )
 
     return (
         "Ein paar Bewertungen fehlen noch: "
-        f"{', '.join(missing_labels)}. Kannst du sie kurz einschätzen?"
+        f"{', '.join(missing_labels)}. Kannst du sie kurz von 1 bis 10 einschätzen?"
     )
 
 
@@ -1051,10 +1172,10 @@ def _missing_rating_labels(draft: ReportDraft) -> list[str]:
     ]
 
 
-def _update_customer_context(draft: ReportDraft, message_text: str) -> None:
+def _update_visit_context(draft: ReportDraft, message_text: str) -> None:
     normalized_text = message_text.lower()
-    customer_matches = find_customers(message_text)
-    lead_matches = find_leads(message_text)
+    account_matches = search_accounts(message_text)
+    draft.account = None
     draft.customer = None
     draft.lead = None
     draft.contact = None
@@ -1064,15 +1185,10 @@ def _update_customer_context(draft: ReportDraft, message_text: str) -> None:
         draft.validation_status = ValidationStatus.CONFIRMED_NEW.value
         return
 
-    if len(customer_matches) == 1:
-        draft.customer = customer_matches[0]
-        draft.customer_context_type = CustomerContextType.EXISTING_CUSTOMER.value
-        draft.validation_status = ValidationStatus.MATCHED.value
-        return
-
-    if len(lead_matches) == 1:
-        draft.lead = lead_matches[0]
-        draft.customer_context_type = CustomerContextType.EXISTING_LEAD.value
+    if len(account_matches) == 1:
+        account = account_matches[0]
+        draft.account = account
+        draft.customer_context_type = _customer_context_type_for_account(account)
         draft.validation_status = ValidationStatus.MATCHED.value
         return
 
@@ -1080,12 +1196,39 @@ def _update_customer_context(draft: ReportDraft, message_text: str) -> None:
     draft.validation_status = ValidationStatus.UNKNOWN.value
 
 
+def _customer_context_type_for_account(account: Any) -> str:
+    if account.account_type == AccountType.ADDRESS.value:
+        return CustomerContextType.EXISTING_LEAD.value
+
+    return CustomerContextType.EXISTING_CUSTOMER.value
+
+
+def _update_visit_type(draft: ReportDraft, message_text: str) -> None:
+    normalized_text = message_text.lower()
+    if any(value in normalized_text for value in ("telefon", "phone", "call")):
+        draft.visit_type = VisitType.PHONE.value
+    elif any(
+        value in normalized_text for value in ("virtuell", "video", "teams", "zoom")
+    ):
+        draft.visit_type = VisitType.VIRTUAL.value
+    elif any(
+        value in normalized_text
+        for value in ("persön", "personlich", "vor ort", "beim", "bei ")
+    ):
+        draft.visit_type = VisitType.IN_PERSON.value
+    elif message_text in {visit_type.value for visit_type in VisitType}:
+        draft.visit_type = message_text
+    else:
+        draft.visit_type = VisitType.IN_PERSON.value
+
+
 def _update_contacts(draft: ReportDraft, message_text: str) -> None:
     draft.contact = None
-    if draft.customer_id is None:
+    account_id = draft.account_id or (draft.account.id if draft.account else None)
+    if account_id is None:
         return
 
-    contact_matches = find_contacts(draft.customer_id, message_text)
+    contact_matches = find_contacts(account_id, message_text)
     if len(contact_matches) == 1:
         draft.contact = contact_matches[0]
 
@@ -1097,10 +1240,10 @@ def _update_offer_reference(draft: ReportDraft, message_text: str) -> None:
         return
 
     draft.external_offer_reference = message_text
-    if draft.customer_id is None:
+    if draft.account_id is None:
         return
 
-    offer_matches = find_offers(draft.customer_id, message_text)
+    offer_matches = find_offers(draft.account_id, message_text)
     if len(offer_matches) == 1:
         draft.related_offer = offer_matches[0]
 
@@ -1118,22 +1261,38 @@ def _update_order_reference(draft: ReportDraft, message_text: str) -> None:
         **_draft_data(draft),
         "order_reference_raw": message_text,
     }
-    if draft.customer_id is None:
+    if draft.account_id is None:
         return
 
-    order_matches = find_orders(draft.customer_id, message_text)
+    order_matches = find_orders(draft.account_id, message_text)
     if len(order_matches) == 1:
         draft.related_order = order_matches[0]
 
 
-def _update_rating(draft: ReportDraft, step_key: str, message_text: str) -> None:
-    rating_key = step_key.removeprefix("rating_")
+def _update_ratings(draft: ReportDraft, message_text: str) -> None:
     ratings = dict(draft.ratings_json)
-    ratings[rating_key] = {
-        "value": _parse_rating_value(message_text),
-        "reason": message_text,
-    }
+    parsed_values = _parse_rating_values(message_text)
+    for index, (rating_key, _label_en, _label_de) in enumerate(RATING_FIELDS):
+        value = parsed_values[index] if index < len(parsed_values) else None
+        if value is None and rating_key in ratings:
+            continue
+        ratings[rating_key] = {
+            "value": value,
+            "reason": message_text,
+        }
+
     draft.ratings_json = ratings
+
+
+def _update_reminder_signal(draft: ReportDraft, message_text: str) -> None:
+    if _is_none_answer(message_text):
+        return
+
+    draft.draft_data_json = {
+        **_draft_data(draft),
+        INSIDE_SALES_FOLLOW_UP_KEY: True,
+        "reminder_message": message_text,
+    }
 
 
 def _classify_reason(message_text: str) -> str:
@@ -1160,6 +1319,14 @@ def _parse_rating_value(message_text: str) -> int | None:
     return int(match.group(1))
 
 
+def _parse_rating_values(message_text: str) -> list[int]:
+    return [
+        int(match)
+        for match in re.findall(r"\b(10|[1-9])\b", message_text)
+        if 1 <= int(match) <= 10
+    ]
+
+
 def _parse_iso_date(message_text: str) -> date | None:
     match = re.search(r"\b\d{4}-\d{2}-\d{2}\b", message_text)
     if match is None:
@@ -1172,7 +1339,12 @@ def _section_status_for_answer(
     step: ReportStep,
     draft: ReportDraft,
 ) -> SectionStatus:
-    if step.key in {"offer_reference", "order_reference"}:
+    if step.key in {
+        "next_appointment_date",
+        "offer_reference",
+        "order_reference",
+        "reminders",
+    }:
         answer = _draft_data(draft).get("answers", {}).get(step.key, "")
         if _is_none_answer(answer):
             return SectionStatus.NOT_APPLICABLE
@@ -1214,6 +1386,7 @@ def _missing_sections(section_statuses: dict[str, str]) -> list[str]:
         not in {
             ReportSection.FINAL_REPORT.value,
             ReportSection.USER_CONFIRMATION.value,
+            *OPTIONAL_REPORT_SECTIONS,
         }
     ]
 
@@ -1228,7 +1401,11 @@ def _missing_sections_for_draft(draft: ReportDraft) -> list[str]:
 
 def _missing_step_keys(draft: ReportDraft) -> list[str]:
     completed_steps = set(_draft_data(draft).get("completed_steps", []))
-    return [step.key for step in REPORT_STEPS if step.key not in completed_steps]
+    return [
+        step.key
+        for step in REPORT_STEPS
+        if step.key not in completed_steps and step.key not in OPTIONAL_STEP_KEYS
+    ]
 
 
 def _missing_rating_keys(draft: ReportDraft) -> list[str]:
@@ -1240,7 +1417,10 @@ def _missing_rating_keys(draft: ReportDraft) -> list[str]:
 
 
 def _missing_rating_step_keys(draft: ReportDraft) -> list[str]:
-    return [f"rating_{rating_key}" for rating_key in _missing_rating_keys(draft)]
+    if _all_ratings_collected(draft):
+        return []
+
+    return ["ratings"]
 
 
 def _all_ratings_collected(draft: ReportDraft) -> bool:
@@ -1341,16 +1521,23 @@ def _clear_ai_cache(draft: ReportDraft) -> None:
 def _draft_context(draft: ReportDraft) -> dict[str, Any]:
     answers = dict(_draft_data(draft).get("answers", {}))
     return {
-        "customer_or_lead": answers.get("customer_context"),
-        "contacts": answers.get("contacts"),
-        "visit_reason": answers.get("visit_reason"),
-        "summary": draft.summary,
-        "outcome": draft.outcome,
+        "visit_context": answers.get("visit_context"),
+        "visit_type": draft.visit_type,
+        "participants": answers.get("participants"),
+        "visit_date": str(draft.visit_date) if draft.visit_date else None,
+        "target_topic": answers.get("target_topic"),
+        "info_text": draft.summary,
+        "agreement_text": draft.outcome,
         "next_action": draft.next_action,
+        "next_appointment_date": (
+            str(draft.follow_up_date) if draft.follow_up_date else None
+        ),
         "offer_reference": answers.get("offer_reference"),
         "order_reference": answers.get("order_reference"),
+        "strength_text": answers.get("strength_text"),
+        "weakness_text": answers.get("weakness_text"),
         "ratings": dict(draft.ratings_json),
-        "inside_sales_tasks": _task_preview_titles(draft),
+        "reminders": _reminder_preview_titles(draft),
         "status": draft.report_status,
     }
 
@@ -1360,13 +1547,17 @@ def _build_final_report_text(draft: ReportDraft) -> str:
     report_lines = [
         "Besuchsbericht",
         "",
-        f"Kunde/Lead: {_display_value(answers.get('customer_context'))}",
-        f"Teilnehmer: {_display_value(answers.get('contacts'))}",
-        f"Besuchsgrund: {_display_value(answers.get('visit_reason'))}",
+        f"Kunde/Lead/Kontakt: {_display_value(answers.get('visit_context'))}",
+        f"Besuchsart: {_display_value(draft.visit_type)}",
+        f"Teilnehmer: {_display_value(answers.get('participants'))}",
+        f"Besuchsdatum: {_display_value(draft.visit_date)}",
+        f"Ziel/Thema: {_display_value(answers.get('target_topic'))}",
         "",
-        f"Zusammenfassung: {draft.summary or 'Nicht angegeben'}",
-        f"Ergebnis: {draft.outcome or 'Nicht angegeben'}",
+        f"Info: {draft.summary or 'Nicht angegeben'}",
+        f"Vereinbarung: {draft.outcome or 'Nicht angegeben'}",
         f"Nächster Schritt: {draft.next_action or 'Nicht angegeben'}",
+        f"Stärke: {_display_value(answers.get('strength_text'), 'Nicht angegeben')}",
+        f"Schwäche: {_display_value(answers.get('weakness_text'), 'Nicht angegeben')}",
         "",
         f"Bewertungen: {_format_ratings(draft.ratings_json)}",
     ]
@@ -1390,79 +1581,122 @@ def _format_ratings(ratings: dict[str, Any]) -> str:
 
 
 def _format_task_preview(draft: ReportDraft) -> str:
-    task_titles = _task_preview_titles(draft)
-    if not task_titles:
+    reminder_titles = _reminder_preview_titles(draft)
+    if not reminder_titles:
         return "Keine"
 
-    return "; ".join(task_titles)
+    return "; ".join(reminder_titles)
 
 
-def _build_inside_sales_tasks(
+def _mock_visit_report_payload(
     draft: ReportDraft,
     final_report: FinalReport,
-) -> list[InsideSalesTask]:
-    tasks = []
-    for title, task_type, description in _task_definitions(draft):
-        tasks.append(
-            InsideSalesTask(
-                final_report=final_report,
-                task_type=task_type,
-                title=title,
-                description=description,
-                detected_customer_name=_draft_answer(draft, "customer_context"),
-                detected_contact_name=_draft_answer(draft, "contacts"),
-                related_customer_id=draft.customer_id,
-            )
-        )
+) -> dict[str, Any]:
+    answers = dict(_draft_data(draft).get("answers", {}))
+    account = draft.account
+    representative = _default_field_sales_representative()
+    responsible_user = _default_crm_user()
+    ratings = dict(draft.ratings_json)
+    return {
+        "visit_type": draft.visit_type or VisitType.IN_PERSON.value,
+        "visit_report_status": VisitReportStatus.CLOSED.value,
+        "report_status": VisitReportStatus.CLOSED.value,
+        "account_id": draft.account_id,
+        "account_number": account.account_number if account else None,
+        "account_type": account.account_type if account else AccountType.ADDRESS.value,
+        "account_search_name": account.search_name if account else None,
+        "contact_id": draft.contact_id,
+        "contact_name": _draft_answer(draft, "participants"),
+        "field_sales_representative_id": (
+            representative.id if representative is not None else None
+        ),
+        "responsible_user_id": responsible_user.id if responsible_user else None,
+        "visit_date": draft.visit_date,
+        "target_topic": answers.get("target_topic") or final_report.summary,
+        "info_text": draft.summary or final_report.summary,
+        "agreement_text": draft.outcome or final_report.outcome or "Nicht angegeben",
+        "strength_text": answers.get("strength_text"),
+        "weakness_text": answers.get("weakness_text"),
+        "customer_satisfaction_rating": _rating_value(
+            ratings,
+            "customer_satisfaction_rating",
+        ),
+        "technical_attractiveness_rating": _rating_value(
+            ratings,
+            "technical_attractiveness_rating",
+        ),
+        "commercial_attractiveness_rating": _rating_value(
+            ratings,
+            "commercial_attractiveness_rating",
+        ),
+        "priority_rating": _rating_value(ratings, "priority_rating"),
+        "next_appointment_date": draft.follow_up_date,
+        "offer_reference": answers.get("offer_reference"),
+        "order_reference": answers.get("order_reference")
+        or _draft_data(draft).get("order_reference_raw"),
+    }
 
-    return tasks
+
+def _create_mock_reminders(
+    draft: ReportDraft,
+    mock_visit_report: MockVisitReport,
+) -> list[MockReminder]:
+    if not _draft_data(draft).get(INSIDE_SALES_FOLLOW_UP_KEY):
+        return []
+
+    owner = _default_crm_user()
+    if owner is None:
+        return []
+
+    reminder = create_mock_reminder(
+        mock_visit_report.visit_report_number,
+        {
+            "due_date": draft.follow_up_date,
+            "owner_type": ReminderOwnerType.CRM_USER.value,
+            "owner_id": owner.id,
+            "created_by_user_id": draft.sales_user_id,
+            "message": _reminder_message(draft),
+        },
+    )
+    return [reminder]
 
 
-def _task_preview_titles(draft: ReportDraft) -> list[str]:
-    return [title for title, _task_type, _description in _task_definitions(draft)]
+def _default_crm_user() -> Any | None:
+    users = list_crm_users()
+    return users[0] if users else None
 
 
-def _task_definitions(draft: ReportDraft) -> list[tuple[str, str, str]]:
-    definitions = []
-    if draft.customer_context_type == CustomerContextType.NEW_LEAD.value:
-        definitions.append(
-            (
-                "Review new lead",
-                InsideSalesTaskType.COMPLETE_MASTER_DATA.value,
-                "A new lead was mentioned and must be reviewed before CRM creation.",
-            )
-        )
+def _default_field_sales_representative() -> Any | None:
+    representatives = list_field_sales_representatives()
+    return representatives[0] if representatives else None
 
-    contact_answer = _draft_answer(draft, "contacts").lower()
-    if _mentions_new(contact_answer):
-        definitions.append(
-            (
-                "Review new contact",
-                InsideSalesTaskType.COMPLETE_MASTER_DATA.value,
-                "A new contact was mentioned and must be checked by inside sales.",
-            )
-        )
 
-    offer_answer = _draft_answer(draft, "offer_reference").lower()
-    if _is_unclear_answer(offer_answer):
-        definitions.append(
-            (
-                "Clarify offer reference",
-                InsideSalesTaskType.CLARIFY_DETAILS.value,
-                "The offer reference is unclear and needs inside sales follow-up.",
-            )
-        )
+def _rating_value(ratings: dict[str, Any], rating_key: str) -> int | None:
+    rating = ratings.get(rating_key)
+    if not isinstance(rating, dict):
+        return None
 
-    if _draft_data(draft).get(INSIDE_SALES_FOLLOW_UP_KEY):
-        definitions.append(
-            (
-                "Inside sales follow-up",
-                InsideSalesTaskType.FOLLOW_UP_CALL.value,
-                "Inside sales should follow up on the mentioned next step.",
-            )
-        )
+    value = rating.get("value")
+    return value if isinstance(value, int) else None
 
-    return definitions
+
+def _reminder_message(draft: ReportDraft) -> str:
+    return (
+        _draft_data(draft).get("reminder_message")
+        or draft.next_action
+        or "Bitte Besuchsbericht prüfen und Folgeaktion übernehmen."
+    )
+
+
+def _reminder_preview_titles(draft: ReportDraft) -> list[str]:
+    if not _draft_data(draft).get(INSIDE_SALES_FOLLOW_UP_KEY):
+        return []
+
+    message = _reminder_message(draft)
+    due_date = (
+        draft.follow_up_date.isoformat() if draft.follow_up_date else "ohne Datum"
+    )
+    return [f"Wiedervorlage Innendienst ({due_date}): {message}"]
 
 
 def _draft_answer(draft: ReportDraft, key: str) -> str:
@@ -1540,7 +1774,7 @@ def _looks_like_follow_up_action(message_text: str) -> bool:
             "in 2 wochen",
             "in zwei wochen",
             "nächste woche",
-            "naechste woche",
+            "nächste woche",
         )
     )
 

@@ -1,21 +1,22 @@
 {% extends "base.html" %}
 
-{% block title %}Completed Reports - BENNO{% endblock %}
+{% block title %}Abgeschlossene Berichte - BENNO{% endblock %}
 {% block shell_class %}app-shell--page{% endblock %}
 
 {% block content %}
   <section class="page-section" aria-labelledby="completed-reports-title">
     <p class="hero__eyebrow">Sales workspace</p>
-    <h1 id="completed-reports-title">Completed Reports</h1>
+    <h1 id="completed-reports-title">Abgeschlossene Berichte</h1>
     {% if reports %}
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>ID</th>
+              <th>Bericht</th>
+              <th>Kunde/Lead</th>
+              <th>Ziel/Thema</th>
               <th>Status</th>
-              <th>Visit Date</th>
-              <th>Language</th>
+              <th>Besuchsdatum</th>
             </tr>
           </thead>
           <tbody>
@@ -23,19 +24,36 @@
               <tr data-report-id="{{ report.id }}">
                 <td>
                   <a href="{{ url_for('sales.final_report_detail', report_id=report.id) }}">
-                    {{ report.id }}
+                    {% if report.mock_visit_report %}
+                      {{ report.mock_visit_report.visit_report_number }}
+                    {% else %}
+                      #{{ report.id }}
+                    {% endif %}
                   </a>
                 </td>
+                <td>
+                  {% if report.mock_visit_report %}
+                    {{ report.mock_visit_report.account_search_name or "Nicht erkannt" }}
+                  {% else %}
+                    Nicht erkannt
+                  {% endif %}
+                </td>
+                <td>
+                  {% if report.mock_visit_report %}
+                    {{ report.mock_visit_report.target_topic }}
+                  {% else %}
+                    {{ report.summary }}
+                  {% endif %}
+                </td>
                 <td>{{ report.status }}</td>
-                <td>{{ report.visit_date or "Not set" }}</td>
-                <td>{{ report.report_language }}</td>
+                <td>{{ report.visit_date or "Nicht gesetzt" }}</td>
               </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
     {% else %}
-      <p class="empty-state">No completed reports yet.</p>
+      <p class="empty-state">Noch keine abgeschlossenen Berichte.</p>
     {% endif %}
   </section>
 {% endblock %}

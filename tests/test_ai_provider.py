@@ -109,14 +109,14 @@ def test_gemini_section_update_list_converts_to_internal_dict() -> None:
     gemini_analysis = GeminiMessageAnalysis(
         intent=UserIntent.ADDITIONAL_INFO,
         intent_confidence=0.93,
-        target_sections=["customer_context", "contacts", "visit_reason"],
+        target_sections=["visit_context", "participants", "target_topic"],
         section_updates=[
-            GeminiSectionUpdate(section="customer_context", value="PerfSolar"),
-            GeminiSectionUpdate(section="contacts", value="Frau Müller"),
-            GeminiSectionUpdate(section="visit_reason", value="Forecast"),
+            GeminiSectionUpdate(section="visit_context", value="PerfSolar"),
+            GeminiSectionUpdate(section="participants", value="Frau Müller"),
+            GeminiSectionUpdate(section="target_topic", value="Forecast"),
         ],
-        suggested_next_section="summary",
-        suggested_next_question="Was waren die wichtigsten Gesprächspunkte?",
+        suggested_next_section="info_text",
+        suggested_next_question="Was wurde besprochen?",
     )
 
     analysis = _convert_gemini_analysis(gemini_analysis)
@@ -124,35 +124,33 @@ def test_gemini_section_update_list_converts_to_internal_dict() -> None:
     assert analysis.intent == UserIntent.ADDITIONAL_INFO
     assert analysis.intent_confidence == 0.93
     assert analysis.section_updates == {
-        "customer_context": "PerfSolar",
-        "contacts": "Frau Müller",
-        "visit_reason": "Forecast",
+        "visit_context": "PerfSolar",
+        "participants": "Frau Müller",
+        "target_topic": "Forecast",
     }
-    assert analysis.suggested_next_section == "summary"
-    assert analysis.suggested_next_question == (
-        "Was waren die wichtigsten Gesprächspunkte?"
-    )
+    assert analysis.suggested_next_section == "info_text"
+    assert analysis.suggested_next_question == "Was wurde besprochen?"
 
 
 def test_gemini_section_update_conversion_ignores_malformed_empty_values() -> None:
     gemini_analysis = GeminiMessageAnalysis(
         section_updates=[
-            GeminiSectionUpdate(section="contacts", value="Frau Schmidt"),
-            GeminiSectionUpdate(section="contacts", value=""),
-            GeminiSectionUpdate(section="contacts", value="Herr Walther"),
+            GeminiSectionUpdate(section="participants", value="Frau Schmidt"),
+            GeminiSectionUpdate(section="participants", value=""),
+            GeminiSectionUpdate(section="participants", value="Herr Walther"),
             GeminiSectionUpdate(section=None, value="No section"),
-            GeminiSectionUpdate(section="summary", value=None),
+            GeminiSectionUpdate(section="info_text", value=None),
         ],
     )
 
     analysis = _convert_gemini_analysis(gemini_analysis)
 
-    assert analysis.section_updates == {"contacts": "Herr Walther"}
+    assert analysis.section_updates == {"participants": "Herr Walther"}
 
 
 def test_gemini_analysis_uses_system_instruction_separate_from_content() -> None:
     content = _build_analysis_content(
-        {"current_step": "customer_context"},
+        {"current_step": "visit_context"},
         "Ich war bei PerfSolar.",
     )
 
@@ -166,8 +164,8 @@ def test_gemini_analysis_uses_system_instruction_separate_from_content() -> None
 def test_gemini_next_question_prompt_uses_conversation_system_instruction() -> None:
     prompt = _build_next_question_prompt(
         {
-            "next_step": "contacts",
-            "known_answers": {"customer_context": "PerfSolar"},
+            "next_step": "participants",
+            "known_answers": {"visit_context": "PerfSolar"},
         }
     )
 

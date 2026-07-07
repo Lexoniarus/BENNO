@@ -4,13 +4,14 @@ from decimal import Decimal
 
 from werkzeug.security import generate_password_hash
 
-from benno.enums import AiProvider, SessionLanguage, UserRole
+from benno.enums import AccountType, AiProvider, SessionLanguage, UserRole
 from benno.extensions import db
 from benno.models import (
     GlobalSetting,
+    MockAccount,
     MockContact,
-    MockCustomer,
-    MockLead,
+    MockCrmUser,
+    MockFieldSalesRepresentative,
     MockOffer,
     MockOrder,
     User,
@@ -81,12 +82,14 @@ def _create_user_if_missing(
 
 
 def _seed_mock_crm_data() -> None:
-    customer_data = [
+    account_data = [
         {
-            "external_customer_id": "CUST-1001",
-            "name": "Nordlicht Maschinenbau GmbH",
-            "city": "Hamburg",
-            "industry": "Mechanical Engineering",
+            "account_number": "AKL-K-1001",
+            "account_type": AccountType.CUSTOMER.value,
+            "search_name": "NORDLICHT",
+            "display_name": "Nordlicht Maschinenbau GmbH",
+            "address_text": "Hamburg",
+            "address_restriction": None,
             "contacts": [
                 {
                     "external_contact_id": "CONT-1001",
@@ -125,10 +128,12 @@ def _seed_mock_crm_data() -> None:
             ],
         },
         {
-            "external_customer_id": "CUST-1002",
-            "name": "Solaris Verpackung AG",
-            "city": "Freiburg",
-            "industry": "Packaging",
+            "account_number": "AKL-K-1002",
+            "account_type": AccountType.CUSTOMER.value,
+            "search_name": "SOLARIS",
+            "display_name": "Solaris Verpackung AG",
+            "address_text": "Freiburg",
+            "address_restriction": None,
             "contacts": [
                 {
                     "external_contact_id": "CONT-2001",
@@ -148,10 +153,12 @@ def _seed_mock_crm_data() -> None:
             "orders": [],
         },
         {
-            "external_customer_id": "CUST-1003",
-            "name": "Hafenblick Logistik KG",
-            "city": "Bremen",
-            "industry": "Logistics",
+            "account_number": "AKL-K-1003",
+            "account_type": AccountType.CUSTOMER.value,
+            "search_name": "HAFENBLICK",
+            "display_name": "Hafenblick Logistik KG",
+            "address_text": "Bremen",
+            "address_restriction": None,
             "contacts": [],
             "offers": [],
             "orders": [
@@ -164,10 +171,12 @@ def _seed_mock_crm_data() -> None:
             ],
         },
         {
-            "external_customer_id": "CUST-1004",
-            "name": "Alpina Medizintechnik GmbH",
-            "city": "Munich",
-            "industry": "Medical Technology",
+            "account_number": "AKL-K-1004",
+            "account_type": AccountType.CUSTOMER.value,
+            "search_name": "ALPINA",
+            "display_name": "Alpina Medizintechnik GmbH",
+            "address_text": "Munich",
+            "address_restriction": None,
             "contacts": [
                 {
                     "external_contact_id": "CONT-4001",
@@ -179,45 +188,84 @@ def _seed_mock_crm_data() -> None:
             "offers": [],
             "orders": [],
         },
+        {
+            "account_number": "AKL-A-9001",
+            "account_type": AccountType.ADDRESS.value,
+            "search_name": "URBANGRID",
+            "display_name": "UrbanGrid Mobility GmbH",
+            "address_text": "Cologne",
+            "address_restriction": None,
+            "contacts": [
+                {
+                    "external_contact_id": "CONT-9001",
+                    "full_name": "Timo Neumann",
+                    "email": "timo.neumann@example.invalid",
+                    "role_title": "Business Development",
+                }
+            ],
+            "offers": [],
+            "orders": [],
+        },
+        {
+            "account_number": "AKL-L-3001",
+            "account_type": AccountType.SUPPLIER.value,
+            "search_name": "RHEINTECH",
+            "display_name": "RheinTech Komponenten OHG",
+            "address_text": "Düsseldorf",
+            "address_restriction": "Supplier demo record",
+            "contacts": [],
+            "offers": [],
+            "orders": [],
+        },
     ]
 
-    for customer_record in customer_data:
-        customer = _create_customer_if_missing(customer_record)
-        _create_contacts_if_missing(customer, customer_record["contacts"])
-        _create_offers_if_missing(customer, customer_record["offers"])
-        _create_orders_if_missing(customer, customer_record["orders"])
+    for account_record in account_data:
+        account = _create_account_if_missing(account_record)
+        _create_contacts_if_missing(account, account_record["contacts"])
+        _create_offers_if_missing(account, account_record["offers"])
+        _create_orders_if_missing(account, account_record["orders"])
 
-    _create_lead_if_missing(
-        external_lead_id="LEAD-9001",
-        company_name="UrbanGrid Mobility GmbH",
-        contact_name="Timo Neumann",
-        city="Cologne",
-        source="trade_fair",
+    _create_crm_user_if_missing(
+        username="inside.sales",
+        display_name="Inside Sales Team",
+        email="inside.sales@example.invalid",
+    )
+    _create_crm_user_if_missing(
+        username="service.backoffice",
+        display_name="Service Backoffice",
+        email="service.backoffice@example.invalid",
+    )
+    _create_field_sales_representative_if_missing(
+        representative_number="REP-001",
+        display_name="BENNO Sales Rep",
+        email="sales@example.invalid",
     )
 
 
-def _create_customer_if_missing(customer_record: dict) -> MockCustomer:
-    customer = (
-        db.session.query(MockCustomer)
-        .filter_by(external_customer_id=customer_record["external_customer_id"])
+def _create_account_if_missing(account_record: dict) -> MockAccount:
+    account = (
+        db.session.query(MockAccount)
+        .filter_by(account_number=account_record["account_number"])
         .one_or_none()
     )
-    if customer:
-        return customer
+    if account:
+        return account
 
-    customer = MockCustomer(
-        external_customer_id=customer_record["external_customer_id"],
-        name=customer_record["name"],
-        city=customer_record["city"],
-        industry=customer_record["industry"],
+    account = MockAccount(
+        account_number=account_record["account_number"],
+        account_type=account_record["account_type"],
+        search_name=account_record["search_name"],
+        display_name=account_record["display_name"],
+        address_text=account_record["address_text"],
+        address_restriction=account_record["address_restriction"],
     )
-    db.session.add(customer)
+    db.session.add(account)
     db.session.flush()
-    return customer
+    return account
 
 
 def _create_contacts_if_missing(
-    customer: MockCustomer,
+    account: MockAccount,
     contact_records: list[dict],
 ) -> None:
     for contact_record in contact_records:
@@ -231,7 +279,7 @@ def _create_contacts_if_missing(
 
         db.session.add(
             MockContact(
-                customer_id=customer.id,
+                account_id=account.id,
                 external_contact_id=contact_record["external_contact_id"],
                 full_name=contact_record["full_name"],
                 email=contact_record["email"],
@@ -241,7 +289,7 @@ def _create_contacts_if_missing(
 
 
 def _create_offers_if_missing(
-    customer: MockCustomer,
+    account: MockAccount,
     offer_records: list[dict],
 ) -> None:
     for offer_record in offer_records:
@@ -255,7 +303,7 @@ def _create_offers_if_missing(
 
         db.session.add(
             MockOffer(
-                customer_id=customer.id,
+                account_id=account.id,
                 external_offer_id=offer_record["external_offer_id"],
                 title=offer_record["title"],
                 status=offer_record["status"],
@@ -265,7 +313,7 @@ def _create_offers_if_missing(
 
 
 def _create_orders_if_missing(
-    customer: MockCustomer,
+    account: MockAccount,
     order_records: list[dict],
 ) -> None:
     for order_record in order_records:
@@ -279,7 +327,7 @@ def _create_orders_if_missing(
 
         db.session.add(
             MockOrder(
-                customer_id=customer.id,
+                account_id=account.id,
                 external_order_id=order_record["external_order_id"],
                 title=order_record["title"],
                 status=order_record["status"],
@@ -288,27 +336,43 @@ def _create_orders_if_missing(
         )
 
 
-def _create_lead_if_missing(
-    external_lead_id: str,
-    company_name: str,
-    contact_name: str,
-    city: str,
-    source: str,
+def _create_crm_user_if_missing(
+    username: str,
+    display_name: str,
+    email: str,
 ) -> None:
-    lead = (
-        db.session.query(MockLead)
-        .filter_by(external_lead_id=external_lead_id)
-        .one_or_none()
-    )
-    if lead:
+    crm_user = db.session.query(MockCrmUser).filter_by(username=username).one_or_none()
+    if crm_user:
         return
 
     db.session.add(
-        MockLead(
-            external_lead_id=external_lead_id,
-            company_name=company_name,
-            contact_name=contact_name,
-            city=city,
-            source=source,
+        MockCrmUser(
+            username=username,
+            display_name=display_name,
+            email=email,
+            is_active=True,
+        )
+    )
+
+
+def _create_field_sales_representative_if_missing(
+    representative_number: str,
+    display_name: str,
+    email: str,
+) -> None:
+    representative = (
+        db.session.query(MockFieldSalesRepresentative)
+        .filter_by(representative_number=representative_number)
+        .one_or_none()
+    )
+    if representative:
+        return
+
+    db.session.add(
+        MockFieldSalesRepresentative(
+            representative_number=representative_number,
+            display_name=display_name,
+            email=email,
+            is_active=True,
         )
     )

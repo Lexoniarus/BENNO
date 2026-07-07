@@ -49,13 +49,13 @@ Do not propose updates for requirements that are completed or not_applicable
 unless the user's intent is correction and the user explicitly targets them.
 Preserve German spelling exactly, including ä, ö, ü, Ä, Ö, Ü, and ß.
 Do not rewrite umlauts as ae, oe, ue, or ss.
-Do not infer unstated outcomes, next actions, ratings, offers, or orders.
+Do not infer unstated agreements, next actions, ratings, offers, or orders.
 If the user explicitly says there is no offer, no order, or the account is a lead,
 use "keiner" for offer_reference and order_reference when appropriate.
 If the user mentions inside sales calling or following up, extract that as
 next_action if the next action is still missing.
 Ratings may be answered together. Extract every explicitly stated rating clue
-into the matching rating_* section. If the user says a rating is too early,
+into the matching eNVenta rating section. If the user says a rating is too early,
 keep that wording as the value instead of inventing a number.
 Also propose the next useful German assistant question in suggested_next_question.
 Set suggested_next_section to the requirement key that should be asked next after
@@ -67,34 +67,35 @@ Allowed intents:
 answer, correction, additional_info, confirmation, rejection, repeat, cancel, unknown.
 
 Allowed section update keys:
-customer_context, contacts, visit_reason, summary, outcome, next_action,
-offer_reference, order_reference, rating_sales_opportunity, rating_meeting_mood,
-rating_priority, rating_closing_probability, rating_need_for_action,
-rating_customer_satisfaction.
+visit_context, visit_type, participants, visit_date, target_topic, info_text,
+agreement_text, next_action, next_appointment_date, offer_reference,
+order_reference, strength_text, weakness_text, reminders,
+customer_satisfaction_rating, technical_attractiveness_rating,
+commercial_attractiveness_rating, priority_rating.
 
 Return section_updates as an array of objects with exactly these fields:
 section, value.
 Example:
 [
-  {"section": "contacts", "value": "Frau Schmidt"},
-  {"section": "visit_reason", "value": "Forecast"}
+  {"section": "participants", "value": "Frau Schmidt"},
+  {"section": "target_topic", "value": "Forecast"}
 ]
 Do not return section_updates as an object with dynamic section keys.
 
 German extraction examples:
-- "Ich war bei PerfSolar" -> customer_context = "PerfSolar".
-- "mit Frau Müller" -> contacts = "Frau Müller".
-- "über den Forecast gesprochen" -> visit_reason = "Forecast".
-- "über eine mögliche Kooperation gesprochen" -> visit_reason = "mögliche Kooperation".
-- "Wir haben uns über den Forecast unterhalten" -> visit_reason = "Forecast".
+- "Ich war bei PerfSolar" -> visit_context = "PerfSolar".
+- "mit Frau Müller" -> participants = "Frau Müller".
+- "über den Forecast gesprochen" -> target_topic = "Forecast".
+- "über eine mögliche Kooperation gesprochen" -> target_topic = "mögliche Kooperation".
+- "Wir haben uns über den Forecast unterhalten" -> target_topic = "Forecast".
 - "Sie wollen Muster und wir reden in 2 Wochen drüber" ->
-  outcome = "Kunde möchte Muster"; next_action = "Gespräch in 2 Wochen".
+  agreement_text = "Kunde möchte Muster"; next_action = "Gespräch in 2 Wochen".
 - "nee die sind Lead, da muss der Innendienst nochmal anrufen" ->
   offer_reference = "keiner"; order_reference = "keiner";
-  next_action = "Innendienst soll nochmal anrufen".
-- "Priorität 7, Stimmung gut, Abschluss noch zu früh" ->
-  rating_priority = "7"; rating_meeting_mood = "gut";
-  rating_closing_probability = "zu früh".
+  reminders = "Innendienst soll nochmal anrufen".
+- "Zufriedenheit 8, technische Attraktivität 7, kaufmännisch 6, Priorität 9" ->
+  customer_satisfaction_rating = "8"; technical_attractiveness_rating = "7";
+  commercial_attractiveness_rating = "6"; priority_rating = "9".
 """.strip()
 
 NEXT_QUESTION_SYSTEM_INSTRUCTION = """
@@ -327,7 +328,7 @@ def _build_final_report_prompt(draft_context: dict[str, Any]) -> str:
 Write the final CRM visit report text for this B2B field sales visit.
 Use clear professional German. Do not invent facts.
 Include customer context, participants, reason, summary, outcome, next action,
-relevant references, and sales ratings when available.
+relevant references, strength/weakness notes, and eNVenta ratings when available.
 
 Draft:
 {context_json}

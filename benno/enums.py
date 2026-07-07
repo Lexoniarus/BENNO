@@ -33,6 +33,14 @@ class CustomerContextType(StrEnum):
     UNCLEAR = "unclear"
 
 
+class AccountType(StrEnum):
+    """AKL-like account type codes."""
+
+    ADDRESS = "A"
+    CUSTOMER = "K"
+    SUPPLIER = "L"
+
+
 class InsideSalesTaskStatus(StrEnum):
     """Lifecycle status for inside sales tasks."""
 
@@ -86,14 +94,20 @@ class ReportSection(StrEnum):
     """Internal report sections used before final eNVenta field mapping."""
 
     CUSTOMER_CONTEXT = "customer_context"
+    VISIT_TYPE = "visit_type"
+    VISIT_DATE = "visit_date"
     CONTACTS = "contacts"
     VISIT_REASON = "visit_reason"
     SUMMARY = "summary"
     OUTCOME = "outcome"
     NEXT_ACTION = "next_action"
+    NEXT_APPOINTMENT_DATE = "next_appointment_date"
     OFFER_REFERENCE = "offer_reference"
     ORDER_REFERENCE = "order_reference"
+    STRENGTHS = "strengths"
+    WEAKNESSES = "weaknesses"
     RATINGS = "ratings"
+    REMINDERS = "reminders"
     FINAL_REPORT = "final_report"
     USER_CONFIRMATION = "user_confirmation"
 
@@ -107,6 +121,21 @@ class ReportStatus(StrEnum):
     BLOCKED = "blocked"
     CONFIRMED = "confirmed"
     SUBMITTED = "submitted"
+    CANCELLED = "cancelled"
+
+
+class ReminderOwnerType(StrEnum):
+    """Owner domains for mock eNVenta reminders."""
+
+    CRM_USER = "crm_user"
+    FIELD_SALES_REPRESENTATIVE = "field_sales_representative"
+
+
+class ReminderStatus(StrEnum):
+    """Lifecycle status for mock eNVenta reminders."""
+
+    OPEN = "open"
+    DONE = "done"
     CANCELLED = "cancelled"
 
 
@@ -149,8 +178,14 @@ class ValidationStatus(StrEnum):
 class VisitType(StrEnum):
     """Visit type codes."""
 
-    ON_SITE = "on_site"
+    IN_PERSON = "in_person"
+    VIRTUAL = "virtual"
     PHONE = "phone"
-    VIDEO = "video"
-    TRADE_FAIR = "trade_fair"
-    OTHER = "other"
+
+
+class VisitReportStatus(StrEnum):
+    """Mock eNVenta visit report status values."""
+
+    OPEN = "open"
+    IN_PROGRESS = "in_progress"
+    CLOSED = "closed"
