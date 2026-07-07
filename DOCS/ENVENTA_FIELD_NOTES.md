@@ -73,6 +73,41 @@ structured handoff target with these groups:
 The MVP should not implement `visit_rhythm`, supplier-specific behavior, or a
 full eNVenta screen clone.
 
+### Phase 6 Target Model Decisions
+
+`final_reports` remain BENNO's internal confirmed report record. They preserve
+the reviewed BENNO result.
+
+`mock_visit_reports` are the mock CRM/eNVenta write target. They represent the
+visit report shape BENNO would later write to eNVenta. This target should
+contain the eNVenta-oriented free-text fields:
+
+- `target_topic` for `Ziel/Thema`
+- `info_text` for `Info`
+- `agreement_text` for `Vereinbarung`
+- `strength_text` for `Stärke`
+- `weakness_text` for `Schwäche`
+
+These texts are derived from the conversation, validated report facts, and
+field-sales ratings. They should not be a raw transcript and must not invent
+facts outside the reviewed BENNO report.
+
+The existing Phase 2 mock customer and lead tables are legacy scaffolding for
+Phase 6. The Phase 6 target model should represent the eNVenta AKL logic as
+`accounts`, where leads, customers, and suppliers share one address/account
+domain. Contacts are linked to these accounts.
+
+`inside_sales_tasks` should become the basis for eNVenta-like
+`reminders`/`follow_ups`. The task/reminder target may point to either inside
+sales users or field sales users.
+
+CRM users and field sales representatives are separate eNVenta-style domains:
+
+- `crm_users` / `responsible_users` represent users in the CRM. This includes
+  inside sales users and may also include field sales users.
+- `field_sales_representatives` represent the sales representative master data.
+  Representatives are always field sales people.
+
 ## MVP Working Mapping Table
 
 This table is the current Phase 6 working contract. It is derived from the

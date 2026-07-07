@@ -282,11 +282,15 @@ Phase 6 field decisions already clarified:
 - `Status` and `Berichtsstatus` represent the visit report processing state; MVP values are `open`, `in_progress`, and `closed`.
 - `Termin ab` maps to `next_appointment_date`.
 - `Besuchsrhythmus` is out of scope for the MVP.
-- `Zufriedenheit`, `Techn. Attrakt.`, `Kaufm. Attrakt.`, and `PrioritÃ¤t` are ratings from 1 to 10.
+- `Zufriedenheit`, `Techn. Attrakt.`, `Kaufm. Attrakt.`, and `Priorität` are ratings from 1 to 10.
 - These four eNVenta screenshot ratings are authoritative for Phase 6. The older six BENNO internal ratings from Phase 4/5 are legacy working fields and should not remain the target contract.
 - Offers and orders may appear in one eNVenta table but must remain separate BENNO document types.
 - AKL is the shared address/customer/supplier/lead domain; contacts are linked to AKL/account records.
-- The placeholder contract should include reminders, field sales users, responsible users, accounts, contacts, offers, and orders.
+- The placeholder contract should include accounts, contacts, offers, orders, reminders, CRM users, and field sales representatives.
+- `mock_visit_reports` are the eNVenta-shaped write target created from confirmed BENNO final reports. Their free-text fields include `target_topic`, `info_text`, `agreement_text`, `strength_text`, and `weakness_text`.
+- Phase 6 should replace the Phase 2 mock customer/lead split with an AKL-like account model where leads, customers, and suppliers are account types.
+- CRM users and field sales representatives are separate mock domains. Responsible users live in the CRM user domain; representatives are always field sales people.
+- Current inside sales tasks are the legacy basis for eNVenta-like reminders. Reminders may be assigned to inside sales users or field sales representatives.
 - The working mapping table and MVP required fields are maintained in `DOCS/ENVENTA_FIELD_NOTES.md`.
 
 The placeholder CRM service should then define:

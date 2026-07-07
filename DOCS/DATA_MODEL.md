@@ -37,6 +37,10 @@ The MVP needs these data areas:
 | `mock_offers` | Placeholder offer references |
 | `mock_orders` | Placeholder order references |
 | `mock_visit_reports` | Placeholder eNVenta visit report write target |
+| `mock_accounts` | Phase 6 AKL-like account/address domain |
+| `mock_crm_users` | CRM user domain for responsible users |
+| `mock_field_sales_representatives` | Field sales representative master data |
+| `mock_reminders` | eNVenta-like follow-up/reminder target |
 
 Phase 6 adds the eNVenta-oriented visit report write shape based on Bernd's
 screenshots and the clarified MVP mapping.
@@ -190,6 +194,21 @@ what BENNO would later write toward eNVenta.
 The mock visit report target should use the Phase 6 eNVenta field mapping, not
 the earlier Phase 4/5 BENNO-only report shape.
 
+`final_reports` stay as BENNO's internal confirmed report. `mock_visit_reports`
+represent the external eNVenta-shaped write target created from that confirmed
+report.
+
+Required eNVenta-oriented free-text target fields:
+
+- `target_topic`
+- `info_text`
+- `agreement_text`
+- `strength_text`
+- `weakness_text`
+
+These fields are generated from validated BENNO report facts, user statements,
+and ratings. They are not raw transcripts.
+
 Required target rating fields:
 
 - `customer_satisfaction_rating`
@@ -200,6 +219,29 @@ Required target rating fields:
 These four fields replace the earlier six internal BENNO rating fields as the
 target contract. The old fields should not be kept in parallel in the mock
 eNVenta visit report target.
+
+## Mock Accounts And Users
+
+Phase 6 should move the target mock CRM shape toward eNVenta's AKL logic.
+
+`mock_accounts` represent the shared AKL-like address/account domain. Leads,
+customers, and suppliers are account types inside that domain. Existing
+`mock_customers` and `mock_leads` are Phase 2 legacy scaffolding and should be
+wrapped, replaced, or migrated toward the account model during Phase 6.
+
+Contacts belong to accounts.
+
+CRM users and field sales representatives are separate mock domains:
+
+- `mock_crm_users` represent CRM users and responsible users. Inside sales users
+  live here, and field sales users may also have CRM user records.
+- `mock_field_sales_representatives` represent field sales representative master
+  data. Representatives are always field sales people.
+
+`mock_reminders` represent eNVenta-like follow-ups. They can be assigned to CRM
+users or field sales representatives. BENNO's current `inside_sales_tasks`
+should be treated as the legacy basis for these reminders, not as a separate
+parallel concept.
 
 ## Inside Sales Tasks
 
