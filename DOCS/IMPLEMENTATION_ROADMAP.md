@@ -291,6 +291,9 @@ Phase 6 field decisions already clarified:
 - Phase 6 should replace the Phase 2 mock customer/lead split with an AKL-like account model where leads, customers, and suppliers are account types.
 - CRM users and field sales representatives are separate mock domains. Responsible users live in the CRM user domain; representatives are always field sales people.
 - Current inside sales tasks are the legacy basis for eNVenta-like reminders. Reminders may be assigned to inside sales users or field sales representatives.
+- The report chat should use broad conversation blocks instead of one question
+  per eNVenta field: visit context, goal/topic, discussion content, agreement
+  and next step, document references when relevant, ratings, and final review.
 - The working mapping table and MVP required fields are maintained in `DOCS/ENVENTA_FIELD_NOTES.md`.
 
 The placeholder CRM service should then define:

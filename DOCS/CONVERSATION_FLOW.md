@@ -18,6 +18,35 @@ BENNO should not behave like a rigid form. The field sales user may start freely
 
 If the first user message already contains enough information, BENNO should move directly toward a block-based review instead of creating artificial extra questions.
 
+## Phase 6 eNVenta Conversation Shape
+
+Phase 6 should adapt the conversation to the eNVenta target fields without
+turning BENNO into a copied eNVenta form.
+
+The backend owns the required eNVenta checklist. Gemini helps interpret free
+German input against that checklist, proposes field updates, and suggests the
+next natural question. Gemini must not decide which fields are required and
+must not save anything directly.
+
+The intended high-level question flow is:
+
+| Conversation block | Natural German question intent | Main target fields |
+|---|---|---|
+| Visit context | Ask which customer, lead, or contact the visit was about and whether the visit was in person, virtual, or by phone. | `account`, `contact`, `visit_type`, `participants` |
+| Goal or topic | Ask for the visit reason, goal, or main topic. | `target_topic` / `visit_topic` |
+| Discussion content | Let the user describe the conversation freely. | `info_text` / `summary`, optional `strength_text`, optional `weakness_text`, offer/order references |
+| Agreement and next step | Ask what was agreed, who should do what next, and whether a follow-up or reminder is needed. | `agreement_text`, `outcome`, `next_action`, `next_appointment_date`, `reminders` |
+| eNVenta ratings | Ask for the four eNVenta ratings together, either as numbers from 1 to 10 or in words. | `customer_satisfaction_rating`, `technical_attractiveness_rating`, `commercial_attractiveness_rating`, `priority_rating` |
+| Review | Show the eNVenta-oriented draft for confirmation. | `mock_visit_reports` write target |
+
+BENNO should ask direct follow-up questions only for missing or unclear
+requirements. For example, `strength_text` and `weakness_text` can often be
+derived from the user's description and ratings. They should not block the
+report unless the business rule later makes them mandatory.
+
+The desired behavior is: BENNO knows the eNVenta target shape; Gemini recognizes
+which parts of a normal sales conversation already satisfy that shape.
+
 ## Report Sections
 
 The report draft is organized into these sections:

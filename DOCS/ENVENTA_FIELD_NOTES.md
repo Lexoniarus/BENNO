@@ -108,6 +108,31 @@ CRM users and field sales representatives are separate eNVenta-style domains:
 - `field_sales_representatives` represent the sales representative master data.
   Representatives are always field sales people.
 
+### Phase 6 Conversation Collection Strategy
+
+BENNO should collect the eNVenta target fields through a guided conversation,
+not through a copied eNVenta form.
+
+The backend defines the required field checklist. Gemini compares each free
+German user message against that checklist and proposes which target fields are
+already covered. BENNO then validates the proposal and asks only for missing or
+unclear information.
+
+The conversation should use these broad blocks:
+
+| Block | Purpose | Target fields |
+|---|---|---|
+| Visit context | Identify account or lead, contact or participants, and visit type. | `account_id` / `account_name`, `contact_id` / `contact_name`, `participants`, `visit_type` |
+| Goal or topic | Capture the reason, goal, or main subject of the visit. | `target_topic` / `visit_topic` |
+| Discussion content | Capture what was discussed in free form. | `info_text` / `summary`, optional `strength_text`, optional `weakness_text` |
+| Agreement and next step | Capture decisions, next actions, ownership, and follow-up dates. | `agreement_text`, `outcome`, `next_action`, `next_appointment_date`, `reminders` |
+| Document references | Capture offer or order references only when mentioned or relevant. | `offer_reference`, `order_reference` |
+| eNVenta ratings | Capture the four eNVenta ratings together. | `customer_satisfaction_rating`, `technical_attractiveness_rating`, `commercial_attractiveness_rating`, `priority_rating` |
+
+The LLM may derive `strength_text` and `weakness_text` from the conversation and
+ratings, but BENNO should not invent facts. If a derived value is unclear, BENNO
+asks a short follow-up question instead of silently filling the field.
+
 ## MVP Working Mapping Table
 
 This table is the current Phase 6 working contract. It is derived from the
