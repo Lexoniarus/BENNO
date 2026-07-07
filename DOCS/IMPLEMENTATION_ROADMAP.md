@@ -247,6 +247,10 @@ Goal:
 
 The internal report structure is mapped to the expected eNVenta visit report fields.
 
+Detailed implementation plan:
+
+- `DOCS/PHASE_6_IMPLEMENTATION_PLAN.md`
+
 Questions to resolve:
 
 - Which fields are required?

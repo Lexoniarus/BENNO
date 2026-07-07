@@ -52,6 +52,39 @@ tested against real Gemini behavior. They are not fixed as a hard form script.
 If Gemini reliably extracts several fields from one answer, BENNO should skip
 the redundant follow-up questions.
 
+## Phase 6 Report Requirements
+
+The Phase 6 `report_requirements` checklist should be built from the eNVenta
+target fields. The wording below is the deterministic fallback wording. Gemini
+may make the questions more natural, but it must not ask for fields that are
+already completed or marked not applicable.
+
+| Key | German label | Required | Section | Fallback question |
+|---|---|---|---|---|
+| `visit_context` | Besuchskontext | Yes | `customer_context` | `Um welchen Kunden, Lead oder Kontakt ging es bei dem Besuch?` |
+| `visit_type` | Besuchsart | Yes | `visit_type` | `War der Besuch persönlich, virtuell oder telefonisch?` |
+| `participants` | Teilnehmer | Yes | `contacts` | `Wer hat an dem Gespräch teilgenommen?` |
+| `visit_date` | Besuchsdatum | Yes | `visit_date` | `War der Besuch heute oder an einem anderen Datum?` |
+| `target_topic` | Ziel/Thema | Yes | `visit_reason` | `Was war das Ziel oder Hauptthema des Besuchs?` |
+| `info_text` | Info | Yes | `summary` | `Was wurde besprochen? Du kannst es frei erzählen.` |
+| `agreement_text` | Vereinbarung | Yes | `outcome` | `Was wurde konkret vereinbart oder entschieden?` |
+| `next_action` | Nächster Schritt | Yes | `next_action` | `Was ist der nächste Schritt, und wer soll ihn übernehmen?` |
+| `next_appointment_date` | Termin ab | Conditional | `next_action` | `Gibt es einen konkreten Folgetermin oder Wiedervorlage-Termin?` |
+| `offer_reference` | Angebot | Conditional | `offer_reference` | `Gibt es dazu ein Angebot oder eine Angebotsnummer?` |
+| `order_reference` | Auftrag | Conditional | `order_reference` | `Gibt es dazu einen Auftrag oder eine Auftragsnummer?` |
+| `strength_text` | Stärke | Optional | `strengths` | `Gibt es aus deiner Sicht besondere Stärken oder positive Punkte?` |
+| `weakness_text` | Schwäche | Optional | `weaknesses` | `Gibt es Risiken, Einwände oder Schwächen, die festgehalten werden sollen?` |
+| `ratings` | Bewertungen | Yes | `ratings` | `Wie bewertest du Zufriedenheit, technische Attraktivität, kaufmännische Attraktivität und Priorität jeweils von 1 bis 10?` |
+| `reminders` | Wiedervorlagen | Conditional | `reminders` | `Soll daraus eine Wiedervorlage entstehen? Falls ja: für wen, bis wann und mit welcher Nachricht?` |
+
+Conditional requirements should become `not_applicable` when the conversation
+clearly says they do not apply. For example, a new lead without offer or order
+should not trigger separate offer and order questions.
+
+The first assistant question may combine `visit_context`, `visit_type`, and
+`participants` if that feels natural. Later questions should stay short and ask
+for only the next truly missing information.
+
 ## Report Sections
 
 The report draft is organized into these sections:

@@ -168,6 +168,33 @@ The final review does not need to be LLM-driven. BENNO can show each new
 eNVenta-oriented entry and ask the user whether it should be written that way.
 Only confirmed entries are saved into the mock visit report target.
 
+### Placeholder CRM Service Contract
+
+Phase 6 should expose a local mock CRM/eNVenta service layer. It is a
+replaceable boundary around SQLAlchemy models, not a real eNVenta integration.
+
+Suggested service functions:
+
+| Function | Purpose |
+|---|---|
+| `search_accounts(query: str, account_type: str | None = None)` | Search AKL-like accounts by number, search name, display name, or address text. |
+| `find_contacts(account_id: int, query: str | None = None)` | Find contacts linked to one account. |
+| `find_offers(account_id: int, query: str | None = None)` | Find offers linked to one account. |
+| `find_orders(account_id: int, query: str | None = None)` | Find orders linked to one account. |
+| `list_crm_users(query: str | None = None)` | Resolve responsible CRM users, including inside sales users. |
+| `list_field_sales_representatives(query: str | None = None)` | Resolve field sales representative master data. |
+| `save_mock_visit_report(final_report_id: int, payload: dict)` | Save the confirmed eNVenta-shaped mock visit report. |
+| `create_mock_reminder(visit_report_number: str, payload: dict)` | Create a follow-up reminder linked to the mock visit report number. |
+
+The service may use dictionaries internally during the first implementation,
+but its public behavior should already match the eNVenta-oriented concepts:
+accounts, contacts, offers, orders, CRM users, representatives, visit reports,
+and reminders.
+
+The service must not create real master data from AI guesses. Unknown accounts,
+contacts, or document references should be stored as report text and, where
+needed, become reminder or review work.
+
 ## MVP Working Mapping Table
 
 This table is the current Phase 6 working contract. It is derived from the
