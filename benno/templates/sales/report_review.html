@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 
-{% block title %}Report Review - BENNO{% endblock %}
+{% block title %}Bericht pr&uuml;fen - BENNO{% endblock %}
 {% block shell_class %}app-shell--page{% endblock %}
 
 {% block content %}
   <section class="page-section" aria-labelledby="report-review-title">
-    <p class="hero__eyebrow">Sales workspace</p>
-    <h1 id="report-review-title">Report Review</h1>
+    <p class="hero__eyebrow">Sales Workspace</p>
+    <h1 id="report-review-title">Bericht pr&uuml;fen</h1>
 
     {% if review.review_text %}
       <article class="review-block review-block--wide">
-        <span>Review Summary</span>
+        <span>Pr&uuml;fzusammenfassung</span>
         <p>{{ review.review_text }}</p>
       </article>
     {% endif %}
@@ -25,29 +25,29 @@
     </div>
 
     <article class="review-block review-block--wide">
-      <span>Final Report Text</span>
+      <span>Finaler Berichtstext</span>
       <pre>{{ review.final_report_text }}</pre>
     </article>
 
     <form class="form-stack review-correction" method="post" action="{{ url_for('sales.report_correction', chat_id=chat.id) }}">
-      <label for="field_key">Correction field</label>
+      <label for="field_key">Korrekturfeld</label>
       <select id="field_key" name="field_key" required>
         {% for field_key, label in review.correction_fields %}
           <option value="{{ field_key }}">{{ label }}</option>
         {% endfor %}
       </select>
 
-      <label for="correction_text">Correction</label>
+      <label for="correction_text">Korrektur</label>
       <textarea id="correction_text" name="correction_text" rows="3" required></textarea>
-      <button class="button" type="submit">Apply Correction</button>
+      <button class="button" type="submit">Korrektur &uuml;bernehmen</button>
     </form>
 
     <div class="action-row">
       <form method="post" action="{{ url_for('sales.confirm_report_route', chat_id=chat.id) }}">
-        <button class="button" type="submit">Confirm and Save</button>
+        <button class="button" type="submit">Best&auml;tigen und speichern</button>
       </form>
       <a class="button button--link" href="{{ url_for('sales.report_chat', chat_id=chat.id) }}">
-        Back to Chat
+        Zur&uuml;ck zum Chat
       </a>
     </div>
   </section>

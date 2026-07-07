@@ -2,7 +2,7 @@
 
 import re
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from benno.enums import (
@@ -518,7 +518,7 @@ def _apply_step_answer(
     draft: ReportDraft,
     step: ReportStep,
     message_text: str,
-) -> None:
+) -> bool:
     _clear_ai_cache(draft)
     draft_data = _draft_data(draft)
     answers = dict(draft_data.get("answers", {}))
@@ -529,11 +529,17 @@ def _apply_step_answer(
     if step.key == "visit_context":
         _update_visit_context(draft, message_text)
     elif step.key == "visit_type":
-        _update_visit_type(draft, message_text)
+        if not _update_visit_type(draft, message_text):
+            _set_section_status(draft, step.section, SectionStatus.OPEN)
+            return False
     elif step.key == "participants":
         _update_contacts(draft, message_text)
     elif step.key == "visit_date":
-        draft.visit_date = _parse_iso_date(message_text) or date.today()
+        visit_date = _parse_visit_date(message_text)
+        if visit_date is None:
+            _set_section_status(draft, step.section, SectionStatus.OPEN)
+            return False
+        draft.visit_date = visit_date
     elif step.key == "target_topic":
         draft.reason_code = _classify_reason(message_text)
     elif step.key == "info_text":
@@ -557,10 +563,15 @@ def _apply_step_answer(
         draft.draft_data_json = draft_data
     elif step.key == "ratings":
         _update_ratings(draft, message_text)
+        _set_section_status(
+            draft, step.section, _section_status_for_answer(step, draft)
+        )
+        return _all_ratings_collected(draft)
     elif step.key == "reminders":
         _update_reminder_signal(draft, message_text)
 
     _set_section_status(draft, step.section, _section_status_for_answer(step, draft))
+    return True
 
 
 def _analyze_report_message(
@@ -696,16 +707,16 @@ def _apply_assisted_answers(
     applied_steps = []
     current_answer = _answer_for_step(current_step, message_text, analysis)
     if current_answer is not None:
-        _apply_step_answer(draft, current_step, current_answer)
-        applied_steps.append(current_step)
+        if _apply_step_answer(draft, current_step, current_answer):
+            applied_steps.append(current_step)
 
     for step in _additional_ai_steps(
         current_step,
         analysis,
         completed_before_message,
     ):
-        _apply_step_answer(draft, step, analysis.section_updates[step.key])
-        applied_steps.append(step)
+        if _apply_step_answer(draft, step, analysis.section_updates[step.key]):
+            applied_steps.append(step)
 
     _apply_flow_shortcuts(
         draft,
@@ -808,8 +819,8 @@ def _apply_no_offer_order_shortcut(
         if any(applied_step.key == step.key for applied_step in applied_steps):
             continue
 
-        _apply_step_answer(draft, step, "keiner")
-        applied_steps.append(step)
+        if _apply_step_answer(draft, step, "keiner"):
+            applied_steps.append(step)
 
 
 def _apply_follow_up_shortcut(
@@ -834,8 +845,8 @@ def _apply_follow_up_shortcut(
     if _step_index(next_action_step) <= _step_index(current_step):
         return
 
-    _apply_step_answer(draft, next_action_step, message_text)
-    applied_steps.append(next_action_step)
+    if _apply_step_answer(draft, next_action_step, message_text):
+        applied_steps.append(next_action_step)
 
 
 def _additional_ai_steps(
@@ -1203,23 +1214,32 @@ def _customer_context_type_for_account(account: Any) -> str:
     return CustomerContextType.EXISTING_CUSTOMER.value
 
 
-def _update_visit_type(draft: ReportDraft, message_text: str) -> None:
+def _update_visit_type(draft: ReportDraft, message_text: str) -> bool:
+    visit_type = _parse_visit_type(message_text)
+    if visit_type is None:
+        return False
+
+    draft.visit_type = visit_type
+    return True
+
+
+def _parse_visit_type(message_text: str) -> str | None:
     normalized_text = message_text.lower()
     if any(value in normalized_text for value in ("telefon", "phone", "call")):
-        draft.visit_type = VisitType.PHONE.value
-    elif any(
+        return VisitType.PHONE.value
+    if any(
         value in normalized_text for value in ("virtuell", "video", "teams", "zoom")
     ):
-        draft.visit_type = VisitType.VIRTUAL.value
-    elif any(
+        return VisitType.VIRTUAL.value
+    if any(
         value in normalized_text
-        for value in ("persön", "personlich", "vor ort", "beim", "bei ")
+        for value in ("persön", "persoen", "personlich", "vor ort", "beim", "bei ")
     ):
-        draft.visit_type = VisitType.IN_PERSON.value
-    elif message_text in {visit_type.value for visit_type in VisitType}:
-        draft.visit_type = message_text
-    else:
-        draft.visit_type = VisitType.IN_PERSON.value
+        return VisitType.IN_PERSON.value
+    if message_text in {visit_type.value for visit_type in VisitType}:
+        return message_text
+
+    return None
 
 
 def _update_contacts(draft: ReportDraft, message_text: str) -> None:
@@ -1272,13 +1292,18 @@ def _update_order_reference(draft: ReportDraft, message_text: str) -> None:
 def _update_ratings(draft: ReportDraft, message_text: str) -> None:
     ratings = dict(draft.ratings_json)
     parsed_values = _parse_rating_values(message_text)
+    is_not_assessable = _is_not_assessable_rating_answer(message_text)
     for index, (rating_key, _label_en, _label_de) in enumerate(RATING_FIELDS):
         value = parsed_values[index] if index < len(parsed_values) else None
+        if value is None and not is_not_assessable:
+            continue
         if value is None and rating_key in ratings:
             continue
+
         ratings[rating_key] = {
             "value": value,
             "reason": message_text,
+            "not_assessable": value is None and is_not_assessable,
         }
 
     draft.ratings_json = ratings
@@ -1327,12 +1352,42 @@ def _parse_rating_values(message_text: str) -> list[int]:
     ]
 
 
+def _is_not_assessable_rating_answer(message_text: str) -> bool:
+    normalized_text = message_text.lower()
+    return any(
+        phrase in normalized_text
+        for phrase in (
+            "nicht bewertbar",
+            "noch nicht bewertbar",
+            "zu früh",
+            "zu frueh",
+            "too early",
+            "not assessable",
+            "kann ich nicht bewerten",
+        )
+    )
+
+
 def _parse_iso_date(message_text: str) -> date | None:
     match = re.search(r"\b\d{4}-\d{2}-\d{2}\b", message_text)
     if match is None:
         return None
 
     return date.fromisoformat(match.group(0))
+
+
+def _parse_visit_date(message_text: str) -> date | None:
+    parsed_date = _parse_iso_date(message_text)
+    if parsed_date is not None:
+        return parsed_date
+
+    normalized_text = message_text.strip().lower()
+    if normalized_text in {"heute", "today"}:
+        return date.today()
+    if normalized_text in {"gestern", "yesterday"}:
+        return date.today() - timedelta(days=1)
+
+    return None
 
 
 def _section_status_for_answer(
@@ -1412,7 +1467,7 @@ def _missing_rating_keys(draft: ReportDraft) -> list[str]:
     return [
         rating_key
         for rating_key, _label_en, _label_de in RATING_FIELDS
-        if rating_key not in draft.ratings_json
+        if not _rating_is_handled(draft.ratings_json.get(rating_key))
     ]
 
 
@@ -1425,9 +1480,17 @@ def _missing_rating_step_keys(draft: ReportDraft) -> list[str]:
 
 def _all_ratings_collected(draft: ReportDraft) -> bool:
     return all(
-        rating_key in draft.ratings_json
+        _rating_is_handled(draft.ratings_json.get(rating_key))
         for rating_key, _label_en, _label_de in RATING_FIELDS
     )
+
+
+def _rating_is_handled(rating: Any) -> bool:
+    if not isinstance(rating, dict):
+        return False
+
+    value = rating.get("value")
+    return isinstance(value, int) or rating.get("not_assessable") is True
 
 
 def _is_ready_for_review(draft: ReportDraft) -> bool:

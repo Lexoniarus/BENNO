@@ -132,6 +132,60 @@ def test_four_enventa_ratings_complete_rating_section(app) -> None:
     assert chat.report_draft.draft_data_json["current_step"] == "review"
 
 
+def test_partial_rating_answer_keeps_rating_step_open(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_all_required_until_ratings(chat)
+
+    process_report_message_with_ai(chat, "Zufriedenheit 8", _FakeAiService())
+
+    draft = chat.report_draft
+    assert draft.ratings_json["customer_satisfaction_rating"]["value"] == 8
+    assert "technical_attractiveness_rating" not in draft.ratings_json
+    assert draft.draft_data_json["current_step"] == "ratings"
+
+
+def test_not_assessable_rating_answer_can_complete_rating_step(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_all_required_until_ratings(chat)
+
+    process_report_message_with_ai(
+        chat,
+        "Alle vier Bewertungen sind noch nicht bewertbar.",
+        _FakeAiService(),
+    )
+
+    ratings = chat.report_draft.ratings_json
+    assert all(rating["not_assessable"] is True for rating in ratings.values())
+    assert chat.report_draft.draft_data_json["current_step"] == "review"
+
+
+def test_unclear_visit_type_does_not_default_to_in_person(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+
+    process_report_message_with_ai(
+        chat, "Nordlicht Maschinenbau GmbH", _FakeAiService()
+    )
+    process_report_message_with_ai(chat, "weiss ich gerade nicht", _FakeAiService())
+
+    assert chat.report_draft.visit_type is None
+    assert chat.report_draft.draft_data_json["current_step"] == "visit_type"
+
+
+def test_unclear_visit_date_does_not_default_to_today(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+
+    for answer in ["Nordlicht Maschinenbau GmbH", "persoenlich", "Mara Stein"]:
+        process_report_message_with_ai(chat, answer, _FakeAiService())
+    process_report_message_with_ai(chat, "irgendwann letzte Woche", _FakeAiService())
+
+    assert chat.report_draft.visit_date is None
+    assert chat.report_draft.draft_data_json["current_step"] == "visit_date"
+
+
 def test_lead_without_offer_or_order_skips_document_reference_questions(app) -> None:
     seed_database()
     chat = _start_sales_chat()
