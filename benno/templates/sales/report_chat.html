@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 
-{% block title %}Report Chat - BENNO{% endblock %}
+{% block title %}Berichts-Chat - BENNO{% endblock %}
 {% block shell_class %}app-shell--page{% endblock %}
 
 {% block content %}
   <section class="page-section page-section--report" aria-labelledby="report-chat-title">
-    <p class="hero__eyebrow">Sales Workspace</p>
+    <p class="hero__eyebrow">Vertriebsbereich</p>
     <h1 id="report-chat-title">Besuchsbericht #{{ chat.id }}</h1>
     <p class="ai-status ai-status--{{ ai_status.state }}">{{ ai_status.label }}</p>
 
     <div class="report-layout">
-      <div class="chat-panel" data-chat-panel aria-label="Report chat messages">
+      <div class="chat-panel" data-chat-panel aria-label="Nachrichten im Berichts-Chat">
         {% for message in chat.messages %}
           <article class="chat-message chat-message--{{ message.sender }}">
             <span>{{ message.sender }}</span>
@@ -19,7 +19,7 @@
         {% endfor %}
       </div>
 
-      <aside class="progress-panel" aria-label="Report progress">
+      <aside class="progress-panel" aria-label="Berichtsfortschritt">
         <h2>Fortschritt</h2>
         <dl class="definition-list definition-list--compact">
           <div>

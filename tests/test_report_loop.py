@@ -99,6 +99,64 @@ def test_ai_analysis_can_fill_multiple_phase_6_sections_from_one_message(app) ->
     )
 
 
+def test_rating_clues_are_extracted_from_later_bundle_without_ai_rating_update(
+    app,
+) -> None:
+    seed_database()
+    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    chat = start_report_chat(sales_user)
+    ai_service = _FakeAiService(
+        analysis=AiMessageAnalysis(
+            intent=UserIntent.ADDITIONAL_INFO,
+            intent_confidence=0.95,
+            target_sections=[
+                "visit_context",
+                "visit_type",
+                "participants",
+                "visit_date",
+                "target_topic",
+                "info_text",
+                "agreement_text",
+                "next_action",
+                "next_appointment_date",
+                "offer_reference",
+                "order_reference",
+            ],
+            section_updates={
+                "visit_context": "Solaris Verpackung AG",
+                "visit_type": "telefonisch",
+                "participants": "Lea Hartmann",
+                "visit_date": "heute",
+                "target_topic": "Line inspection",
+                "info_text": "Linieninspektion besprochen.",
+                "agreement_text": "Auswertung und Angebot OFF-24005 senden.",
+                "next_action": "Vertrieb meldet sich in zwei Wochen.",
+                "next_appointment_date": "keine",
+                "offer_reference": "OFF-24005",
+                "order_reference": "keiner",
+            },
+        )
+    )
+
+    process_report_message_with_ai(
+        chat,
+        (
+            "Telefonischer Besuch heute bei Solaris mit Lea Hartmann. "
+            "Zufriedenheit 8, technische Attraktivitaet 8, "
+            "kaufmaennische Attraktivitaet 7, Prioritaet 8."
+        ),
+        ai_service,
+    )
+
+    assert set(chat.report_draft.ratings_json) == {
+        "customer_satisfaction_rating",
+        "technical_attractiveness_rating",
+        "commercial_attractiveness_rating",
+        "priority_rating",
+    }
+    assert chat.report_draft.draft_data_json["current_step"] == "review"
+
+
 def test_four_enventa_ratings_complete_rating_section(app) -> None:
     seed_database()
     chat = _start_sales_chat()
@@ -184,6 +242,47 @@ def test_unclear_visit_date_does_not_default_to_today(app) -> None:
 
     assert chat.report_draft.visit_date is None
     assert chat.report_draft.draft_data_json["current_step"] == "visit_date"
+
+
+def test_unrelated_follow_up_date_answer_keeps_date_step_open(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_until_next_appointment_date(chat)
+
+    process_report_message_with_ai(
+        chat,
+        "Es gibt keinen Auftrag. Staerke: klarer Bedarf.",
+        _FakeAiService(),
+    )
+
+    draft = chat.report_draft
+    assert draft.follow_up_date is None
+    assert "next_appointment_date" not in draft.draft_data_json["answers"]
+    assert draft.draft_data_json["current_step"] == "next_appointment_date"
+
+
+def test_relative_follow_up_date_can_complete_next_appointment_step(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_until_next_appointment_date(chat)
+
+    process_report_message_with_ai(chat, "naechste Woche", _FakeAiService())
+
+    assert chat.report_draft.follow_up_date is not None
+    assert chat.report_draft.draft_data_json["current_step"] == "offer_reference"
+
+
+def test_inside_sales_nachfassen_creates_mock_reminder(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+
+    final_report = confirm_report(chat)
+
+    visit_report = final_report.mock_visit_report
+    assert visit_report is not None
+    assert len(visit_report.reminders) == 1
+    assert "nachfassen" in visit_report.reminders[0].message.lower()
 
 
 def test_lead_without_offer_or_order_skips_document_reference_questions(app) -> None:
@@ -300,6 +399,21 @@ def _process_until_offer_reference(chat) -> None:
         "Werbematerial zusenden.",
         "Innendienst soll anrufen.",
         "keine",
+    ]
+    for answer in answers:
+        process_report_message_with_ai(chat, answer, _FakeAiService())
+
+
+def _process_until_next_appointment_date(chat) -> None:
+    answers = [
+        "Nordlicht Maschinenbau GmbH",
+        "persoenlich",
+        "Mara Stein",
+        "2026-07-07",
+        "Forecast",
+        "Forecast und Lieferfaehigkeit besprochen.",
+        "Revidiertes Angebot wird geschickt.",
+        "Innendienst soll naechste Woche nachfassen.",
     ]
     for answer in answers:
         process_report_message_with_ai(chat, answer, _FakeAiService())

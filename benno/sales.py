@@ -90,7 +90,11 @@ def completed_reports():
         _own_completed_reports_query().order_by(FinalReport.created_at.desc()).all()
     )
 
-    return render_template("sales/completed_reports.html", reports=reports)
+    return render_template(
+        "sales/completed_reports.html",
+        reports=reports,
+        status_labels=REPORT_STATUS_LABELS_DE,
+    )
 
 
 @sales_blueprint.get("/reports/new")
@@ -126,7 +130,7 @@ def report_message(chat_id: int):
     chat = _get_own_chat_or_404(chat_id)
     message_text = request.form.get("message", "")
     if not message_text.strip():
-        flash("Please enter a message before sending.", "warning")
+        flash("Bitte gib vor dem Senden eine Nachricht ein.", "warning")
         return redirect(url_for("sales.report_chat", chat_id=chat.id))
 
     try:
@@ -143,7 +147,9 @@ def report_review(chat_id: int):
     """Render the block-based final review for a completed draft."""
     chat = _get_own_chat_or_404(chat_id)
     if not is_ready_for_review(chat):
-        flash("Please complete the missing report sections first.", "warning")
+        flash(
+            "Bitte vervollstaendige zuerst die fehlenden Berichtsbereiche.", "warning"
+        )
         return redirect(url_for("sales.report_chat", chat_id=chat.id))
 
     return render_template(
@@ -202,7 +208,11 @@ def final_report_detail(report_id: int):
     """Render a saved final report for the current sales user."""
     final_report = _get_own_final_report_or_404(report_id)
 
-    return render_template("sales/final_report.html", report=final_report)
+    return render_template(
+        "sales/final_report.html",
+        report=final_report,
+        status_labels=REPORT_STATUS_LABELS_DE,
+    )
 
 
 @sales_blueprint.get("/options")

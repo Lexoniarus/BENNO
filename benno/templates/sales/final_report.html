@@ -5,7 +5,7 @@
 
 {% block content %}
   <section class="page-section" aria-labelledby="final-report-title">
-    <p class="hero__eyebrow">Sales workspace</p>
+    <p class="hero__eyebrow">Vertriebsbereich</p>
     <h1 id="final-report-title">
       {% if report.mock_visit_report %}
         Besuchsbericht {{ report.mock_visit_report.visit_report_number }}
@@ -43,7 +43,7 @@
       {% endif %}
       <div>
         <dt>Status</dt>
-        <dd>{{ report.status }}</dd>
+        <dd>{{ status_labels.get(report.status, report.status) }}</dd>
       </div>
       <div>
         <dt>Interne Zusammenfassung</dt>

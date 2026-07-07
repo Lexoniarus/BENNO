@@ -1,28 +1,28 @@
 {% extends "base.html" %}
 
-{% block title %}Sales Dashboard - BENNO{% endblock %}
+{% block title %}Vertriebsbereich - BENNO{% endblock %}
 {% block shell_class %}app-shell--page{% endblock %}
 
 {% block content %}
   <section class="page-section" aria-labelledby="sales-title">
-    <p class="hero__eyebrow">Sales workspace</p>
-    <h1 id="sales-title">Visit Reports</h1>
+    <p class="hero__eyebrow">Vertriebsbereich</p>
+    <h1 id="sales-title">Besuchsberichte</h1>
     <div class="action-grid">
       <a class="action-card" href="{{ url_for('sales.open_reports') }}">
-        <span>Open Reports</span>
+        <span>Offene Berichte</span>
         <strong>{{ open_report_count }}</strong>
       </a>
       <a class="action-card" href="{{ url_for('sales.completed_reports') }}">
-        <span>Completed Reports</span>
+        <span>Fertige Berichte</span>
         <strong>{{ completed_report_count }}</strong>
       </a>
       <a class="action-card" href="{{ url_for('sales.options') }}">
-        <span>Options</span>
+        <span>Optionen</span>
         <strong>{{ current_user.preferred_language }}</strong>
       </a>
       <a class="action-card" href="{{ url_for('sales.new_report') }}">
-        <span>New Report</span>
-        <strong>Start</strong>
+        <span>Neuer Bericht</span>
+        <strong>Starten</strong>
       </a>
     </div>
   </section>

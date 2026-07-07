@@ -5,7 +5,7 @@
 
 {% block content %}
   <section class="page-section" aria-labelledby="completed-reports-title">
-    <p class="hero__eyebrow">Sales workspace</p>
+    <p class="hero__eyebrow">Vertriebsbereich</p>
     <h1 id="completed-reports-title">Abgeschlossene Berichte</h1>
     {% if reports %}
       <div class="table-wrap">
@@ -45,7 +45,7 @@
                     {{ report.summary }}
                   {% endif %}
                 </td>
-                <td>{{ report.status }}</td>
+                <td>{{ status_labels.get(report.status, report.status) }}</td>
                 <td>{{ report.visit_date or "Nicht gesetzt" }}</td>
               </tr>
             {% endfor %}

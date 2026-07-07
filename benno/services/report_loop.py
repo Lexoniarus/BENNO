@@ -530,6 +530,7 @@ def _apply_step_answer(
         _update_visit_context(draft, message_text)
     elif step.key == "visit_type":
         if not _update_visit_type(draft, message_text):
+            _remove_draft_answer(draft, step.key)
             _set_section_status(draft, step.section, SectionStatus.OPEN)
             return False
     elif step.key == "participants":
@@ -537,6 +538,7 @@ def _apply_step_answer(
     elif step.key == "visit_date":
         visit_date = _parse_visit_date(message_text)
         if visit_date is None:
+            _remove_draft_answer(draft, step.key)
             _set_section_status(draft, step.section, SectionStatus.OPEN)
             return False
         draft.visit_date = visit_date
@@ -550,7 +552,12 @@ def _apply_step_answer(
         draft.next_action = message_text
         draft.follow_up_date = _parse_iso_date(message_text)
     elif step.key == "next_appointment_date":
-        draft.follow_up_date = _parse_iso_date(message_text)
+        follow_up_date = _parse_visit_date(message_text)
+        if follow_up_date is None and not _is_none_answer(message_text):
+            _remove_draft_answer(draft, step.key)
+            _set_section_status(draft, step.section, SectionStatus.OPEN)
+            return False
+        draft.follow_up_date = follow_up_date
     elif step.key == "offer_reference":
         _update_offer_reference(draft, message_text)
     elif step.key == "order_reference":
@@ -774,6 +781,13 @@ def _apply_flow_shortcuts(
         completed_before_message,
         applied_steps,
     )
+    _apply_rating_shortcut(
+        draft,
+        current_step,
+        message_text,
+        completed_before_message,
+        applied_steps,
+    )
 
 
 def _apply_lead_context_signal(draft: ReportDraft, message_text: str) -> None:
@@ -847,6 +861,27 @@ def _apply_follow_up_shortcut(
 
     if _apply_step_answer(draft, next_action_step, message_text):
         applied_steps.append(next_action_step)
+
+
+def _apply_rating_shortcut(
+    draft: ReportDraft,
+    current_step: ReportStep,
+    message_text: str,
+    completed_before_message: set[str],
+    applied_steps: list[ReportStep],
+) -> None:
+    if "ratings" in completed_before_message:
+        return
+    if any(applied_step.key == "ratings" for applied_step in applied_steps):
+        return
+    if not _looks_like_rating_answer(message_text):
+        return
+
+    rating_step = _step_by_key("ratings")
+    if _step_index(rating_step) < _step_index(current_step):
+        return
+    if _apply_step_answer(draft, rating_step, message_text):
+        applied_steps.append(rating_step)
 
 
 def _additional_ai_steps(
@@ -1368,6 +1403,27 @@ def _is_not_assessable_rating_answer(message_text: str) -> bool:
     )
 
 
+def _looks_like_rating_answer(message_text: str) -> bool:
+    normalized_text = message_text.lower()
+    if _is_not_assessable_rating_answer(message_text):
+        return True
+
+    rating_values = _parse_rating_values(message_text)
+    if len(rating_values) < len(RATING_FIELDS):
+        return False
+
+    return any(
+        keyword in normalized_text
+        for keyword in (
+            "zufriedenheit",
+            "attraktiv",
+            "priorit",
+            "rating",
+            "bewertung",
+        )
+    )
+
+
 def _parse_iso_date(message_text: str) -> date | None:
     match = re.search(r"\b\d{4}-\d{2}-\d{2}\b", message_text)
     if match is None:
@@ -1386,6 +1442,10 @@ def _parse_visit_date(message_text: str) -> date | None:
         return date.today()
     if normalized_text in {"gestern", "yesterday"}:
         return date.today() - timedelta(days=1)
+    if "n\u00e4chste woche" in normalized_text or "naechste woche" in normalized_text:
+        return date.today() + timedelta(days=7)
+    if "in zwei wochen" in normalized_text or "in 2 wochen" in normalized_text:
+        return date.today() + timedelta(days=14)
 
     return None
 
@@ -1767,6 +1827,14 @@ def _draft_answer(draft: ReportDraft, key: str) -> str:
     return answer or ""
 
 
+def _remove_draft_answer(draft: ReportDraft, key: str) -> None:
+    draft_data = _draft_data(draft)
+    answers = dict(draft_data.get("answers", {}))
+    answers.pop(key, None)
+    draft_data["answers"] = answers
+    draft.draft_data_json = draft_data
+
+
 def _draft_data(draft: ReportDraft) -> dict[str, Any]:
     return dict(draft.draft_data_json or {})
 
@@ -1819,7 +1887,8 @@ def _mentions_lead(message_text: str) -> bool:
 def _mentions_inside_sales_follow_up(message_text: str) -> bool:
     normalized_text = message_text.lower()
     return "innendienst" in normalized_text and any(
-        keyword in normalized_text for keyword in ("anrufen", "melden", "follow")
+        keyword in normalized_text
+        for keyword in ("anrufen", "melden", "nachfassen", "follow")
     )
 
 
