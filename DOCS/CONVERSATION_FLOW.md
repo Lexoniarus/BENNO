@@ -145,20 +145,25 @@ If a contact is new or cannot be validated, BENNO does not create a master data 
 
 The `ratings` section is mandatory.
 
-BENNO uses six rating values on a scale from 1 to 10:
+Starting with Phase 6, the eNVenta screenshot ratings are the leading target
+structure. Earlier Phase 4/5 BENNO ratings were useful for the first text loop,
+but they are no longer the desired business field set.
 
 | Rating | Meaning |
 |---|---|
-| `sales_opportunity` | Sales relevance of the opportunity |
-| `meeting_mood` | How positive or difficult the meeting atmosphere was |
-| `priority` | How much attention the case requires |
-| `closing_probability` | How likely a successful close appears |
-| `need_for_action` | How urgent further action is |
-| `customer_satisfaction` | How satisfied the customer appears |
+| `customer_satisfaction_rating` | eNVenta `Zufriedenheit`, from 1 to 10 |
+| `technical_attractiveness_rating` | eNVenta `Techn. Attrakt.`, from 1 to 10 |
+| `commercial_attractiveness_rating` | eNVenta `Kaufm. Attrakt.`, from 1 to 10 |
+| `priority_rating` | eNVenta `Priorität`, from 1 to 10 |
 
 BENNO should infer ratings from the conversation where possible, explain them briefly, and allow the user to confirm or correct them.
 
 The final report text should be consistent with the ratings. It does not need to mechanically repeat every numeric value.
+
+The previous internal fields `sales_opportunity`, `meeting_mood`,
+`closing_probability`, and `need_for_action` should be treated as legacy
+Phase 4/5 fields. They may be migrated or mapped during implementation, but
+they must not remain the Phase 6 target contract.
 
 ## Assisted Flow Bundling
 

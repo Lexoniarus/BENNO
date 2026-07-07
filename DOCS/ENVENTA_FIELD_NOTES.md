@@ -117,6 +117,11 @@ screenshots and user clarification, not from a real eNVenta API schema.
 BENNO should treat a visit report as complete for the Phase 6 MVP only when
 these fields are available or explicitly marked not applicable:
 
+The four eNVenta screenshot ratings are the authoritative Phase 6 rating
+fields. The earlier six BENNO ratings from the Phase 4/5 text loop are legacy
+working fields and should be replaced or explicitly mapped during the Phase 6
+implementation.
+
 | BENNO field | Requirement |
 |---|---|
 | `visit_type` | Required. Must be one of `in_person`, `virtual`, or `phone`. |
