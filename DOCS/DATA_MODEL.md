@@ -209,6 +209,40 @@ Required eNVenta-oriented free-text target fields:
 These fields are generated from validated BENNO report facts, user statements,
 and ratings. They are not raw transcripts.
 
+Derived Phase 6 target fields for `mock_visit_reports`:
+
+| Field | Purpose |
+|---|---|
+| `id` | Local mock visit report identifier |
+| `visit_report_number` | Human-readable mock report number used for references |
+| `final_report_id` | Link back to BENNO's confirmed internal report |
+| `visit_type` | `in_person`, `virtual`, or `phone` |
+| `visit_report_status` | Mock eNVenta `Status` |
+| `report_status` | Mock eNVenta `Berichtsstatus` |
+| `account_id` | Link to the AKL-like account record |
+| `account_number` | Mock AKL number |
+| `account_type` | `A`, `K`, or `L` |
+| `account_search_name` | Search name from the AKL-like account |
+| `contact_id` | Link to the account contact, if known |
+| `contact_name` | Captured or selected contact name |
+| `field_sales_representative_id` | Representative from the CRM-like representative domain |
+| `responsible_user_id` | CRM user responsible for follow-up handling, if needed |
+| `visit_date` | Visit date |
+| `visit_time` | Visit time, if relevant |
+| `target_topic` | eNVenta `Ziel/Thema` text |
+| `info_text` | eNVenta `Info` text |
+| `agreement_text` | eNVenta `Vereinbarung` text |
+| `strength_text` | eNVenta `Stärke` text |
+| `weakness_text` | eNVenta `Schwäche` text |
+| `next_appointment_date` | eNVenta `Termin ab`, if a follow-up appointment exists |
+| `offer_reference` | Offer reference, if relevant |
+| `order_reference` | Order reference, if relevant |
+| `created_at` | Local mock creation timestamp |
+
+`visit_report_status` and `report_status` should be stored as separate fields.
+For the Phase 6 mock they may use the same initial status logic, but keeping
+both fields prevents hiding a later eNVenta distinction.
+
 Required target rating fields:
 
 - `customer_satisfaction_rating`
@@ -229,12 +263,32 @@ customers, and suppliers are account types inside that domain. Existing
 `mock_customers` and `mock_leads` are Phase 2 legacy scaffolding and should be
 wrapped, replaced, or migrated toward the account model during Phase 6.
 
+Mock account type codes:
+
+| Code | Meaning |
+|---|---|
+| `A` | Address or lead-like account |
+| `K` | Customer account |
+| `L` | Supplier account |
+
+Minimum mock account fields:
+
+- `id`
+- `account_number`
+- `account_type`
+- `search_name`
+- `display_name`
+- `address_text`
+- `address_restriction`
+- `created_at`
+
 Contacts belong to accounts.
 
 CRM users and field sales representatives are separate mock domains:
 
 - `mock_crm_users` represent CRM users and responsible users. Inside sales users
-  live here, and field sales users may also have CRM user records.
+  live here, and field sales users may also have CRM user records. There is no
+  required link from a CRM user to a representative in the Phase 6 mock.
 - `mock_field_sales_representatives` represent field sales representative master
   data. Representatives are always field sales people.
 
@@ -243,9 +297,29 @@ users or field sales representatives. BENNO's current `inside_sales_tasks`
 should be treated as the legacy basis for these reminders, not as a separate
 parallel concept.
 
+Minimum mock reminder fields:
+
+- `id`
+- `visit_report_number`
+- `due_date`
+- `owner_type`
+- `owner_id`
+- `created_by_user_id`
+- `message`
+- `status`
+- `created_at`
+
+`owner_type` should identify whether the reminder belongs to a CRM user or to a
+field sales representative.
+
 ## Inside Sales Tasks
 
-Inside sales tasks capture follow-up work that should not be done automatically by BENNO.
+Inside sales tasks are the Phase 2/4 legacy follow-up concept. In Phase 6 they
+should be replaced or migrated into `mock_reminders` for the eNVenta-oriented
+target model.
+
+Historically, inside sales tasks captured follow-up work that should not be done
+automatically by BENNO.
 
 Canonical MVP task types:
 
@@ -283,11 +357,9 @@ Use controlled English codes internally.
 
 Visit type:
 
-- `on_site`
+- `in_person`
+- `virtual`
 - `phone`
-- `video`
-- `trade_fair`
-- `other`
 
 Reason code:
 

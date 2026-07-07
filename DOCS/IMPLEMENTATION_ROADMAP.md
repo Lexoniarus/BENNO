@@ -294,25 +294,32 @@ Phase 6 field decisions already clarified:
 - The report chat should use broad conversation blocks instead of one question
   per eNVenta field: visit context, goal/topic, discussion content, agreement
   and next step, document references when relevant, ratings, and final review.
+- The concrete German questions should be derived from the target fields and
+  adjusted through Gemini behavior tests, not frozen as a copied eNVenta form.
+- The final review should explicitly confirm the eNVenta-oriented entries before
+  saving them into the mock write target. This can be deterministic.
+- Phase 6 replaces the old Phase 4/5 rating set and updates affected tests and
+  mock data accordingly.
 - The working mapping table and MVP required fields are maintained in `DOCS/ENVENTA_FIELD_NOTES.md`.
 
 The placeholder CRM service should then define:
 
 - search account or AKL record
-- search customer
-- search contact
-- search offer
-- search order
-- list or resolve field sales users
-- list or resolve responsible users
-- save visit report
-- create reminder or inside sales task
+- search contacts by account
+- search offers
+- search orders
+- list or resolve CRM users
+- list or resolve field sales representatives
+- save mock visit report
+- create mock reminder
 
 Done when:
 
 - The mock database represents the relevant eNVenta fields.
 - A final report can be saved in the expected structure.
 - The placeholder CRM contract is clear enough to be replaced by a real integration later.
+- Existing tests and seed/mock data use the Phase 6 account, visit report,
+  reminder, and rating target structure.
 
 ## Phase 7: Minimal Admin Completion
 

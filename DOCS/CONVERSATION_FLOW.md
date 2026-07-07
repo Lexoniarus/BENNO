@@ -47,6 +47,11 @@ report unless the business rule later makes them mandatory.
 The desired behavior is: BENNO knows the eNVenta target shape; Gemini recognizes
 which parts of a normal sales conversation already satisfy that shape.
 
+The concrete German questions should be derived from the target fields and then
+tested against real Gemini behavior. They are not fixed as a hard form script.
+If Gemini reliably extracts several fields from one answer, BENNO should skip
+the redundant follow-up questions.
+
 ## Report Sections
 
 The report draft is organized into these sections:
@@ -194,6 +199,10 @@ The previous internal fields `sales_opportunity`, `meeting_mood`,
 Phase 4/5 fields. They may be migrated or mapped during implementation, but
 they must not remain the Phase 6 target contract.
 
+Phase 6 should replace the older six-rating test expectations with the four
+eNVenta ratings. Test data may be migrated or rebuilt, but the target contract
+must not keep both rating sets in parallel.
+
 ## Assisted Flow Bundling
 
 The Gemini-assisted text loop should feel like a guided conversation, not a rigid field form.
@@ -246,6 +255,11 @@ The checklist is context only. It is not persisted as a separate database object
 ## Final Review Loop
 
 The final review is block-based and human-readable.
+
+For Phase 6, the review should focus on the entries that BENNO would write into
+`mock_visit_reports` and related reminder records. BENNO should ask for explicit
+confirmation before saving each new write target entry or the complete write
+set. This confirmation step can be deterministic; it does not need an LLM call.
 
 It should include:
 

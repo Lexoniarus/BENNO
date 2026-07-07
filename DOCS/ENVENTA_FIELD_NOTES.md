@@ -34,7 +34,7 @@ database columns, API fields, and internal contracts must use English names.
 |---|---|---|
 | `Besuchsart` | `visit_type` | BENNO should ask or derive this. Allowed MVP values are `in_person`, `virtual`, and `phone`. |
 | `Status` | `visit_report_status` | Processing state of the visit report. MVP values: `open`, `in_progress`, `closed`. |
-| `Berichtsstatus` | `report_status` | Same business meaning as `Status` for the current MVP. Keep one BENNO source of truth and map both eNVenta labels later if required. |
+| `Berichtsstatus` | `report_status` | Separate stored state field. It may follow the same initial logic as `Status`, but BENNO keeps both fields because eNVenta may distinguish them later. |
 | `Termin ab` | `next_appointment_date` | Next appointment or follow-up date. BENNO may ask for it when a next appointment is mentioned or needed. |
 | `Besuchsrhythmus` | - | Out of scope for the MVP and should not be asked or mapped yet. |
 | `Zufriedenheit` | `customer_satisfaction_rating` | Rating from 1 to 10. |
@@ -50,7 +50,7 @@ placeholder integration contract.
 
 | eNVenta concept | BENNO name | Meaning |
 |---|---|---|
-| AKL | `accounts` | Shared address/customer/supplier/lead domain. Contains leads, customers, and suppliers. |
+| AKL | `accounts` | Shared address/customer/supplier/lead domain. Contains address/lead-like records, customers, and suppliers. Uses account type codes `A`, `K`, and `L`. |
 | Ansprechpartner | `contacts` | Contact persons linked to an AKL/account record. |
 | Angebote | `offers` | Commercial offer records. |
 | Aufträge | `orders` | Order records. Offers and orders may appear in one eNVenta table but must remain distinct BENNO document types. |
@@ -92,10 +92,26 @@ These texts are derived from the conversation, validated report facts, and
 field-sales ratings. They should not be a raw transcript and must not invent
 facts outside the reviewed BENNO report.
 
+The mock visit report target fields can be derived from the screenshots and
+current MVP decisions. Since BENNO is not connected to eNVenta yet, this is a
+local placeholder contract, not a final eNVenta API schema.
+
+`Stärke` and `Schwäche` should be derived from the conversation where possible.
+If the value is unclear, BENNO may ask explicit follow-up questions. They should
+not be invented silently.
+
 The existing Phase 2 mock customer and lead tables are legacy scaffolding for
 Phase 6. The Phase 6 target model should represent the eNVenta AKL logic as
 `accounts`, where leads, customers, and suppliers share one address/account
 domain. Contacts are linked to these accounts.
+
+AKL account type codes for the mock:
+
+| Code | Meaning |
+|---|---|
+| `A` | Address or lead-like account |
+| `K` | Customer account |
+| `L` | Supplier account |
 
 `inside_sales_tasks` should become the basis for eNVenta-like
 `reminders`/`follow_ups`. The task/reminder target may point to either inside
@@ -107,6 +123,21 @@ CRM users and field sales representatives are separate eNVenta-style domains:
   inside sales users and may also include field sales users.
 - `field_sales_representatives` represent the sales representative master data.
   Representatives are always field sales people.
+
+There is no required relation between CRM users and field sales representatives
+in the Phase 6 mock. A real person may exist in both domains, but BENNO should
+model them as separate CRM concepts.
+
+Minimum reminder target fields:
+
+- `due_date`
+- `owner_type`
+- `owner_id`
+- `created_by_user_id`
+- `message`
+- `visit_report_number`
+
+The reminder reference should point to the mock visit report by report number.
 
 ### Phase 6 Conversation Collection Strategy
 
@@ -132,6 +163,10 @@ The conversation should use these broad blocks:
 The LLM may derive `strength_text` and `weakness_text` from the conversation and
 ratings, but BENNO should not invent facts. If a derived value is unclear, BENNO
 asks a short follow-up question instead of silently filling the field.
+
+The final review does not need to be LLM-driven. BENNO can show each new
+eNVenta-oriented entry and ask the user whether it should be written that way.
+Only confirmed entries are saved into the mock visit report target.
 
 ## MVP Working Mapping Table
 
