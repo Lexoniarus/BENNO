@@ -22,6 +22,57 @@ BENNO should only ask the field sales user for information that cannot be suppli
 
 ## Field Source Classification
 
+## Phase 6 Clarifications From User Discussion
+
+These decisions refine the first screenshot observations. German labels remain
+source labels from the eNVenta UI only. BENNO code, functions, variables,
+database columns, API fields, and internal contracts must use English names.
+
+### Visit Report Fields
+
+| eNVenta label | BENNO field name | Source or behavior |
+|---|---|---|
+| `Besuchsart` | `visit_type` | BENNO should ask or derive this. Allowed MVP values are `in_person`, `virtual`, and `phone`. |
+| `Status` | `visit_report_status` | Processing state of the visit report. MVP values: `open`, `in_progress`, `closed`. |
+| `Berichtsstatus` | `report_status` | Same business meaning as `Status` for the current MVP. Keep one BENNO source of truth and map both eNVenta labels later if required. |
+| `Termin ab` | `next_appointment_date` | Next appointment or follow-up date. BENNO may ask for it when a next appointment is mentioned or needed. |
+| `Besuchsrhythmus` | - | Out of scope for the MVP and should not be asked or mapped yet. |
+| `Zufriedenheit` | `customer_satisfaction_rating` | Rating from 1 to 10. |
+| `Techn. Attrakt.` | `technical_attractiveness_rating` | Rating from 1 to 10. |
+| `Kaufm. Attrakt.` | `commercial_attractiveness_rating` | Rating from 1 to 10. |
+| `Priorität` | `priority_rating` | Rating from 1 to 10. |
+
+### Related eNVenta Data Areas
+
+The visible eNVenta areas imply several related data tables or lookup domains.
+BENNO should represent them with English names in the mock database and the
+placeholder integration contract.
+
+| eNVenta concept | BENNO name | Meaning |
+|---|---|---|
+| AKL | `accounts` | Shared address/customer/supplier/lead domain. Contains leads, customers, and suppliers. |
+| Ansprechpartner | `contacts` | Contact persons linked to an AKL/account record. |
+| Angebote | `offers` | Commercial offer records. |
+| Aufträge | `orders` | Order records. Offers and orders may appear in one eNVenta table but must remain distinct BENNO document types. |
+| Wiedervorlagen | `reminders` | Follow-up reminders or callbacks. |
+| Außendienstler / Vertreter | `field_sales_users` | Field sales representatives. Usually mapped from BENNO users or eNVenta users. |
+| Sachbearbeiter | `responsible_users` | Responsible back-office or inside-sales users. |
+
+### Phase 6 Mapping Direction
+
+For the placeholder contract, BENNO should treat the eNVenta visit report as a
+structured handoff target with these groups:
+
+- report content entered or spoken by the sales user
+- ratings and visit type derived or confirmed through the conversation
+- account and contact lookup data from AKL/contact tables
+- offer and order references as separate document types
+- reminders or inside-sales tasks for follow-up work
+- eNVenta-managed metadata that BENNO does not ask for
+
+The MVP should not implement `visit_rhythm`, supplier-specific behavior, or a
+full eNVenta screen clone.
+
 ### User-Provided Report Content
 
 These fields are likely report content and may be collected through BENNO's guided dialog:
@@ -53,7 +104,6 @@ These fields may be suggested by AI but should remain reviewable or correctable:
 | `Priorität` | Priority |
 | `Besuchsart` | Visit type, if clearly stated |
 | `Dauer` | Duration, if clearly stated |
-| `Besuchsrhythmus` | Visit rhythm or cadence, if clearly stated |
 
 BENNO may propose these values, but the backend remains responsible for allowed values, validation, and final status.
 
@@ -114,7 +164,27 @@ These fields likely belong to record lifecycle, planning, or follow-up workflow:
 | `Erfasser` | Creator/responsible metadata for a task entry |
 | `Eigner` | Owner of a follow-up or task entry |
 
-Some of these may be written by BENNO later, especially follow-up tasks and reminder-like data. The exact behavior should be decided in Phase 6 after the final field list and expected workflow are understood.
+The Phase 6 working mapping for these workflow fields is:
+
+- `Status` -> `visit_report_status`, with MVP values `open`, `in_progress`,
+  and `closed`.
+- `Berichtsstatus` -> `report_status`, treated as the same business state as
+  `Status` for the MVP.
+- `Termin ab` -> `next_appointment_date`.
+- `Besuch` -> `visit_report_id`, likely assigned by eNVenta later.
+- `Plan` -> `plan_reference`, not a normal MVP dialog question.
+- `Besuchsdatum` -> `visit_date`.
+- `Besuchszeit` -> `visit_time`.
+- `Vorgänge/Aufgaben` -> `related_documents` and `tasks`.
+- `WV-Historie` -> `reminder_history`.
+- `Call-Betreff` -> `task_subject`.
+- `Kategorie` -> `task_category`.
+- `Erfasser` -> `task_created_by`.
+- `Eigner` -> `task_owner`.
+
+Some of these may be written by BENNO later, especially follow-up tasks and
+reminder-like data. Phase 6 should define the placeholder behavior before any
+real eNVenta writeback is attempted.
 
 ## Current Phase-6 Implication
 

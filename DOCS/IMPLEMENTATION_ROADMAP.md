@@ -276,12 +276,26 @@ Known eNVenta system metadata examples:
 
 BENNO should not ask for or write these fields. They may be read-only integration metadata later.
 
+Phase 6 field decisions already clarified:
+
+- `Besuchsart` maps to `visit_type`; MVP values are `in_person`, `virtual`, and `phone`.
+- `Status` and `Berichtsstatus` represent the visit report processing state; MVP values are `open`, `in_progress`, and `closed`.
+- `Termin ab` maps to `next_appointment_date`.
+- `Besuchsrhythmus` is out of scope for the MVP.
+- `Zufriedenheit`, `Techn. Attrakt.`, `Kaufm. Attrakt.`, and `PrioritÃ¤t` are ratings from 1 to 10.
+- Offers and orders may appear in one eNVenta table but must remain separate BENNO document types.
+- AKL is the shared address/customer/supplier/lead domain; contacts are linked to AKL/account records.
+- The placeholder contract should include reminders, field sales users, responsible users, accounts, contacts, offers, and orders.
+
 The placeholder CRM service should then define:
 
+- search account or AKL record
 - search customer
 - search contact
 - search offer
 - search order
+- list or resolve field sales users
+- list or resolve responsible users
 - save visit report
 - create reminder or inside sales task
 
