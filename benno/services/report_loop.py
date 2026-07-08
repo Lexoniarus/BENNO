@@ -93,6 +93,7 @@ __all__ = [
     "build_report_review",
     "cancel_report",
     "confirm_report",
+    "is_ready_for_review",
     "process_report_message",
     "process_report_message_with_ai",
     "process_report_turn",
