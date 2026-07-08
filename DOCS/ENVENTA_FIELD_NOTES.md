@@ -168,10 +168,17 @@ The final review does not need to be LLM-driven. BENNO can show each new
 eNVenta-oriented entry and ask the user whether it should be written that way.
 Only confirmed entries are saved into the mock visit report target.
 
-### Placeholder CRM Service Contract
+### Placeholder CRM/eNVenta Gateway Contract
 
-Phase 6 should expose a local mock CRM/eNVenta service layer. It is a
-replaceable boundary around SQLAlchemy models, not a real eNVenta integration.
+Phase 6 exposes an internal mock CRM/eNVenta gateway. It is a replaceable
+boundary around the current SQLAlchemy-backed mock data, not a real eNVenta
+integration and not an external REST API.
+
+The report loop should depend on this gateway contract, not on local mock table
+models. Gateway methods return neutral reference objects for accounts,
+contacts, documents, CRM users, representatives, visit reports, and reminders.
+The current implementation writes to SQLite-backed mock tables; a later MVP
+step may move persistence to Postgres behind the same gateway boundary.
 
 Suggested service functions:
 
@@ -186,10 +193,10 @@ Suggested service functions:
 | `save_mock_visit_report(final_report_id: int, payload: dict)` | Save the confirmed eNVenta-shaped mock visit report. |
 | `create_mock_reminder(visit_report_number: str, payload: dict)` | Create a follow-up reminder linked to the mock visit report number. |
 
-The service may use dictionaries internally during the first implementation,
-but its public behavior should already match the eNVenta-oriented concepts:
-accounts, contacts, offers, orders, CRM users, representatives, visit reports,
-and reminders.
+The gateway may still expose compatibility wrapper functions during the first
+implementation, but its report-loop contract should already match the
+eNVenta-oriented concepts: accounts, contacts, offers, orders, CRM users,
+representatives, visit reports, and reminders.
 
 The service must not create real master data from AI guesses. Unknown accounts,
 contacts, or document references should be stored as report text and, where

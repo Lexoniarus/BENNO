@@ -10,6 +10,11 @@ mock CRM data and saves a confirmed `MockVisitReport` plus optional
 `MockReminder` records. The user experience remains a guided German
 conversation, not a copied eNVenta form.
 
+The report loop must talk to an internal CRM/eNVenta gateway boundary. In
+Phase 6 this gateway is backed by local mock tables; later MVP work may move
+that persistence to Postgres, and a later integration step may replace the
+mock backend with real eNVenta access.
+
 ## Goals
 
 - Replace the Phase 4/5 internal report target with an eNVenta-shaped mock
@@ -23,10 +28,14 @@ conversation, not a copied eNVenta form.
 - Create `mock_reminders` for follow-up work.
 - Keep Gemini as proposer only; backend validation and save decisions stay in
   BENNO.
+- Keep the report loop independent from direct mock-table access by using the
+  internal CRM/eNVenta gateway.
 
 ## Non-Goals
 
 - No real eNVenta API connection.
+- No external REST API for the mock CRM/eNVenta boundary.
+- No SQLite-to-Postgres migration in this phase.
 - No Alembic migration setup.
 - No voice, STT, or TTS.
 - No full eNVenta screen clone.
@@ -101,53 +110,33 @@ Rules:
 - `seed-db` should remain idempotent for core demo data.
 - Existing demo login users stay unchanged.
 
-### Package 3: Mock CRM Service
+### Package 3: CRM/eNVenta Gateway
 
-Create or update a service boundary for Phase 6 mock CRM behavior.
+Create or update the internal gateway boundary for Phase 6 mock CRM behavior.
+This is a replaceable connector boundary, not an external HTTP API.
 
 Service interface:
 
 ```python
-def search_accounts(query: str, account_type: str | None = None) -> list[MockAccount]:
+class CrmGateway(Protocol):
     ...
 
-def find_contacts(account_id: int, query: str | None = None) -> list[MockContact]:
-    ...
-
-def find_offers(account_id: int, query: str | None = None) -> list[MockOffer]:
-    ...
-
-def find_orders(account_id: int, query: str | None = None) -> list[MockOrder]:
-    ...
-
-def list_crm_users(query: str | None = None) -> list[MockCrmUser]:
-    ...
-
-def list_field_sales_representatives(
-    query: str | None = None,
-) -> list[MockFieldSalesRepresentative]:
-    ...
-
-def save_mock_visit_report(
-    final_report_id: int,
-    payload: dict,
-) -> MockVisitReport:
-    ...
-
-def create_mock_reminder(
-    visit_report_number: str,
-    payload: dict,
-) -> MockReminder:
-    ...
+class MockCrmGateway:
+    """SQLAlchemy-backed implementation for the local mock database."""
 ```
 
 Behavior:
 
-- Search functions return empty lists for unknown data, not exceptions.
-- Save functions validate required keys before writing.
+- Gateway lookup methods return neutral reference objects, not ORM models as the
+  report-loop contract.
+- Compatibility wrapper functions may remain for existing tests and callers.
+- Search methods return empty lists for unknown data, not exceptions.
+- Save methods validate required keys before writing.
 - No real master data is created from AI guesses.
 - Unknown accounts, contacts, offers, or orders can stay as captured report text
   and may create reminder/review work.
+- The report loop stores stable CRM reference snapshots in the draft so review
+  and writeback do not depend on live ORM relationship objects.
 
 ### Package 4: Report Requirements And Flow
 
@@ -319,6 +308,9 @@ Manual smoke test:
 - A sales user can complete a guided German report conversation.
 - BENNO saves a confirmed `MockVisitReport`.
 - BENNO creates `MockReminder` records when the conversation requires follow-up.
+- The report loop uses the internal CRM/eNVenta gateway boundary for lookup and
+  writeback, so the mock backend can later be replaced by Postgres-backed or
+  real eNVenta-backed implementations.
 - Old six-rating expectations are replaced by the four eNVenta ratings.
 - Admin boundaries remain intact and do not expose full chat or report content.
 - `ruff`, `black --check`, and `pytest` pass.

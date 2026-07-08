@@ -9,6 +9,9 @@ from benno.extensions import db
 from benno.models import FinalReport, MockReminder, MockVisitReport, User
 from benno.seed import seed_database
 from benno.services.mock_crm import (
+    AccountReference,
+    MockCrmGateway,
+    VisitReportReference,
     create_mock_reminder,
     find_contacts,
     find_offers,
@@ -26,8 +29,21 @@ def test_known_accounts_are_found_by_search_name(app) -> None:
     accounts = search_accounts("Nordlicht")
 
     assert len(accounts) == 1
+    assert isinstance(accounts[0], AccountReference)
     assert accounts[0].account_number == "AKL-K-1001"
     assert accounts[0].account_type == AccountType.CUSTOMER.value
+
+
+def test_mock_gateway_returns_neutral_references(app) -> None:
+    seed_database()
+    gateway = MockCrmGateway()
+
+    accounts = gateway.search_accounts("Nordlicht")
+    contacts = gateway.find_contacts(accounts[0].id, "Mara")
+
+    assert isinstance(accounts[0], AccountReference)
+    assert accounts[0].search_name == "NORDLICHT"
+    assert contacts[0].full_name == "Mara Stein"
 
 
 def test_accounts_can_be_filtered_by_type(app) -> None:
@@ -100,6 +116,7 @@ def test_save_mock_visit_report_persists_enventa_payload(app) -> None:
     )
     db.session.commit()
 
+    assert isinstance(visit_report, VisitReportReference)
     saved_report = db.session.get(MockVisitReport, visit_report.id)
     assert saved_report.visit_report_number == "VR-00001"
     assert saved_report.target_topic == "Forecast"

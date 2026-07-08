@@ -4,6 +4,14 @@ from benno.enums import MessageSender, ReportStatus, UserIntent, VisitType
 from benno.models import MockReminder, MockVisitReport, User
 from benno.seed import seed_database
 from benno.services.ai_provider import AiMessageAnalysis, AiProviderError
+from benno.services.mock_crm import (
+    AccountReference,
+    ContactReference,
+    CrmUserReference,
+    FieldSalesRepresentativeReference,
+    ReminderReference,
+    VisitReportReference,
+)
 from benno.services.report_loop import (
     _ai_message_context,
     _step_by_key,
@@ -365,6 +373,23 @@ def test_provider_error_falls_back_to_deterministic_flow(app) -> None:
     )
 
 
+def test_report_loop_can_use_injected_crm_gateway(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    crm_gateway = _FakeCrmGateway()
+
+    _process_complete_report_with_gateway(chat, crm_gateway)
+    final_report = confirm_report(chat, crm_gateway=crm_gateway)
+
+    references = chat.report_draft.draft_data_json["crm_references"]
+    assert references["account"]["account_number"] == "FAKE-AKL-1"
+    assert references["contact"]["full_name"] == "Frau Gateway"
+    assert final_report.account_id == 1
+    assert crm_gateway.saved_visit_report_payload["account_number"] == "FAKE-AKL-1"
+    assert crm_gateway.saved_visit_report_payload["contact_name"] == "Frau Gateway"
+    assert crm_gateway.created_reminder_payload["message"]
+
+
 def _start_sales_chat():
     sales_user = User.query.filter_by(email="sales@benno.local").one()
     return start_report_chat(sales_user)
@@ -440,6 +465,30 @@ def _process_complete_report_with_reminder(chat) -> None:
     )
 
 
+def _process_complete_report_with_gateway(chat, crm_gateway) -> None:
+    answers = [
+        "Gateway Kunde",
+        "telefonisch",
+        "Frau Gateway",
+        "2026-07-07",
+        "Gateway Test",
+        "Wir haben die Gateway-Grenze besprochen.",
+        "BENNO soll den Connector sauber nutzen.",
+        "Innendienst soll naechste Woche nachfassen.",
+        "2026-07-14",
+        "keine",
+        "keine",
+        "8 7 6 9",
+    ]
+    for answer in answers:
+        process_report_message_with_ai(
+            chat,
+            answer,
+            _FakeAiService(),
+            crm_gateway,
+        )
+
+
 def _requirement_from(
     requirements: list[dict[str, object]],
     requirement_key: str,
@@ -492,3 +541,94 @@ class _FakeAiService:
     def draft_final_report_text(self, draft_context) -> str | None:
         self.final_report_calls += 1
         return self.final_report_text
+
+
+class _FakeCrmGateway:
+    def __init__(self) -> None:
+        self.saved_visit_report_payload = None
+        self.created_reminder_payload = None
+
+    def search_accounts(
+        self,
+        query: str,
+        account_type: str | None = None,
+    ) -> list[AccountReference]:
+        if "Gateway Kunde" not in query:
+            return []
+
+        return [
+            AccountReference(
+                id=1,
+                account_number="FAKE-AKL-1",
+                account_type="K",
+                search_name="GATEWAY",
+                display_name="Gateway Kunde GmbH",
+            )
+        ]
+
+    def find_contacts(
+        self,
+        account_id: int,
+        query: str | None = None,
+    ) -> list[ContactReference]:
+        if query != "Frau Gateway":
+            return []
+
+        return [
+            ContactReference(
+                id=1,
+                account_id=account_id,
+                full_name="Frau Gateway",
+            )
+        ]
+
+    def find_offers(self, account_id: int, query: str | None = None) -> list:
+        return []
+
+    def find_orders(self, account_id: int, query: str | None = None) -> list:
+        return []
+
+    def list_crm_users(self, query: str | None = None) -> list[CrmUserReference]:
+        return [
+            CrmUserReference(
+                id=1,
+                username="inside.sales",
+                display_name="Inside Sales",
+            )
+        ]
+
+    def list_field_sales_representatives(
+        self,
+        query: str | None = None,
+    ) -> list[FieldSalesRepresentativeReference]:
+        return [
+            FieldSalesRepresentativeReference(
+                id=1,
+                representative_number="REP-FAKE",
+                display_name="Gateway Rep",
+            )
+        ]
+
+    def save_visit_report(
+        self,
+        final_report_id: int,
+        payload: dict,
+    ) -> VisitReportReference:
+        self.saved_visit_report_payload = payload
+        return VisitReportReference(
+            id=100,
+            visit_report_number="VR-GATEWAY-1",
+        )
+
+    def create_reminder(
+        self,
+        visit_report_number: str,
+        payload: dict,
+    ) -> ReminderReference:
+        self.created_reminder_payload = payload
+        return ReminderReference(
+            id=200,
+            visit_report_number=visit_report_number,
+            message=payload["message"],
+            due_date=payload.get("due_date"),
+        )

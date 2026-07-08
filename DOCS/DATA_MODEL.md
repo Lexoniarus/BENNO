@@ -85,6 +85,11 @@ For the first implementation, seeded demo users are sufficient. Setup links and 
 
 Mock CRM data exists only to simulate the external CRM/ERP counterpart.
 
+BENNO should access this area through the internal CRM/eNVenta gateway, not by
+making the report loop depend on mock table models. The current mock backend is
+SQLAlchemy-backed and local; later MVP work may use Postgres behind the same
+gateway boundary.
+
 It should include:
 
 - customers
@@ -190,6 +195,9 @@ The final eNVenta-specific fields are added later.
 Phase 6 should add or emulate a mock CRM/eNVenta visit report write target.
 This is the local placeholder table or structured save result that represents
 what BENNO would later write toward eNVenta.
+
+The write target should be reached through the CRM/eNVenta gateway. The gateway
+returns stable write references and keeps ORM details behind the mock backend.
 
 The mock visit report target should use the Phase 6 eNVenta field mapping, not
 the earlier Phase 4/5 BENNO-only report shape.

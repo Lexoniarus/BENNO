@@ -306,7 +306,7 @@ Phase 6 field decisions already clarified:
   mock data accordingly.
 - The working mapping table and MVP required fields are maintained in `DOCS/ENVENTA_FIELD_NOTES.md`.
 
-The placeholder CRM service should then define:
+The placeholder CRM/eNVenta gateway should then define:
 
 - search account or AKL record
 - search contacts by account
@@ -317,11 +317,18 @@ The placeholder CRM service should then define:
 - save mock visit report
 - create mock reminder
 
+This is an internal connector boundary, not an external REST API. Phase 6 uses
+local mock tables behind it; a later MVP step may move persistence to Postgres
+without changing the report loop's CRM/eNVenta contract.
+
 Done when:
 
 - The mock database represents the relevant eNVenta fields.
 - A final report can be saved in the expected structure.
-- The placeholder CRM contract is clear enough to be replaced by a real integration later.
+- The report loop uses the placeholder CRM/eNVenta gateway for lookup and
+  writeback instead of direct mock-table access.
+- The placeholder CRM/eNVenta contract is clear enough to be replaced by a
+  Postgres-backed mock backend or a real integration later.
 - Existing tests and seed/mock data use the Phase 6 account, visit report,
   reminder, and rating target structure.
 
