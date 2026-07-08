@@ -3,9 +3,11 @@
 BENNO means **B2B Encounter Notes and Next-step Organizer**.
 
 BENNO is a guided visit report assistant for B2B field sales. The current
-project phase builds the first Gemini-assisted report workflow on top of the
-local Flask foundation, login, data model, and mock CRM/ERP data. Voice,
-eNVenta field mapping, and local AI are planned for later phases.
+project phase builds a Gemini-assisted German report workflow on top of the
+local Flask foundation, login, data model, and eNVenta-shaped mock CRM/ERP
+gateway. Confirmed reports are saved locally as mock visit reports with optional
+follow-up reminders. Voice, Postgres, real eNVenta access, and local AI are
+planned for later phases.
 
 ## Local Setup
 

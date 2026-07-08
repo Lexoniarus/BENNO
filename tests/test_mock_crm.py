@@ -118,7 +118,7 @@ def test_save_mock_visit_report_persists_enventa_payload(app) -> None:
 
     assert isinstance(visit_report, VisitReportReference)
     saved_report = db.session.get(MockVisitReport, visit_report.id)
-    assert saved_report.visit_report_number == "VR-00001"
+    assert saved_report.visit_report_number.startswith("VR-")
     assert saved_report.target_topic == "Forecast"
     assert saved_report.priority_rating == 9
 

@@ -23,7 +23,7 @@ def test_default_gemini_model_is_configured() -> None:
     app = create_app("testing")
 
     assert app.config["AI_PROVIDER"] == "gemini"
-    assert app.config["GEMINI_MODEL"] == "gemini-2.5-flash-lite"
+    assert app.config["GEMINI_MODEL"] == "gemini-3.1-flash-lite"
 
 
 def test_development_configuration_reads_gemini_environment(monkeypatch) -> None:
@@ -77,7 +77,7 @@ def test_ai_status_shows_missing_gemini_sdk(app, monkeypatch) -> None:
         status = get_ai_status()
 
     assert status == {
-        "label": "KI: Gemini / gemini-2.5-flash-lite SDK fehlt",
+        "label": "KI: Gemini / gemini-3.1-flash-lite SDK fehlt",
         "state": "inactive",
     }
 
@@ -98,7 +98,7 @@ def test_ai_status_shows_provider_initialization_error(app, monkeypatch) -> None
 
     assert status == {
         "label": (
-            "KI: Gemini / gemini-2.5-flash-lite nicht verfügbar "
+            "KI: Gemini / gemini-3.1-flash-lite nicht verfügbar "
             "(Initialisierung fehlgeschlagen)"
         ),
         "state": "inactive",

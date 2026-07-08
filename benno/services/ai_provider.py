@@ -86,7 +86,7 @@ def get_ai_service() -> AiService:
     if not api_key:
         return NullAiService()
 
-    model = current_app.config.get("GEMINI_MODEL", "gemini-2.5-flash-lite")
+    model = current_app.config.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
     from benno.services.gemini_provider import GeminiService
 
     try:
@@ -105,7 +105,7 @@ def get_ai_status() -> dict[str, str]:
     if provider_code != AiProvider.GEMINI.value:
         return {"label": f"KI: {provider_code} nicht aktiv", "state": "inactive"}
 
-    model = current_app.config.get("GEMINI_MODEL", "gemini-2.5-flash-lite")
+    model = current_app.config.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
     if not current_app.config.get("GEMINI_API_KEY"):
         return {"label": f"KI: Gemini / {model} ohne API-Key", "state": "inactive"}
 

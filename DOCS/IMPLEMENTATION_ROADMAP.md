@@ -8,7 +8,7 @@ It is not a product concept document. It is a practical implementation roadmap: 
 
 Guiding principle:
 
-> Build a small, complete text loop first. Then add depth, voice, eNVenta field mapping, and local AI.
+> Build a small, complete text loop first. Then add depth, voice, real eNVenta integration, Postgres, and local AI.
 
 BENNO must not be built as one large big-bang application. Every phase should be runnable, testable, and committable.
 

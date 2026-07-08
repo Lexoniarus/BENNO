@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Protocol
+from uuid import uuid4
 
 from sqlalchemy import or_
 
@@ -556,8 +557,7 @@ def _validate_required_payload(
 
 
 def _next_visit_report_number() -> str:
-    next_id = (db.session.query(MockVisitReport).count() or 0) + 1
-    return f"VR-{next_id:05d}"
+    return f"VR-{uuid4().hex[:12].upper()}"
 
 
 def _like_query(query: str | None) -> str | None:

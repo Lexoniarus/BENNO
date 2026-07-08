@@ -6,7 +6,7 @@ class BaseConfig:
 
     AI_PROVIDER = "gemini"
     GEMINI_API_KEY = None
-    GEMINI_MODEL = "gemini-2.5-flash-lite"
+    GEMINI_MODEL = "gemini-3.1-flash-lite"
     SECRET_KEY = "development-secret-key"
     SQLALCHEMY_DATABASE_URI = None
     SQLALCHEMY_TRACK_MODIFICATIONS = False
