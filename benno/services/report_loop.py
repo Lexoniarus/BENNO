@@ -80,15 +80,24 @@ from benno.services.report_steps import (
     is_ready_for_review as draft_is_ready_for_review,
 )
 from benno.services.report_writeback import (
+    build_mock_visit_report_payload,
     create_mock_reminders,
-    mock_visit_report_payload,
 )
 
 MUTABLE_REPORT_STATUSES = {
     ReportStatus.IN_PROGRESS.value,
     ReportStatus.READY_FOR_REVIEW.value,
 }
-__all__ = ["build_report_review"]
+__all__ = [
+    "apply_report_correction",
+    "build_report_review",
+    "cancel_report",
+    "confirm_report",
+    "process_report_message",
+    "process_report_message_with_ai",
+    "process_report_turn",
+    "start_report_chat",
+]
 
 
 def start_report_chat(sales_user: User) -> Chat:
@@ -129,7 +138,7 @@ def start_report_chat(sales_user: User) -> Chat:
 
 def process_report_message(chat: Chat, message_text: str) -> Chat:
     """Store a user answer and advance the deterministic report state."""
-    return process_report_message_with_ai(chat, message_text, get_ai_service())
+    return process_report_turn(chat, message_text, get_ai_service())
 
 
 def process_report_message_with_ai(
@@ -138,29 +147,33 @@ def process_report_message_with_ai(
     ai_service: AiService | None,
     crm_gateway: CrmGateway | None = None,
 ) -> Chat:
-    """Store a user answer and advance the assisted report state."""
-    draft = _require_draft(chat)
-    _ensure_report_is_mutable(chat)
-    gateway = crm_gateway or get_crm_gateway()
-    normalized_message = message_text.strip()
-    if not normalized_message:
-        raise ValueError("Message text must not be empty.")
+    """Compatibility wrapper for tests and older service callers."""
+    return process_report_turn(chat, message_text, ai_service, crm_gateway)
 
-    _add_user_message(chat, message_text)
+
+def process_report_turn(
+    chat: Chat,
+    message_text: str,
+    ai_service: AiService | None,
+    crm_gateway: CrmGateway | None = None,
+) -> Chat:
+    """Store a user answer and advance the assisted report state."""
+    draft = _require_mutable_draft(chat)
+    gateway = crm_gateway or get_crm_gateway()
+    normalized_message = _normalize_message_text(message_text)
+    _record_user_message(chat, message_text)
 
     current_step = _current_step(draft)
     if current_step is None:
-        _add_assistant_message(chat, _review_ready_message(chat))
-        db.session.commit()
-        return chat
+        return _complete_report_turn(chat, _review_ready_message(chat))
 
-    analysis = _analyze_report_message(
+    analysis = _analyze_user_message(
         draft,
         current_step,
         normalized_message,
         ai_service,
     )
-    applied_steps = _apply_assisted_answers(
+    applied_steps = _apply_report_answers(
         draft,
         current_step,
         normalized_message,
@@ -169,7 +182,11 @@ def process_report_message_with_ai(
     )
     next_step = _advance_after_applied_steps(draft, applied_steps)
     next_question = _next_question(chat, next_step, analysis)
-    _add_assistant_message(chat, next_question)
+    return _complete_report_turn(chat, next_question)
+
+
+def _complete_report_turn(chat: Chat, assistant_reply: str) -> Chat:
+    _record_assistant_reply(chat, assistant_reply)
     db.session.commit()
 
     return chat
@@ -202,7 +219,7 @@ def apply_report_correction(
 
     correction_step = _correction_step(field_key)
     _add_correction_message(chat, correction_step.key, normalized_correction)
-    _apply_step_answer(draft, correction_step, normalized_correction, gateway)
+    _apply_requirement_answer(draft, correction_step, normalized_correction, gateway)
     refresh_missing_sections(draft)
     draft.report_status = ReportStatus.READY_FOR_REVIEW.value
     chat.status = ReportStatus.READY_FOR_REVIEW.value
@@ -232,6 +249,21 @@ def confirm_report(
     if not draft_is_ready_for_review(draft):
         raise ValueError("Report is not ready for confirmation.")
 
+    final_report = _create_final_report(chat, draft, ai_service)
+    mock_visit_report = _write_confirmed_report_to_crm(draft, final_report, gateway)
+    create_mock_reminders(draft, mock_visit_report, gateway)
+    _mark_report_confirmed(chat, draft)
+    _record_confirmation_message(chat)
+    db.session.commit()
+
+    return final_report
+
+
+def _create_final_report(
+    chat: Chat,
+    draft: ReportDraft,
+    ai_service: AiService | None,
+) -> FinalReport:
     final_report = FinalReport(
         chat=chat,
         sales_user=chat.sales_user,
@@ -257,20 +289,29 @@ def confirm_report(
     )
     db.session.add(final_report)
     db.session.flush()
+    return final_report
 
-    mock_visit_report = gateway.save_visit_report(
+
+def _write_confirmed_report_to_crm(
+    draft: ReportDraft,
+    final_report: FinalReport,
+    crm_gateway: CrmGateway,
+) -> Any:
+    mock_visit_report = crm_gateway.save_visit_report(
         final_report.id,
-        mock_visit_report_payload(draft, final_report, gateway),
+        build_mock_visit_report_payload(draft, final_report, crm_gateway),
     )
-    create_mock_reminders(draft, mock_visit_report, gateway)
+    return mock_visit_report
 
+
+def _mark_report_confirmed(chat: Chat, draft: ReportDraft) -> None:
     chat.status = ReportStatus.CONFIRMED.value
     draft.report_status = ReportStatus.CONFIRMED.value
     set_section_status(draft, ReportSection.USER_CONFIRMATION, SectionStatus.CONFIRMED)
-    _add_assistant_message(chat, "The visit report has been confirmed and saved.")
-    db.session.commit()
 
-    return final_report
+
+def _record_confirmation_message(chat: Chat) -> None:
+    _add_assistant_message(chat, "The visit report has been confirmed and saved.")
 
 
 def cancel_report(chat: Chat) -> None:
@@ -297,9 +338,23 @@ def _require_draft(chat: Chat) -> ReportDraft:
     return chat.report_draft
 
 
+def _require_mutable_draft(chat: Chat) -> ReportDraft:
+    draft = _require_draft(chat)
+    _ensure_report_is_mutable(chat)
+    return draft
+
+
 def _ensure_report_is_mutable(chat: Chat) -> None:
     if chat.status not in MUTABLE_REPORT_STATUSES:
         raise ValueError("This report can no longer be changed.")
+
+
+def _normalize_message_text(message_text: str) -> str:
+    normalized_message = message_text.strip()
+    if not normalized_message:
+        raise ValueError("Message text must not be empty.")
+
+    return normalized_message
 
 
 def _current_step(draft: ReportDraft) -> ReportStep | None:
@@ -321,73 +376,152 @@ def _correction_step(field_key: str) -> ReportStep:
     return correction_step
 
 
-def _apply_step_answer(
+def _apply_requirement_answer(
     draft: ReportDraft,
-    step: ReportStep,
-    message_text: str,
+    requirement: ReportStep,
+    answer_text: str,
     crm_gateway: CrmGateway,
 ) -> bool:
     clear_ai_cache(draft)
+    _store_requirement_answer(draft, requirement, answer_text)
+
+    if not _apply_requirement_specific_update(
+        draft,
+        requirement,
+        answer_text,
+        crm_gateway,
+    ):
+        _reject_requirement_answer(draft, requirement)
+        return False
+
+    _update_requirement_status(draft, requirement)
+    return _requirement_is_complete(draft, requirement)
+
+
+def _store_requirement_answer(
+    draft: ReportDraft,
+    requirement: ReportStep,
+    answer_text: str,
+) -> None:
     data = draft_data(draft)
     answers = dict(data.get("answers", {}))
-    answers[step.key] = message_text
+    answers[requirement.key] = answer_text
     data["answers"] = answers
     draft.draft_data_json = data
 
-    if step.key == "visit_context":
-        _update_visit_context(draft, message_text, crm_gateway)
-    elif step.key == "visit_type":
-        if not _update_visit_type(draft, message_text):
-            remove_draft_answer(draft, step.key)
-            set_section_status(draft, step.section, SectionStatus.OPEN)
-            return False
-    elif step.key == "participants":
-        _update_contacts(draft, message_text, crm_gateway)
-    elif step.key == "visit_date":
-        visit_date = parse_visit_date(message_text)
-        if visit_date is None:
-            remove_draft_answer(draft, step.key)
-            set_section_status(draft, step.section, SectionStatus.OPEN)
-            return False
-        draft.visit_date = visit_date
-    elif step.key == "target_topic":
-        draft.reason_code = classify_reason(message_text)
-    elif step.key == "info_text":
-        draft.summary = message_text
-    elif step.key == "agreement_text":
-        draft.outcome = message_text
-    elif step.key == "next_action":
-        draft.next_action = message_text
-        draft.follow_up_date = parse_iso_date(message_text)
-    elif step.key == "next_appointment_date":
-        follow_up_date = parse_visit_date(message_text)
-        if follow_up_date is None and not is_none_answer(message_text):
-            remove_draft_answer(draft, step.key)
-            set_section_status(draft, step.section, SectionStatus.OPEN)
-            return False
-        draft.follow_up_date = follow_up_date
-    elif step.key == "offer_reference":
-        _update_offer_reference(draft, message_text, crm_gateway)
-    elif step.key == "order_reference":
-        _update_order_reference(draft, message_text, crm_gateway)
-    elif step.key == "strength_text":
-        data["strength_text"] = message_text
-        draft.draft_data_json = data
-    elif step.key == "weakness_text":
-        data["weakness_text"] = message_text
-        draft.draft_data_json = data
-    elif step.key == "ratings":
-        _update_ratings(draft, message_text)
-        set_section_status(draft, step.section, _section_status_for_answer(step, draft))
-        return all_ratings_collected(draft)
-    elif step.key == "reminders":
-        _update_reminder_signal(draft, message_text)
 
-    set_section_status(draft, step.section, _section_status_for_answer(step, draft))
+def _apply_requirement_specific_update(
+    draft: ReportDraft,
+    requirement: ReportStep,
+    answer_text: str,
+    crm_gateway: CrmGateway,
+) -> bool:
+    if requirement.key in _GATEWAY_REQUIREMENT_KEYS:
+        _apply_gateway_requirement_answer(draft, requirement, answer_text, crm_gateway)
+        return True
+    if requirement.key == "visit_type":
+        return _apply_visit_type_answer(draft, answer_text)
+    if requirement.key == "visit_date":
+        return _apply_visit_date_answer(draft, answer_text)
+    if requirement.key == "next_appointment_date":
+        return _apply_next_appointment_answer(draft, answer_text)
+
+    _apply_local_requirement_answer(draft, requirement, answer_text)
     return True
 
 
-def _analyze_report_message(
+_GATEWAY_REQUIREMENT_KEYS = {
+    "visit_context",
+    "participants",
+    "offer_reference",
+    "order_reference",
+}
+
+
+def _apply_gateway_requirement_answer(
+    draft: ReportDraft,
+    requirement: ReportStep,
+    answer_text: str,
+    crm_gateway: CrmGateway,
+) -> None:
+    if requirement.key == "visit_context":
+        _apply_visit_context_answer(draft, answer_text, crm_gateway)
+    elif requirement.key == "participants":
+        _apply_participants_answer(draft, answer_text, crm_gateway)
+    elif requirement.key == "offer_reference":
+        _apply_offer_reference_answer(draft, answer_text, crm_gateway)
+    elif requirement.key == "order_reference":
+        _apply_order_reference_answer(draft, answer_text, crm_gateway)
+
+
+def _apply_local_requirement_answer(
+    draft: ReportDraft,
+    requirement: ReportStep,
+    answer_text: str,
+) -> None:
+    if requirement.key == "target_topic":
+        _apply_target_topic_answer(draft, answer_text)
+    elif requirement.key == "info_text":
+        _apply_info_answer(draft, answer_text)
+    elif requirement.key == "agreement_text":
+        _apply_agreement_answer(draft, answer_text)
+    elif requirement.key == "next_action":
+        _apply_next_action_answer(draft, answer_text)
+    elif requirement.key == "strength_text":
+        _store_draft_text_value(draft, "strength_text", answer_text)
+    elif requirement.key == "weakness_text":
+        _store_draft_text_value(draft, "weakness_text", answer_text)
+    elif requirement.key == "ratings":
+        _apply_rating_answers(draft, answer_text)
+    elif requirement.key == "reminders":
+        _apply_reminder_answer(draft, answer_text)
+
+
+def _apply_visit_date_answer(draft: ReportDraft, answer_text: str) -> bool:
+    visit_date = parse_visit_date(answer_text)
+    if visit_date is None:
+        return False
+
+    draft.visit_date = visit_date
+    return True
+
+
+def _apply_next_appointment_answer(draft: ReportDraft, answer_text: str) -> bool:
+    follow_up_date = parse_visit_date(answer_text)
+    if follow_up_date is None and not is_none_answer(answer_text):
+        return False
+
+    draft.follow_up_date = follow_up_date
+    return True
+
+
+def _reject_requirement_answer(draft: ReportDraft, requirement: ReportStep) -> None:
+    remove_draft_answer(draft, requirement.key)
+    set_section_status(draft, requirement.section, SectionStatus.OPEN)
+
+
+def _update_requirement_status(draft: ReportDraft, requirement: ReportStep) -> None:
+    set_section_status(
+        draft,
+        requirement.section,
+        _section_status_for_answer(requirement, draft),
+    )
+
+
+def _requirement_is_complete(draft: ReportDraft, requirement: ReportStep) -> bool:
+    if requirement.key == "ratings":
+        return all_ratings_collected(draft)
+
+    return True
+
+
+def _store_draft_text_value(draft: ReportDraft, key: str, value: str) -> None:
+    data = draft_data(draft)
+    data[key] = value
+    draft.draft_data_json = data
+
+
+def _analyze_user_message(
     draft: ReportDraft,
     current_step: ReportStep,
     message_text: str,
@@ -411,7 +545,7 @@ def _analyze_report_message(
     return sanitized_analysis
 
 
-def _apply_assisted_answers(
+def _apply_report_answers(
     draft: ReportDraft,
     current_step: ReportStep,
     message_text: str,
@@ -420,25 +554,23 @@ def _apply_assisted_answers(
 ) -> list[ReportStep]:
     completed_before_message = set(draft_data(draft).get("completed_steps", []))
     applied_steps = []
-    current_answer = _answer_for_step(current_step, message_text, analysis)
-    if current_answer is not None:
-        if _apply_step_answer(draft, current_step, current_answer, crm_gateway):
-            applied_steps.append(current_step)
-
-    for step in _additional_ai_steps(
+    _apply_current_requirement_answer(
+        draft,
+        current_step,
+        message_text,
+        analysis,
+        applied_steps,
+        crm_gateway,
+    )
+    _apply_ai_requirement_updates(
+        draft,
         current_step,
         analysis,
         completed_before_message,
-    ):
-        if _apply_step_answer(
-            draft,
-            step,
-            analysis.section_updates[step.key],
-            crm_gateway,
-        ):
-            applied_steps.append(step)
-
-    _apply_flow_shortcuts(
+        applied_steps,
+        crm_gateway,
+    )
+    _apply_rule_based_updates(
         draft,
         current_step,
         message_text,
@@ -450,20 +582,62 @@ def _apply_assisted_answers(
     return applied_steps
 
 
-def _answer_for_step(
-    step: ReportStep,
+def _apply_current_requirement_answer(
+    draft: ReportDraft,
+    current_step: ReportStep,
+    message_text: str,
+    analysis: AiMessageAnalysis | None,
+    applied_steps: list[ReportStep],
+    crm_gateway: CrmGateway,
+) -> None:
+    current_answer = _answer_for_requirement(current_step, message_text, analysis)
+    if current_answer is None:
+        return
+
+    if _apply_requirement_answer(draft, current_step, current_answer, crm_gateway):
+        applied_steps.append(current_step)
+
+
+def _apply_ai_requirement_updates(
+    draft: ReportDraft,
+    current_step: ReportStep,
+    analysis: AiMessageAnalysis | None,
+    completed_before_message: set[str],
+    applied_steps: list[ReportStep],
+    crm_gateway: CrmGateway,
+) -> None:
+    if analysis is None:
+        return
+
+    for requirement in _additional_ai_requirements(
+        current_step,
+        analysis,
+        completed_before_message,
+    ):
+        if _apply_requirement_answer(
+            draft,
+            requirement,
+            analysis.section_updates[requirement.key],
+            crm_gateway,
+        ):
+            applied_steps.append(requirement)
+
+
+def _answer_for_requirement(
+    requirement: ReportStep,
     message_text: str,
     analysis: AiMessageAnalysis | None,
 ) -> str | None:
-    if step.key in {"offer_reference", "order_reference"} and is_no_reference_message(
-        message_text
-    ):
+    if requirement.key in {
+        "offer_reference",
+        "order_reference",
+    } and is_no_reference_message(message_text):
         return "keiner"
 
     if analysis is None:
         return message_text
 
-    suggested_value = analysis.section_updates.get(step.key)
+    suggested_value = analysis.section_updates.get(requirement.key)
     if not suggested_value:
         if analysis.intent == UserIntent.CORRECTION:
             return None
@@ -472,7 +646,7 @@ def _answer_for_step(
     return suggested_value
 
 
-def _apply_flow_shortcuts(
+def _apply_rule_based_updates(
     draft: ReportDraft,
     current_step: ReportStep,
     message_text: str,
@@ -482,37 +656,23 @@ def _apply_flow_shortcuts(
 ) -> None:
     _apply_lead_context_signal(draft, message_text)
     _apply_inside_sales_follow_up_signal(draft, current_step, message_text)
-    _apply_visit_type_shortcut(
-        draft,
-        current_step,
-        message_text,
-        completed_before_message,
-        applied_steps,
-        crm_gateway,
-    )
-    _apply_no_offer_order_shortcut(
-        draft,
-        current_step,
-        message_text,
-        completed_before_message,
-        applied_steps,
-        crm_gateway,
-    )
-    _apply_follow_up_shortcut(
-        draft,
-        current_step,
-        message_text,
-        completed_before_message,
-        applied_steps,
-        crm_gateway,
-    )
-    _apply_rating_shortcut(
-        draft,
-        current_step,
-        message_text,
-        completed_before_message,
-        applied_steps,
-        crm_gateway,
+    for hint_handler in _rule_based_hint_handlers():
+        hint_handler(
+            draft,
+            current_step,
+            message_text,
+            completed_before_message,
+            applied_steps,
+            crm_gateway,
+        )
+
+
+def _rule_based_hint_handlers() -> tuple[Any, ...]:
+    return (
+        _apply_visit_type_hint,
+        _apply_no_reference_hint,
+        _apply_next_action_hint,
+        _apply_rating_hint,
     )
 
 
@@ -540,7 +700,7 @@ def _apply_inside_sales_follow_up_signal(
     }
 
 
-def _apply_visit_type_shortcut(
+def _apply_visit_type_hint(
     draft: ReportDraft,
     current_step: ReportStep,
     message_text: str,
@@ -558,11 +718,11 @@ def _apply_visit_type_shortcut(
     visit_type_step = step_by_key("visit_type")
     if step_index(visit_type_step) < step_index(current_step):
         return
-    if _apply_step_answer(draft, visit_type_step, message_text, crm_gateway):
+    if _apply_requirement_answer(draft, visit_type_step, message_text, crm_gateway):
         applied_steps.append(visit_type_step)
 
 
-def _apply_no_offer_order_shortcut(
+def _apply_no_reference_hint(
     draft: ReportDraft,
     current_step: ReportStep,
     message_text: str,
@@ -582,11 +742,11 @@ def _apply_no_offer_order_shortcut(
         if any(applied_step.key == step.key for applied_step in applied_steps):
             continue
 
-        if _apply_step_answer(draft, step, "keiner", crm_gateway):
+        if _apply_requirement_answer(draft, step, "keiner", crm_gateway):
             applied_steps.append(step)
 
 
-def _apply_follow_up_shortcut(
+def _apply_next_action_hint(
     draft: ReportDraft,
     current_step: ReportStep,
     message_text: str,
@@ -607,11 +767,11 @@ def _apply_follow_up_shortcut(
     if step_index(next_action_step) <= step_index(current_step):
         return
 
-    if _apply_step_answer(draft, next_action_step, message_text, crm_gateway):
+    if _apply_requirement_answer(draft, next_action_step, message_text, crm_gateway):
         applied_steps.append(next_action_step)
 
 
-def _apply_rating_shortcut(
+def _apply_rating_hint(
     draft: ReportDraft,
     current_step: ReportStep,
     message_text: str,
@@ -629,11 +789,11 @@ def _apply_rating_shortcut(
     rating_step = step_by_key("ratings")
     if step_index(rating_step) < step_index(current_step):
         return
-    if _apply_step_answer(draft, rating_step, message_text, crm_gateway):
+    if _apply_requirement_answer(draft, rating_step, message_text, crm_gateway):
         applied_steps.append(rating_step)
 
 
-def _additional_ai_steps(
+def _additional_ai_requirements(
     current_step: ReportStep,
     analysis: AiMessageAnalysis | None,
     completed_before_message: set[str],
@@ -657,28 +817,28 @@ def _additional_ai_steps(
 
 
 def _can_apply_ai_update(
-    step: ReportStep,
+    requirement: ReportStep,
     current_index: int,
     analysis: AiMessageAnalysis,
     completed_before_message: set[str],
 ) -> bool:
-    if analysis.intent == UserIntent.CORRECTION and _analysis_targets_step(
+    if analysis.intent == UserIntent.CORRECTION and _analysis_targets_requirement(
         analysis,
-        step,
+        requirement,
     ):
         return True
 
-    if step.key in completed_before_message:
+    if requirement.key in completed_before_message:
         return False
 
-    return step_index(step) > current_index
+    return step_index(requirement) > current_index
 
 
-def _analysis_targets_step(
+def _analysis_targets_requirement(
     analysis: AiMessageAnalysis,
-    step: ReportStep,
+    requirement: ReportStep,
 ) -> bool:
-    return step.key in analysis.target_sections or step.section.value in (
+    return requirement.key in analysis.target_sections or requirement.section.value in (
         analysis.target_sections
     )
 
@@ -750,7 +910,7 @@ def _review_ready_message(chat: Chat) -> str:
     )
 
 
-def _update_visit_context(
+def _apply_visit_context_answer(
     draft: ReportDraft,
     message_text: str,
     crm_gateway: CrmGateway,
@@ -788,7 +948,7 @@ def _customer_context_type_for_account(account: Any) -> str:
     return CustomerContextType.EXISTING_CUSTOMER.value
 
 
-def _update_visit_type(draft: ReportDraft, message_text: str) -> bool:
+def _apply_visit_type_answer(draft: ReportDraft, message_text: str) -> bool:
     visit_type = parse_visit_type(message_text)
     if visit_type is None:
         return False
@@ -797,7 +957,7 @@ def _update_visit_type(draft: ReportDraft, message_text: str) -> bool:
     return True
 
 
-def _update_contacts(
+def _apply_participants_answer(
     draft: ReportDraft,
     message_text: str,
     crm_gateway: CrmGateway,
@@ -815,7 +975,24 @@ def _update_contacts(
         store_crm_reference(draft, "contact", contact)
 
 
-def _update_offer_reference(
+def _apply_target_topic_answer(draft: ReportDraft, answer_text: str) -> None:
+    draft.reason_code = classify_reason(answer_text)
+
+
+def _apply_info_answer(draft: ReportDraft, answer_text: str) -> None:
+    draft.summary = answer_text
+
+
+def _apply_agreement_answer(draft: ReportDraft, answer_text: str) -> None:
+    draft.outcome = answer_text
+
+
+def _apply_next_action_answer(draft: ReportDraft, answer_text: str) -> None:
+    draft.next_action = answer_text
+    draft.follow_up_date = parse_iso_date(answer_text)
+
+
+def _apply_offer_reference_answer(
     draft: ReportDraft,
     message_text: str,
     crm_gateway: CrmGateway,
@@ -838,7 +1015,7 @@ def _update_offer_reference(
         store_crm_reference(draft, "offer", offer)
 
 
-def _update_order_reference(
+def _apply_order_reference_answer(
     draft: ReportDraft,
     message_text: str,
     crm_gateway: CrmGateway,
@@ -867,7 +1044,7 @@ def _update_order_reference(
         store_crm_reference(draft, "order", order)
 
 
-def _update_ratings(draft: ReportDraft, message_text: str) -> None:
+def _apply_rating_answers(draft: ReportDraft, message_text: str) -> None:
     ratings = dict(draft.ratings_json)
     parsed_values = parse_rating_values(message_text)
     is_not_assessable = is_not_assessable_rating_answer(message_text)
@@ -887,7 +1064,7 @@ def _update_ratings(draft: ReportDraft, message_text: str) -> None:
     draft.ratings_json = ratings
 
 
-def _update_reminder_signal(draft: ReportDraft, message_text: str) -> None:
+def _apply_reminder_answer(draft: ReportDraft, message_text: str) -> None:
     if is_none_answer(message_text):
         return
 
@@ -922,6 +1099,10 @@ def _add_user_message(chat: Chat, message_text: str) -> None:
     _add_message(chat, MessageSender.USER, message_text, MessageType.FREE_INPUT)
 
 
+def _record_user_message(chat: Chat, message_text: str) -> None:
+    _add_user_message(chat, message_text)
+
+
 def _add_correction_message(chat: Chat, field_key: str, message_text: str) -> None:
     _add_message(
         chat,
@@ -938,6 +1119,10 @@ def _add_assistant_message(chat: Chat, message_text: str) -> None:
         message_text,
         MessageType.ASSISTANT_QUESTION,
     )
+
+
+def _record_assistant_reply(chat: Chat, message_text: str) -> None:
+    _add_assistant_message(chat, message_text)
 
 
 def _add_message(

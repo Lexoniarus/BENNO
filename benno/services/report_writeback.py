@@ -14,40 +14,70 @@ from benno.services.report_state import (
 )
 
 
-def mock_visit_report_payload(
+def build_mock_visit_report_payload(
     draft: ReportDraft,
     final_report: FinalReport,
     crm_gateway: CrmGateway,
 ) -> dict[str, Any]:
     """Build the eNVenta-shaped mock visit report payload."""
     answers = dict(draft_data(draft).get("answers", {}))
-    account = crm_reference(draft, "account")
-    contact = crm_reference(draft, "contact")
-    representative = default_field_sales_representative(crm_gateway)
-    responsible_user = default_crm_user(crm_gateway)
-    ratings = dict(draft.ratings_json)
     return {
         "visit_type": draft.visit_type or VisitType.IN_PERSON.value,
         "visit_report_status": VisitReportStatus.CLOSED.value,
         "report_status": VisitReportStatus.CLOSED.value,
-        "account_id": draft.account_id or (account.get("id") if account else None),
-        "account_number": account.get("account_number") if account else None,
-        "account_type": (
-            account.get("account_type") if account else AccountType.ADDRESS.value
-        ),
-        "account_search_name": account.get("search_name") if account else None,
-        "contact_id": draft.contact_id or (contact.get("id") if contact else None),
-        "contact_name": draft_answer(draft, "participants"),
-        "field_sales_representative_id": (
-            representative.id if representative is not None else None
-        ),
-        "responsible_user_id": responsible_user.id if responsible_user else None,
         "visit_date": draft.visit_date,
         "target_topic": answers.get("target_topic") or final_report.summary,
         "info_text": draft.summary or final_report.summary,
         "agreement_text": draft.outcome or final_report.outcome or "Nicht angegeben",
         "strength_text": answers.get("strength_text"),
         "weakness_text": answers.get("weakness_text"),
+        "next_appointment_date": draft.follow_up_date,
+        **account_payload_fields(draft),
+        **contact_payload_fields(draft),
+        **ownership_payload_fields(crm_gateway),
+        **rating_payload_fields(draft),
+        **reference_payload_fields(draft, answers),
+    }
+
+
+def account_payload_fields(draft: ReportDraft) -> dict[str, Any]:
+    """Build account-related visit report payload fields."""
+    account = crm_reference(draft, "account")
+    return {
+        "account_id": draft.account_id or (account.get("id") if account else None),
+        "account_number": account.get("account_number") if account else None,
+        "account_type": (
+            account.get("account_type") if account else AccountType.ADDRESS.value
+        ),
+        "account_search_name": account.get("search_name") if account else None,
+    }
+
+
+def contact_payload_fields(draft: ReportDraft) -> dict[str, Any]:
+    """Build contact-related visit report payload fields."""
+    contact = crm_reference(draft, "contact")
+    return {
+        "contact_id": draft.contact_id or (contact.get("id") if contact else None),
+        "contact_name": draft_answer(draft, "participants"),
+    }
+
+
+def ownership_payload_fields(crm_gateway: CrmGateway) -> dict[str, Any]:
+    """Build responsible user and field-sales representative payload fields."""
+    representative = default_field_sales_representative(crm_gateway)
+    responsible_user = default_crm_user(crm_gateway)
+    return {
+        "field_sales_representative_id": (
+            representative.id if representative is not None else None
+        ),
+        "responsible_user_id": responsible_user.id if responsible_user else None,
+    }
+
+
+def rating_payload_fields(draft: ReportDraft) -> dict[str, Any]:
+    """Build eNVenta rating payload fields."""
+    ratings = dict(draft.ratings_json)
+    return {
         "customer_satisfaction_rating": rating_value(
             ratings,
             "customer_satisfaction_rating",
@@ -61,7 +91,15 @@ def mock_visit_report_payload(
             "commercial_attractiveness_rating",
         ),
         "priority_rating": rating_value(ratings, "priority_rating"),
-        "next_appointment_date": draft.follow_up_date,
+    }
+
+
+def reference_payload_fields(
+    draft: ReportDraft,
+    answers: dict[str, Any],
+) -> dict[str, Any]:
+    """Build offer and order reference payload fields."""
+    return {
         "offer_reference": answers.get("offer_reference"),
         "order_reference": answers.get("order_reference")
         or draft_data(draft).get("order_reference_raw"),

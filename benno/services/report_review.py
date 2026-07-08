@@ -20,52 +20,85 @@ def build_report_review(
     ai_service: AiService | None = None,
 ) -> dict[str, Any]:
     """Build a human-readable review from a report draft."""
-    data = draft_data(draft)
-    answers = data.get("answers", {})
     review_text = review_text_for_draft(draft, ai_service)
     final_report_text = final_report_text_for_draft(draft, ai_service)
 
     return {
         "review_text": review_text,
-        "sections": [
-            ("Kunde/Lead/Kontakt", display_value(answers.get("visit_context"))),
-            ("Besuchsart", display_value(draft.visit_type)),
-            ("Teilnehmer", display_value(answers.get("participants"))),
-            ("Besuchsdatum", display_value(draft.visit_date)),
-            ("Ziel/Thema", display_value(answers.get("target_topic"))),
-            ("Info", display_value(draft.summary)),
-            ("Vereinbarung", display_value(draft.outcome)),
-            ("Nächster Schritt", display_value(draft.next_action)),
-            (
-                "Termin ab",
-                display_value(
-                    answers.get("next_appointment_date"),
-                    empty="Nicht relevant",
-                ),
-            ),
-            (
-                "Angebotsbezug",
-                display_value(answers.get("offer_reference"), empty="Nicht relevant"),
-            ),
-            (
-                "Auftragsbezug",
-                display_value(answers.get("order_reference"), empty="Nicht relevant"),
-            ),
-            (
-                "Stärke",
-                display_value(answers.get("strength_text"), empty="Nicht angegeben"),
-            ),
-            (
-                "Schwäche",
-                display_value(answers.get("weakness_text"), empty="Nicht angegeben"),
-            ),
-            ("Bewertungen", format_ratings(draft.ratings_json)),
-            ("Wiedervorlagen", format_task_preview(draft)),
-        ],
+        "sections": _build_review_sections(draft),
         "final_report_text": final_report_text,
         "correction_fields": CORRECTION_FIELDS,
         "status": draft.report_status,
     }
+
+
+def _build_review_sections(draft: ReportDraft) -> list[tuple[str, str]]:
+    answers = draft_data(draft).get("answers", {})
+    return [
+        *_core_review_sections(draft, answers),
+        *_reference_review_sections(answers),
+        *_closing_review_sections(draft, answers),
+    ]
+
+
+def _core_review_sections(
+    draft: ReportDraft,
+    answers: dict[str, Any],
+) -> list[tuple[str, str]]:
+    return [
+        ("Kunde/Lead/Kontakt", display_value(answers.get("visit_context"))),
+        ("Besuchsart", display_value(draft.visit_type)),
+        ("Teilnehmer", display_value(answers.get("participants"))),
+        ("Besuchsdatum", display_value(draft.visit_date)),
+        ("Ziel/Thema", display_value(answers.get("target_topic"))),
+        ("Info", display_value(draft.summary)),
+        ("Vereinbarung", display_value(draft.outcome)),
+        ("Nächster Schritt", display_value(draft.next_action)),
+    ]
+
+
+def _reference_review_sections(answers: dict[str, Any]) -> list[tuple[str, str]]:
+    return [
+        _review_section(
+            "Termin ab",
+            answers.get("next_appointment_date"),
+            empty="Nicht relevant",
+        ),
+        _review_section(
+            "Angebotsbezug",
+            answers.get("offer_reference"),
+            empty="Nicht relevant",
+        ),
+        _review_section(
+            "Auftragsbezug",
+            answers.get("order_reference"),
+            empty="Nicht relevant",
+        ),
+    ]
+
+
+def _closing_review_sections(
+    draft: ReportDraft,
+    answers: dict[str, Any],
+) -> list[tuple[str, str]]:
+    return [
+        _review_section(
+            "Stärke",
+            answers.get("strength_text"),
+            empty="Nicht angegeben",
+        ),
+        _review_section(
+            "Schwäche",
+            answers.get("weakness_text"),
+            empty="Nicht angegeben",
+        ),
+        ("Bewertungen", format_ratings(draft.ratings_json)),
+        ("Wiedervorlagen", format_task_preview(draft)),
+    ]
+
+
+def _review_section(label: str, value: Any, empty: str) -> tuple[str, str]:
+    return (label, display_value(value, empty=empty))
 
 
 def review_text_for_draft(
