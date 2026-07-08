@@ -3,15 +3,12 @@
 from typing import Any
 
 from benno.enums import (
-    AccountType,
-    CustomerContextType,
     MessageSender,
     MessageType,
     ReportSection,
     ReportStatus,
     SectionStatus,
     UserIntent,
-    ValidationStatus,
 )
 from benno.extensions import db
 from benno.models import (
@@ -25,6 +22,10 @@ from benno.models import (
 from benno.services.ai_provider import AiMessageAnalysis, AiProviderError, AiService
 from benno.services.ai_registry import get_ai_service
 from benno.services.mock_crm import CrmGateway, get_crm_gateway
+from benno.services.report_account_resolution import (
+    apply_lead_context_signal,
+    resolve_visit_context,
+)
 from benno.services.report_ai_context import (
     ai_error_code,
     ai_message_context,
@@ -45,8 +46,6 @@ from benno.services.report_shortcuts import (
     looks_like_follow_up_action,
     looks_like_rating_answer,
     mentions_inside_sales_follow_up,
-    mentions_lead,
-    mentions_new,
     parse_iso_date,
     parse_rating_values,
     parse_visit_date,
@@ -678,13 +677,7 @@ def _rule_based_hint_handlers() -> tuple[Any, ...]:
 
 
 def _apply_lead_context_signal(draft: ReportDraft, message_text: str) -> None:
-    if not mentions_lead(message_text):
-        return
-    if draft.account_id is not None:
-        return
-
-    draft.customer_context_type = CustomerContextType.NEW_LEAD.value
-    draft.validation_status = ValidationStatus.CONFIRMED_NEW.value
+    apply_lead_context_signal(draft, message_text)
 
 
 def _apply_inside_sales_follow_up_signal(
@@ -916,37 +909,7 @@ def _apply_visit_context_answer(
     message_text: str,
     crm_gateway: CrmGateway,
 ) -> None:
-    normalized_text = message_text.lower()
-    account_matches = crm_gateway.search_accounts(message_text)
-    draft.account_id = None
-    draft.customer = None
-    draft.lead = None
-    draft.contact_id = None
-    clear_crm_reference(draft, "account")
-    clear_crm_reference(draft, "contact")
-
-    if mentions_new(normalized_text) or "lead" in normalized_text:
-        draft.customer_context_type = CustomerContextType.NEW_LEAD.value
-        draft.validation_status = ValidationStatus.CONFIRMED_NEW.value
-        return
-
-    if len(account_matches) == 1:
-        account = account_matches[0]
-        draft.account_id = account.id
-        store_crm_reference(draft, "account", account)
-        draft.customer_context_type = _customer_context_type_for_account(account)
-        draft.validation_status = ValidationStatus.MATCHED.value
-        return
-
-    draft.customer_context_type = CustomerContextType.UNCLEAR.value
-    draft.validation_status = ValidationStatus.UNKNOWN.value
-
-
-def _customer_context_type_for_account(account: Any) -> str:
-    if account.account_type == AccountType.ADDRESS.value:
-        return CustomerContextType.EXISTING_LEAD.value
-
-    return CustomerContextType.EXISTING_CUSTOMER.value
+    resolve_visit_context(draft, message_text, crm_gateway)
 
 
 def _apply_visit_type_answer(draft: ReportDraft, message_text: str) -> bool:
