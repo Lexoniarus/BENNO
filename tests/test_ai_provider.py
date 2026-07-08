@@ -2,6 +2,10 @@
 
 from benno import create_app
 from benno.enums import UserIntent
+from benno.services.ai_prompts import (
+    ANALYSIS_SYSTEM_INSTRUCTION,
+    NEXT_QUESTION_SYSTEM_INSTRUCTION,
+)
 from benno.services.ai_provider import (
     AiProviderError,
     NullAiService,
@@ -9,8 +13,6 @@ from benno.services.ai_provider import (
     get_ai_status,
 )
 from benno.services.gemini_provider import (
-    ANALYSIS_SYSTEM_INSTRUCTION,
-    NEXT_QUESTION_SYSTEM_INSTRUCTION,
     GeminiMessageAnalysis,
     GeminiSectionUpdate,
     _build_analysis_content,
@@ -69,7 +71,7 @@ def test_ai_status_shows_missing_gemini_sdk(app, monkeypatch) -> None:
     app.config["GEMINI_API_KEY"] = "test-gemini-key"
 
     monkeypatch.setattr(
-        "benno.services.ai_provider.importlib.util.find_spec",
+        "benno.services.ai_registry.importlib.util.find_spec",
         lambda module_name: None if module_name == "google.genai" else object(),
     )
 

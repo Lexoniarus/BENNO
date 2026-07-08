@@ -12,14 +12,14 @@ from benno.services.mock_crm import (
     ReminderReference,
     VisitReportReference,
 )
+from benno.services.report_ai_context import ai_message_context
 from benno.services.report_loop import (
-    _ai_message_context,
-    _step_by_key,
     build_report_review,
     confirm_report,
     process_report_message_with_ai,
     start_report_chat,
 )
+from benno.services.report_steps import step_by_key
 
 
 def test_service_creates_phase_6_chat_draft_and_initial_question(app) -> None:
@@ -41,7 +41,7 @@ def test_fresh_ai_context_lists_phase_6_report_requirements(app) -> None:
     sales_user = User.query.filter_by(email="sales@benno.local").one()
     chat = start_report_chat(sales_user)
 
-    context = _ai_message_context(chat.report_draft, _step_by_key("visit_context"))
+    context = ai_message_context(chat.report_draft, step_by_key("visit_context"))
     requirements = context["report_requirements"]
     requirement_keys = {requirement["key"] for requirement in requirements}
 
