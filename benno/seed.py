@@ -1,6 +1,7 @@
 """Seed data for the BENNO mock database."""
 
 from decimal import Decimal
+from typing import Any
 
 from werkzeug.security import generate_password_hash
 
@@ -16,6 +17,166 @@ from benno.models import (
     MockOrder,
     User,
 )
+
+MOCK_ACCOUNT_DATA: list[dict[str, Any]] = [
+    {
+        "account_number": "AKL-K-1001",
+        "account_type": AccountType.CUSTOMER.value,
+        "search_name": "NORDLICHT",
+        "display_name": "Nordlicht Maschinenbau GmbH",
+        "address_text": "Hamburg",
+        "address_restriction": None,
+        "contacts": [
+            {
+                "external_contact_id": "CONT-1001",
+                "full_name": "Mara Stein",
+                "email": "mara.stein@example.invalid",
+                "role_title": "Head of Procurement",
+            },
+            {
+                "external_contact_id": "CONT-1002",
+                "full_name": "Jonas Keller",
+                "email": "jonas.keller@example.invalid",
+                "role_title": "Operations Manager",
+            },
+        ],
+        "offers": [
+            {
+                "external_offer_id": "OFF-24001",
+                "title": "Conveyor modernization package",
+                "status": "open",
+                "amount": Decimal("48000.00"),
+            },
+            {
+                "external_offer_id": "OFF-24011",
+                "title": "Conveyor spare parts package",
+                "status": "open",
+                "amount": Decimal("8200.00"),
+            },
+        ],
+        "orders": [
+            {
+                "external_order_id": "ORD-23009",
+                "title": "Annual maintenance contract",
+                "status": "active",
+                "amount": Decimal("18500.00"),
+            }
+        ],
+    },
+    {
+        "account_number": "AKL-K-1002",
+        "account_type": AccountType.CUSTOMER.value,
+        "search_name": "SOLARIS",
+        "display_name": "Solaris Verpackung AG",
+        "address_text": "Freiburg",
+        "address_restriction": None,
+        "contacts": [
+            {
+                "external_contact_id": "CONT-2001",
+                "full_name": "Lea Hartmann",
+                "email": "lea.hartmann@example.invalid",
+                "role_title": "Plant Manager",
+            }
+        ],
+        "offers": [
+            {
+                "external_offer_id": "OFF-24005",
+                "title": "Line inspection and optimization",
+                "status": "sent",
+                "amount": Decimal("12600.00"),
+            }
+        ],
+        "orders": [],
+    },
+    {
+        "account_number": "AKL-K-1003",
+        "account_type": AccountType.CUSTOMER.value,
+        "search_name": "HAFENBLICK",
+        "display_name": "Hafenblick Logistik KG",
+        "address_text": "Bremen",
+        "address_restriction": None,
+        "contacts": [],
+        "offers": [],
+        "orders": [
+            {
+                "external_order_id": "ORD-24002",
+                "title": "Warehouse scanner rollout",
+                "status": "in_fulfillment",
+                "amount": Decimal("31500.00"),
+            }
+        ],
+    },
+    {
+        "account_number": "AKL-K-1004",
+        "account_type": AccountType.CUSTOMER.value,
+        "search_name": "ALPINA",
+        "display_name": "Alpina Medizintechnik GmbH",
+        "address_text": "Munich",
+        "address_restriction": None,
+        "contacts": [
+            {
+                "external_contact_id": "CONT-4001",
+                "full_name": "Nina Vogel",
+                "email": "nina.vogel@example.invalid",
+                "role_title": "Technical Buyer",
+            }
+        ],
+        "offers": [],
+        "orders": [],
+    },
+    {
+        "account_number": "AKL-A-9001",
+        "account_type": AccountType.ADDRESS.value,
+        "search_name": "URBANGRID",
+        "display_name": "UrbanGrid Mobility GmbH",
+        "address_text": "Cologne",
+        "address_restriction": None,
+        "contacts": [
+            {
+                "external_contact_id": "CONT-9001",
+                "full_name": "Timo Neumann",
+                "email": "timo.neumann@example.invalid",
+                "role_title": "Business Development",
+            }
+        ],
+        "offers": [],
+        "orders": [],
+    },
+    {
+        "account_number": "AKL-L-3001",
+        "account_type": AccountType.SUPPLIER.value,
+        "search_name": "RHEINTECH",
+        "display_name": "RheinTech Komponenten OHG",
+        "address_text": "Düsseldorf",
+        "address_restriction": "Supplier demo record",
+        "contacts": [],
+        "offers": [],
+        "orders": [],
+    },
+]
+
+
+MOCK_CRM_USERS = [
+    {
+        "username": "inside.sales",
+        "display_name": "Inside Sales Team",
+        "email": "inside.sales@example.invalid",
+    },
+    {
+        "username": "service.backoffice",
+        "display_name": "Service Backoffice",
+        "email": "service.backoffice@example.invalid",
+    },
+]
+
+
+MOCK_FIELD_SALES_REPRESENTATIVES = [
+    {
+        "representative_number": "REP-001",
+        "display_name": "BENNO Sales Rep",
+        "email": "sales@example.invalid",
+    }
+]
 
 
 def seed_database() -> None:
@@ -82,167 +243,20 @@ def _create_user_if_missing(
 
 
 def _seed_mock_crm_data() -> None:
-    account_data = [
-        {
-            "account_number": "AKL-K-1001",
-            "account_type": AccountType.CUSTOMER.value,
-            "search_name": "NORDLICHT",
-            "display_name": "Nordlicht Maschinenbau GmbH",
-            "address_text": "Hamburg",
-            "address_restriction": None,
-            "contacts": [
-                {
-                    "external_contact_id": "CONT-1001",
-                    "full_name": "Mara Stein",
-                    "email": "mara.stein@example.invalid",
-                    "role_title": "Head of Procurement",
-                },
-                {
-                    "external_contact_id": "CONT-1002",
-                    "full_name": "Jonas Keller",
-                    "email": "jonas.keller@example.invalid",
-                    "role_title": "Operations Manager",
-                },
-            ],
-            "offers": [
-                {
-                    "external_offer_id": "OFF-24001",
-                    "title": "Conveyor modernization package",
-                    "status": "open",
-                    "amount": Decimal("48000.00"),
-                },
-                {
-                    "external_offer_id": "OFF-24011",
-                    "title": "Conveyor spare parts package",
-                    "status": "open",
-                    "amount": Decimal("8200.00"),
-                },
-            ],
-            "orders": [
-                {
-                    "external_order_id": "ORD-23009",
-                    "title": "Annual maintenance contract",
-                    "status": "active",
-                    "amount": Decimal("18500.00"),
-                }
-            ],
-        },
-        {
-            "account_number": "AKL-K-1002",
-            "account_type": AccountType.CUSTOMER.value,
-            "search_name": "SOLARIS",
-            "display_name": "Solaris Verpackung AG",
-            "address_text": "Freiburg",
-            "address_restriction": None,
-            "contacts": [
-                {
-                    "external_contact_id": "CONT-2001",
-                    "full_name": "Lea Hartmann",
-                    "email": "lea.hartmann@example.invalid",
-                    "role_title": "Plant Manager",
-                }
-            ],
-            "offers": [
-                {
-                    "external_offer_id": "OFF-24005",
-                    "title": "Line inspection and optimization",
-                    "status": "sent",
-                    "amount": Decimal("12600.00"),
-                }
-            ],
-            "orders": [],
-        },
-        {
-            "account_number": "AKL-K-1003",
-            "account_type": AccountType.CUSTOMER.value,
-            "search_name": "HAFENBLICK",
-            "display_name": "Hafenblick Logistik KG",
-            "address_text": "Bremen",
-            "address_restriction": None,
-            "contacts": [],
-            "offers": [],
-            "orders": [
-                {
-                    "external_order_id": "ORD-24002",
-                    "title": "Warehouse scanner rollout",
-                    "status": "in_fulfillment",
-                    "amount": Decimal("31500.00"),
-                }
-            ],
-        },
-        {
-            "account_number": "AKL-K-1004",
-            "account_type": AccountType.CUSTOMER.value,
-            "search_name": "ALPINA",
-            "display_name": "Alpina Medizintechnik GmbH",
-            "address_text": "Munich",
-            "address_restriction": None,
-            "contacts": [
-                {
-                    "external_contact_id": "CONT-4001",
-                    "full_name": "Nina Vogel",
-                    "email": "nina.vogel@example.invalid",
-                    "role_title": "Technical Buyer",
-                }
-            ],
-            "offers": [],
-            "orders": [],
-        },
-        {
-            "account_number": "AKL-A-9001",
-            "account_type": AccountType.ADDRESS.value,
-            "search_name": "URBANGRID",
-            "display_name": "UrbanGrid Mobility GmbH",
-            "address_text": "Cologne",
-            "address_restriction": None,
-            "contacts": [
-                {
-                    "external_contact_id": "CONT-9001",
-                    "full_name": "Timo Neumann",
-                    "email": "timo.neumann@example.invalid",
-                    "role_title": "Business Development",
-                }
-            ],
-            "offers": [],
-            "orders": [],
-        },
-        {
-            "account_number": "AKL-L-3001",
-            "account_type": AccountType.SUPPLIER.value,
-            "search_name": "RHEINTECH",
-            "display_name": "RheinTech Komponenten OHG",
-            "address_text": "Düsseldorf",
-            "address_restriction": "Supplier demo record",
-            "contacts": [],
-            "offers": [],
-            "orders": [],
-        },
-    ]
-
-    for account_record in account_data:
+    for account_record in MOCK_ACCOUNT_DATA:
         account = _create_account_if_missing(account_record)
         _create_contacts_if_missing(account, account_record["contacts"])
         _create_offers_if_missing(account, account_record["offers"])
         _create_orders_if_missing(account, account_record["orders"])
 
-    _create_crm_user_if_missing(
-        username="inside.sales",
-        display_name="Inside Sales Team",
-        email="inside.sales@example.invalid",
-    )
-    _create_crm_user_if_missing(
-        username="service.backoffice",
-        display_name="Service Backoffice",
-        email="service.backoffice@example.invalid",
-    )
-    _create_field_sales_representative_if_missing(
-        representative_number="REP-001",
-        display_name="BENNO Sales Rep",
-        email="sales@example.invalid",
-    )
+    for crm_user_record in MOCK_CRM_USERS:
+        _create_crm_user_if_missing(**crm_user_record)
+
+    for representative_record in MOCK_FIELD_SALES_REPRESENTATIVES:
+        _create_field_sales_representative_if_missing(**representative_record)
 
 
-def _create_account_if_missing(account_record: dict) -> MockAccount:
+def _create_account_if_missing(account_record: dict[str, Any]) -> MockAccount:
     account = (
         db.session.query(MockAccount)
         .filter_by(account_number=account_record["account_number"])
@@ -266,7 +280,7 @@ def _create_account_if_missing(account_record: dict) -> MockAccount:
 
 def _create_contacts_if_missing(
     account: MockAccount,
-    contact_records: list[dict],
+    contact_records: list[dict[str, Any]],
 ) -> None:
     for contact_record in contact_records:
         contact = (
@@ -290,7 +304,7 @@ def _create_contacts_if_missing(
 
 def _create_offers_if_missing(
     account: MockAccount,
-    offer_records: list[dict],
+    offer_records: list[dict[str, Any]],
 ) -> None:
     for offer_record in offer_records:
         offer = (
@@ -314,7 +328,7 @@ def _create_offers_if_missing(
 
 def _create_orders_if_missing(
     account: MockAccount,
-    order_records: list[dict],
+    order_records: list[dict[str, Any]],
 ) -> None:
     for order_record in order_records:
         order = (

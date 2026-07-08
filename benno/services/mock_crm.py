@@ -308,57 +308,11 @@ class MockCrmGateway:
         final_report_id: int,
         payload: dict[str, Any],
     ) -> VisitReportReference:
-        existing_report = MockVisitReport.query.filter_by(
-            final_report_id=final_report_id
-        ).one_or_none()
+        existing_report = _find_visit_report_by_final_report(final_report_id)
         if existing_report is not None:
             return _visit_report_reference(existing_report)
 
-        _validate_required_payload(
-            payload,
-            required_keys=(
-                "visit_type",
-                "target_topic",
-                "info_text",
-                "agreement_text",
-            ),
-        )
-        visit_report = MockVisitReport(
-            final_report_id=final_report_id,
-            visit_report_number=_next_visit_report_number(),
-            visit_type=payload["visit_type"],
-            visit_report_status=payload.get(
-                "visit_report_status",
-                VisitReportStatus.CLOSED.value,
-            ),
-            report_status=payload.get("report_status", VisitReportStatus.CLOSED.value),
-            account_id=payload.get("account_id"),
-            account_number=payload.get("account_number"),
-            account_type=payload.get("account_type"),
-            account_search_name=payload.get("account_search_name"),
-            contact_id=payload.get("contact_id"),
-            contact_name=payload.get("contact_name"),
-            field_sales_representative_id=payload.get("field_sales_representative_id"),
-            responsible_user_id=payload.get("responsible_user_id"),
-            visit_date=payload.get("visit_date"),
-            visit_time=payload.get("visit_time"),
-            target_topic=payload["target_topic"],
-            info_text=payload["info_text"],
-            agreement_text=payload["agreement_text"],
-            strength_text=payload.get("strength_text"),
-            weakness_text=payload.get("weakness_text"),
-            customer_satisfaction_rating=payload.get("customer_satisfaction_rating"),
-            technical_attractiveness_rating=payload.get(
-                "technical_attractiveness_rating"
-            ),
-            commercial_attractiveness_rating=payload.get(
-                "commercial_attractiveness_rating"
-            ),
-            priority_rating=payload.get("priority_rating"),
-            next_appointment_date=payload.get("next_appointment_date"),
-            offer_reference=payload.get("offer_reference"),
-            order_reference=payload.get("order_reference"),
-        )
+        visit_report = _build_visit_report(final_report_id, payload)
         db.session.add(visit_report)
         db.session.flush()
         return _visit_report_reference(visit_report)
@@ -388,6 +342,67 @@ class MockCrmGateway:
         db.session.add(reminder)
         db.session.flush()
         return _reminder_reference(reminder)
+
+
+def _find_visit_report_by_final_report(
+    final_report_id: int,
+) -> MockVisitReport | None:
+    return MockVisitReport.query.filter_by(
+        final_report_id=final_report_id
+    ).one_or_none()
+
+
+def _build_visit_report(
+    final_report_id: int,
+    payload: dict[str, Any],
+) -> MockVisitReport:
+    _validate_visit_report_payload(payload)
+    return MockVisitReport(
+        final_report_id=final_report_id,
+        visit_report_number=_next_visit_report_number(),
+        visit_type=payload["visit_type"],
+        visit_report_status=payload.get(
+            "visit_report_status",
+            VisitReportStatus.CLOSED.value,
+        ),
+        report_status=payload.get("report_status", VisitReportStatus.CLOSED.value),
+        account_id=payload.get("account_id"),
+        account_number=payload.get("account_number"),
+        account_type=payload.get("account_type"),
+        account_search_name=payload.get("account_search_name"),
+        contact_id=payload.get("contact_id"),
+        contact_name=payload.get("contact_name"),
+        field_sales_representative_id=payload.get("field_sales_representative_id"),
+        responsible_user_id=payload.get("responsible_user_id"),
+        visit_date=payload.get("visit_date"),
+        visit_time=payload.get("visit_time"),
+        target_topic=payload["target_topic"],
+        info_text=payload["info_text"],
+        agreement_text=payload["agreement_text"],
+        strength_text=payload.get("strength_text"),
+        weakness_text=payload.get("weakness_text"),
+        customer_satisfaction_rating=payload.get("customer_satisfaction_rating"),
+        technical_attractiveness_rating=payload.get("technical_attractiveness_rating"),
+        commercial_attractiveness_rating=payload.get(
+            "commercial_attractiveness_rating"
+        ),
+        priority_rating=payload.get("priority_rating"),
+        next_appointment_date=payload.get("next_appointment_date"),
+        offer_reference=payload.get("offer_reference"),
+        order_reference=payload.get("order_reference"),
+    )
+
+
+def _validate_visit_report_payload(payload: dict[str, Any]) -> None:
+    _validate_required_payload(
+        payload,
+        required_keys=(
+            "visit_type",
+            "target_topic",
+            "info_text",
+            "agreement_text",
+        ),
+    )
 
 
 def get_crm_gateway() -> CrmGateway:

@@ -887,8 +887,6 @@ def _apply_follow_up_shortcut(
 ) -> None:
     if current_step.key not in {"info_text", "agreement_text"}:
         return
-    if current_step.key == "next_action":
-        return
     if "next_action" in completed_before_message:
         return
     if any(applied_step.key == "next_action" for applied_step in applied_steps):
@@ -1633,7 +1631,7 @@ def _is_ready_for_review(draft: ReportDraft) -> bool:
 
 
 def _review_text(draft: ReportDraft, ai_service: AiService | None) -> str | None:
-    return _cached_ai_text(
+    return _cached_or_generated_ai_text(
         draft=draft,
         cache_key="review_text",
         fallback_text=None,
@@ -1644,7 +1642,7 @@ def _review_text(draft: ReportDraft, ai_service: AiService | None) -> str | None
 
 def _final_report_text(draft: ReportDraft, ai_service: AiService | None) -> str:
     fallback_text = _build_final_report_text(draft)
-    generated_text = _cached_ai_text(
+    generated_text = _cached_or_generated_ai_text(
         draft=draft,
         cache_key="final_report_text",
         fallback_text=fallback_text,
@@ -1655,7 +1653,7 @@ def _final_report_text(draft: ReportDraft, ai_service: AiService | None) -> str:
     return generated_text or fallback_text
 
 
-def _cached_ai_text(
+def _cached_or_generated_ai_text(
     draft: ReportDraft,
     cache_key: str,
     fallback_text: str | None,
@@ -1681,8 +1679,7 @@ def _cached_ai_text(
     if not cleaned_text:
         return fallback_text
 
-    _store_ai_cache_value(draft, cache_key, cleaned_text)
-    db.session.commit()
+    _persist_generated_ai_text(draft, cache_key, cleaned_text)
     return cleaned_text
 
 
@@ -1702,6 +1699,15 @@ def _store_ai_cache_value(
         **draft_data,
         AI_CACHE_KEY: ai_cache,
     }
+
+
+def _persist_generated_ai_text(
+    draft: ReportDraft,
+    cache_key: str,
+    generated_text: str,
+) -> None:
+    _store_ai_cache_value(draft, cache_key, generated_text)
+    db.session.commit()
 
 
 def _clear_ai_cache(draft: ReportDraft) -> None:
