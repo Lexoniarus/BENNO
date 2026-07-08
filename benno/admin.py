@@ -3,8 +3,8 @@
 from flask import Blueprint, render_template
 
 from benno.auth import admin_required
-from benno.enums import InsideSalesTaskStatus, ReportStatus
-from benno.models import Chat, FinalReport, GlobalSetting, InsideSalesTask, User
+from benno.enums import ReminderStatus, ReportStatus
+from benno.models import Chat, FinalReport, GlobalSetting, MockReminder, User
 
 admin_blueprint = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -47,8 +47,8 @@ def _build_status_overview() -> dict[str, int]:
         "open_chats": Chat.query.filter_by(
             status=ReportStatus.IN_PROGRESS.value
         ).count(),
-        "open_inside_sales_tasks": InsideSalesTask.query.filter_by(
-            status=InsideSalesTaskStatus.OPEN.value
+        "open_reminders": MockReminder.query.filter_by(
+            status=ReminderStatus.OPEN.value
         ).count(),
         "total_users": User.query.count(),
     }

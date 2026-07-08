@@ -42,7 +42,8 @@ The following topics appeared in earlier notes but are not current implementatio
 - Gemini is the first real AI provider for the current MVP baseline.
 - FastAPI and React are not the current first-slice stack.
 - Sales users do not choose the AI provider.
-- SQLite is sufficient for the MVP.
+- SQLite is sufficient for the current local mock backend; Postgres remains a
+  later MVP persistence step behind the CRM/eNVenta gateway boundary.
 - The first implementation starts with text, not voice.
 - Local AI is a later privacy-oriented provider step after the Gemini workflow is stable.
 - The exact eNVenta field mapping waits for Bernd's field list and must distinguish user input, derivation, master data, login context, and eNVenta system metadata.

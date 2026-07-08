@@ -135,7 +135,8 @@ This stack is intentionally pragmatic:
 
 - Flask fits a Python-centered MVP.
 - Jinja and Vanilla JavaScript are sufficient for the first chat UI.
-- SQLite is sufficient for local mock data and MVP persistence.
+- SQLite is sufficient for the current local mock backend. A later MVP step may
+  move persistence to Postgres behind the same CRM/eNVenta gateway boundary.
 - The application remains a responsive web app, not a native mobile app.
 
 ## 8. Architecture
@@ -648,10 +649,10 @@ The following decisions define the current MVP direction:
 | Provider selection by user | Removed from sales UI; provider is an admin setting |
 | Gemini | First real LLM provider |
 | Local provider | Planned after the Gemini workflow is stable, using an OpenAI-compatible local API |
-| Ratings | Six ratings on a 1-10 scale are mandatory |
-| Task types | Use four canonical inside sales task types |
+| Ratings | Phase 6 uses the four eNVenta ratings: customer satisfaction, technical attractiveness, commercial attractiveness, and priority |
+| Follow-up work | Phase 6 writes eNVenta-like reminders instead of the legacy inside-sales task target |
 | CRM | Placeholder CRM/ERP counterpart, not application core |
-| Database | SQLite is sufficient for the MVP, using mock tables that reflect the expected eNVenta data shape once the field list is available |
+| Database | SQLite is the current local mock backend; Postgres can be introduced later behind the same CRM/eNVenta gateway |
 | Admin status overview | Keep it simple in the first slice; expand later only if time allows |
 | Voice | Target layer after text workflow, not part of Vertical Slice 1 |
 | STT/TTS timing | Add and test STT/TTS after a stable text-based report can be created and saved with Gemini |
@@ -664,10 +665,10 @@ The following decisions remain open, deferred, or dependent on external input:
 
 | Topic | Current status |
 |---|---|
-| Gemini model | Default for Phase 5 is `gemini-2.5-flash-lite`; `gemini-3.1-flash-lite` remains a later comparison model |
-| Local LLM candidates | Deferred until the Gemini workflow is stable |
-| eNVenta visit report fields | Pending Bernd's field list, expected Friday, June 26, 2026 |
-| Placeholder CRM/ERP API contract | Pending the eNVenta field list; define the contract once the required fields are known |
+| Gemini model | Current local test setting is `gemini-3.1-flash-lite`; Gemini Free Tier rate limits make a local LM Studio/OpenAI-compatible fallback important for continued testing |
+| Local LLM candidates | Next provider work should evaluate LM Studio through an OpenAI-compatible local API |
+| eNVenta visit report fields | First screenshot-based field mapping is documented; Phase 6 uses an eNVenta-shaped mock target rather than a real eNVenta API |
+| Placeholder CRM/ERP API contract | Phase 6 defines an internal CRM/eNVenta gateway boundary backed by local mock tables; Postgres or real eNVenta access can replace the backend later |
 | Setup/password reset token flow | Needs clarification: decide whether the first slice needs real setup/reset tokens or only seeded demo users |
 
 ## 30. Next Implementation Step

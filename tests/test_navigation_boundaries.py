@@ -7,12 +7,22 @@ from werkzeug.security import generate_password_hash
 from benno.enums import (
     MessageSender,
     MessageType,
+    ReminderOwnerType,
+    ReminderStatus,
     ReportStatus,
     SessionLanguage,
     UserRole,
+    VisitType,
 )
 from benno.extensions import db
-from benno.models import Chat, ChatMessage, FinalReport, User
+from benno.models import (
+    Chat,
+    ChatMessage,
+    FinalReport,
+    MockReminder,
+    MockVisitReport,
+    User,
+)
 from benno.seed import seed_database
 
 
@@ -80,6 +90,38 @@ def test_admin_pages_do_not_render_chat_or_report_content(app) -> None:
         assert response.status_code == 200
         assert b"SECRET CHAT TEXT" not in response.data
         assert b"SECRET REPORT TEXT" not in response.data
+
+
+def test_admin_dashboard_counts_phase_6_mock_reminders(app) -> None:
+    seed_database()
+    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    chat = Chat(sales_user=sales_user, status=ReportStatus.CONFIRMED.value)
+    report = _create_final_report(chat, sales_user, "Reminder report text")
+    visit_report = MockVisitReport(
+        visit_report_number="VR-TEST-001",
+        final_report=report,
+        visit_type=VisitType.PHONE.value,
+        target_topic="Follow-up",
+        info_text="Follow-up discussion.",
+        agreement_text="Inside sales should call back.",
+    )
+    reminder = MockReminder(
+        visit_report_number="VR-TEST-001",
+        owner_type=ReminderOwnerType.CRM_USER.value,
+        owner_id=1,
+        message="Bitte nachfassen.",
+        status=ReminderStatus.OPEN.value,
+    )
+    db.session.add_all([chat, report, visit_report, reminder])
+    db.session.commit()
+
+    with app.test_client() as client:
+        _login(client, "admin@benno.local", "admin-demo-password")
+        response = client.get("/admin")
+
+    assert response.status_code == 200
+    assert b"Open Reminders" in response.data
+    assert b"1" in response.data
 
 
 def _create_sales_user(email: str) -> User:
