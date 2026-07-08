@@ -18,6 +18,12 @@ BENNO should not behave like a rigid form. The field sales user may start freely
 
 If the first user message already contains enough information, BENNO should move directly toward a block-based review instead of creating artificial extra questions.
 
+When a message contains an implied but not fully explicit value, Gemini should
+either extract it with a useful suggestion or ask a contextual clarification.
+BENNO should not fall back to generic form wording after a rich user message.
+The next assistant question should briefly reflect what was understood and then
+ask only for the next missing or uncertain requirement.
+
 ## Phase 6 eNVenta Conversation Shape
 
 Phase 6 should adapt the conversation to the eNVenta target fields without
@@ -51,6 +57,12 @@ The concrete German questions should be derived from the target fields and then
 tested against real Gemini behavior. They are not fixed as a hard form script.
 If Gemini reliably extracts several fields from one answer, BENNO should skip
 the redundant follow-up questions.
+
+For example, if the user says "ich war bei einem neuen potenziellen Kunden",
+Gemini should treat `visit_type = in_person` as a strong candidate. If the
+wording is still ambiguous, the assistant should ask a contextual confirmation
+such as whether the meeting was on site or by phone/video, while mentioning the
+new-lead context it already understood.
 
 ## Phase 6 Report Requirements
 
@@ -157,6 +169,12 @@ Suggested handling:
 
 The confidence score is an internal debugging and control value. It is not a mathematically reliable probability.
 
+Clarification questions should be contextual. If BENNO has already extracted
+useful facts, the assistant should acknowledge one or two of them before asking
+about the uncertain field. A low-confidence `visit_type` question should not be
+the bare fallback question if the message already described the account, lead,
+or next action.
+
 ## Target Sections
 
 Each detected intent should include the affected report sections.
@@ -251,6 +269,12 @@ must not keep both rating sets in parallel.
 The Gemini-assisted text loop should feel like a guided conversation, not a rigid field form.
 
 If one user message clearly contains several report facts, BENNO should capture all valid sections at once and move to the next genuinely missing item.
+
+If one user message contains a likely but uncertain field value, BENNO should
+prefer a short confirmation question over ignoring the user's wording. The LLM
+is responsible for proposing this conversational clarification; the backend
+validates the proposed value and keeps deterministic fallback wording only as a
+safety net.
 
 Examples:
 

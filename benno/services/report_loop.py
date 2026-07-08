@@ -773,6 +773,14 @@ def _apply_flow_shortcuts(
 ) -> None:
     _apply_lead_context_signal(draft, message_text)
     _apply_inside_sales_follow_up_signal(draft, current_step, message_text)
+    _apply_visit_type_shortcut(
+        draft,
+        current_step,
+        message_text,
+        completed_before_message,
+        applied_steps,
+        crm_gateway,
+    )
     _apply_no_offer_order_shortcut(
         draft,
         current_step,
@@ -821,6 +829,28 @@ def _apply_inside_sales_follow_up_signal(
         **_draft_data(draft),
         INSIDE_SALES_FOLLOW_UP_KEY: True,
     }
+
+
+def _apply_visit_type_shortcut(
+    draft: ReportDraft,
+    current_step: ReportStep,
+    message_text: str,
+    completed_before_message: set[str],
+    applied_steps: list[ReportStep],
+    crm_gateway: CrmGateway,
+) -> None:
+    if "visit_type" in completed_before_message:
+        return
+    if any(applied_step.key == "visit_type" for applied_step in applied_steps):
+        return
+    if _parse_visit_type(message_text) is None:
+        return
+
+    visit_type_step = _step_by_key("visit_type")
+    if _step_index(visit_type_step) < _step_index(current_step):
+        return
+    if _apply_step_answer(draft, visit_type_step, message_text, crm_gateway):
+        applied_steps.append(visit_type_step)
 
 
 def _apply_no_offer_order_shortcut(

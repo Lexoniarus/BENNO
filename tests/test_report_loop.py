@@ -107,6 +107,48 @@ def test_ai_analysis_can_fill_multiple_phase_6_sections_from_one_message(app) ->
     )
 
 
+def test_visit_type_is_inferred_from_free_visit_context_message(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+
+    process_report_message_with_ai(
+        chat,
+        (
+            "ich war bei einem neuen potenziellen Kunden, die waren voll der "
+            "Hammer und haben bock auf uns. Innendienst soll mal ein "
+            "Musterangebot fuer ein BalkonSolar erstellen und an Frau Mueller "
+            "schicken"
+        ),
+        _FakeAiService(
+            analysis=AiMessageAnalysis(
+                intent=UserIntent.ANSWER,
+                intent_confidence=0.95,
+                target_sections=[
+                    "visit_context",
+                    "next_action",
+                    "offer_reference",
+                ],
+                section_updates={
+                    "visit_context": "neuer potenzieller Kunde",
+                    "next_action": (
+                        "Innendienst soll Musterangebot fuer BalkonSolar an "
+                        "Frau Mueller schicken"
+                    ),
+                    "offer_reference": "Musterangebot",
+                },
+            )
+        ),
+    )
+
+    draft = chat.report_draft
+    assert draft.visit_type == VisitType.IN_PERSON.value
+    assert "visit_type" in draft.draft_data_json["completed_steps"]
+    assert draft.draft_data_json["current_step"] == "participants"
+    assert chat.messages[-1].message_text != (
+        "War der Besuch persönlich, virtuell oder telefonisch?"
+    )
+
+
 def test_rating_clues_are_extracted_from_later_bundle_without_ai_rating_update(
     app,
 ) -> None:

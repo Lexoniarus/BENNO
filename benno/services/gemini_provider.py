@@ -62,6 +62,9 @@ Set suggested_next_section to the requirement key that should be asked next afte
 your proposed section_updates are applied. Ask only for one next requirement, or
 one compact rating block when ratings are next. If no useful suggestion is safe,
 leave suggested_next_question empty.
+When useful facts were extracted, suggested_next_question may briefly
+acknowledge one or two of them in German before asking the next missing
+requirement. Keep it short and do not sound like a generic form.
 
 Allowed intents:
 answer, correction, additional_info, confirmation, rejection, repeat, cancel, unknown.
@@ -83,11 +86,20 @@ Example:
 Do not return section_updates as an object with dynamic section keys.
 
 German extraction examples:
-- "Ich war bei PerfSolar" -> visit_context = "PerfSolar".
+- "Ich war bei PerfSolar" -> visit_context = "PerfSolar"; visit_type = "persoenlich".
+- "Ich war bei einem neuen potenziellen Kunden" ->
+  visit_context = "neuer potenzieller Kunde"; visit_type = "persoenlich".
+- "Ich habe telefoniert / Telefonat mit PerfSolar" -> visit_type = "telefonisch".
+- "Teams-Termin / Zoom / virtuell mit PerfSolar" -> visit_type = "virtuell".
 - "mit Frau Müller" -> participants = "Frau Müller".
 - "über den Forecast gesprochen" -> target_topic = "Forecast".
 - "über eine mögliche Kooperation gesprochen" -> target_topic = "mögliche Kooperation".
 - "Wir haben uns über den Forecast unterhalten" -> target_topic = "Forecast".
+- "die waren voll der Hammer / haben Bock auf uns" ->
+  strength_text = "Sehr positive Resonanz und Interesse".
+- "Musterangebot erstellen und an Frau Müller schicken" ->
+  next_action = "Musterangebot erstellen und an Frau Müller schicken";
+  offer_reference = "Musterangebot".
 - "Sie wollen Muster und wir reden in 2 Wochen drüber" ->
   agreement_text = "Kunde möchte Muster"; next_action = "Gespräch in 2 Wochen".
 - "nee die sind Lead, da muss der Innendienst nochmal anrufen" ->
