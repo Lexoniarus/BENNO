@@ -53,9 +53,10 @@ Conceptually:
 - one chat has many chat messages
 - one chat has one current report draft
 - one report draft can become one final report
-- one final report can create multiple inside sales tasks
-- one mock customer can have multiple contacts
-- one mock customer can have multiple offers and orders
+- one final report can create one mock eNVenta visit report
+- one mock visit report can create multiple reminders
+- one mock account can have multiple contacts
+- one mock account can have multiple offers and orders
 
 ## Users
 
@@ -127,7 +128,7 @@ It stores:
 - ratings
 - missing sections
 - last question
-- inside sales task candidates
+- reminder and follow-up handoff signals
 
 Draft state should be structured and validatable. It should not be treated as one unstructured text blob.
 
@@ -320,7 +321,7 @@ Minimum mock reminder fields:
 `owner_type` should identify whether the reminder belongs to a CRM user or to a
 field sales representative.
 
-## Inside Sales Tasks
+## Legacy Inside Sales Tasks
 
 Inside sales tasks are the Phase 2/4 legacy follow-up concept. In Phase 6 they
 should be replaced or migrated into `mock_reminders` for the eNVenta-oriented
@@ -329,7 +330,7 @@ target model.
 Historically, inside sales tasks captured follow-up work that should not be done
 automatically by BENNO.
 
-Canonical MVP task types:
+Legacy task types:
 
 | Task Type | Purpose |
 |---|---|
@@ -405,31 +406,32 @@ Normal case:
 - customer and contact are validated
 - required sections are complete
 - user confirms final review
-- final report status becomes `submitted`
+- final report status becomes `confirmed`
+- a `mock_visit_report` is saved as the local eNVenta-shaped write target
 
 New or unknown contact:
 
 - report may be created
 - no contact master data is created automatically
-- inside sales task is created
+- reminder or review work may be created if follow-up is needed
 
 New lead:
 
 - report information may be captured
 - no customer is created automatically
-- inside sales task is created
+- reminder or review work may be created if follow-up is needed
 
 Unclear master data:
 
 - report should not be treated as normally submitted
-- inside sales task is created
-- status may become `inside_sales_input_required` or `blocked`
+- reminder or review work may be created
+- status may remain `confirmed` locally while the mock CRM/eNVenta handoff marks unresolved references in the report text
 
 New offer needed:
 
 - report captures the need
 - offer is not created automatically
-- inside sales task is created
+- reminder or review work may be created
 
 ## API Shape For The First Slice
 

@@ -32,7 +32,7 @@ The assistant should help with:
 - identifying missing mandatory information
 - validating customer, contact, offer, and order references
 - documenting follow-up actions
-- preparing inside sales tasks when master data or follow-up work is required
+- preparing eNVenta-like reminders when follow-up work is required
 
 ## 4. MVP Scope
 
@@ -67,7 +67,7 @@ The MVP includes:
 - block-by-block final review
 - explicit final confirmation
 - local persistence of final reports
-- inside sales tasks for selected follow-up cases
+- eNVenta-like reminders for selected follow-up cases
 - backend debug logging
 
 Current scope boundaries:
@@ -75,7 +75,7 @@ Current scope boundaries:
 - The first vertical slice is text-based.
 - STT and TTS are added after the text-based Gemini workflow can create and save a stable report.
 - The MVP uses a local placeholder CRM/ERP service before any real eNVenta integration.
-- The exact eNVenta visit report field mapping is added once the field list is available.
+- The first screenshot-based eNVenta visit report field mapping is documented and used for the Phase 6 mock target.
 - The admin area stays simple in the first slice.
 - The MVP uses a pragmatic login and user setup flow, not a full production identity management system.
 
@@ -169,7 +169,7 @@ The backend is the central application layer. It owns:
 - AI provider calls
 - placeholder CRM/ERP access
 - final persistence
-- inside sales task creation
+- mock visit report and reminder creation
 
 The LLM supports interpretation and formulation. The application code remains responsible for validation and decisions.
 
@@ -302,14 +302,20 @@ The report draft is organized into report sections.
 ```python
 class ReportSection(str, Enum):
     CUSTOMER_CONTEXT = "customer_context"
+    VISIT_TYPE = "visit_type"
+    VISIT_DATE = "visit_date"
     CONTACTS = "contacts"
     VISIT_REASON = "visit_reason"
     SUMMARY = "summary"
     OUTCOME = "outcome"
     NEXT_ACTION = "next_action"
+    NEXT_APPOINTMENT_DATE = "next_appointment_date"
     OFFER_REFERENCE = "offer_reference"
     ORDER_REFERENCE = "order_reference"
+    STRENGTHS = "strengths"
+    WEAKNESSES = "weaknesses"
     RATINGS = "ratings"
+    REMINDERS = "reminders"
     FINAL_REPORT = "final_report"
     USER_CONFIRMATION = "user_confirmation"
 ```
@@ -319,14 +325,20 @@ Section meanings:
 | Section | Meaning |
 |---|---|
 | `customer_context` | Existing customer, existing lead, new lead, new address, or unclear context |
+| `visit_type` | In-person, virtual, or phone visit |
+| `visit_date` | Visit date |
 | `contacts` | Contact persons or meeting participants |
-| `visit_reason` | Reason for the visit |
-| `summary` | Main meeting summary |
-| `outcome` | Result, agreement, or meeting outcome |
+| `visit_reason` | Goal, topic, or reason for the visit |
+| `summary` | eNVenta `Info` text or main meeting summary |
+| `outcome` | eNVenta `Vereinbarung`, result, or meeting outcome |
 | `next_action` | Next step, follow-up, or follow-up date |
+| `next_appointment_date` | Concrete follow-up appointment or reminder date, if relevant |
 | `offer_reference` | Offer reference, if relevant |
 | `order_reference` | Order reference, if relevant |
-| `ratings` | Six sales evaluation values and explanations |
+| `strengths` | eNVenta `Stärke`, if known or derivable |
+| `weaknesses` | eNVenta `Schwäche`, if known or derivable |
+| `ratings` | Four eNVenta rating values and explanations |
+| `reminders` | eNVenta-like follow-up reminders, if relevant |
 | `final_report` | Written final visit report |
 | `user_confirmation` | Explicit final confirmation |
 
@@ -411,24 +423,22 @@ class CustomerContextType(str, Enum):
 
 The application must not automatically create customers, leads, addresses, or contacts.
 
-If a new lead, address, or contact is detected, the report can capture the information, but an inside sales task should be created for review or completion.
+If a new lead, address, or contact is detected, the report can capture the information. Follow-up or master-data work should become reviewable reminder or CRM handoff work, not an automatic master-data write.
 
 ## 19. Ratings
 
 The `ratings` section is mandatory.
 
-The MVP uses six rating fields on a scale from 1 to 10.
+Phase 6 uses the four eNVenta screenshot ratings as the authoritative MVP target. Each rating is from 1 to 10, or can be explicitly marked as not assessable yet with a short reason.
 
 | Rating | Meaning |
 |---|---|
-| Sales opportunity | How relevant the opportunity is from a sales perspective |
-| Meeting mood | How positive or difficult the meeting atmosphere was |
-| Priority | How much attention the case requires |
-| Closing probability | How likely a successful close appears |
-| Need for action | How urgent further action is |
-| Customer satisfaction | How satisfied the customer appears |
+| Customer satisfaction | eNVenta `Zufriedenheit`; how satisfied the customer appears |
+| Technical attractiveness | eNVenta `Techn. Attrakt.`; how technically attractive the case is |
+| Commercial attractiveness | eNVenta `Kaufm. Attrakt.`; how commercially attractive the case is |
+| Priority | eNVenta `Priorität`; how much attention the case requires |
 
-The assistant should infer ratings from the conversation where possible, provide short explanations, and ask the user to confirm or correct them.
+The assistant should infer these four ratings from the conversation where possible, provide short explanations, and ask the user to confirm or correct them.
 
 The final report text should be consistent with the ratings, but it does not need to mechanically repeat all numeric values.
 
@@ -461,44 +471,39 @@ Status meanings:
 
 `inside_sales_input_required` is not an error. It means the report was captured but cannot be considered fully complete in the CRM/ERP process until inside sales has finished a related task.
 
-## 21. Inside Sales Tasks
+## 21. eNVenta-Like Reminders
 
-For the MVP, four task types are sufficient.
+Phase 6 uses `mock_reminders` as the eNVenta-oriented follow-up target. Legacy inside sales task types may remain in code or older tests as scaffolding, but they are not the Phase 6 write target.
 
-```python
-class InsideSalesTaskType(str, Enum):
-    COMPLETE_MASTER_DATA = "complete_master_data"
-    CREATE_OFFER = "create_offer"
-    CLARIFY_DETAILS = "clarify_details"
-    FOLLOW_UP_CALL = "follow_up_call"
-```
+Reminder ownership can point to a CRM user or to a field sales representative.
 
-Task meanings:
+Minimum reminder fields:
 
-| Task Type | Purpose |
-|---|---|
-| `complete_master_data` | Customer, lead, address, or contact data must be completed |
-| `create_offer` | A new offer should be created |
-| `clarify_details` | Business details are unclear and must be clarified |
-| `follow_up_call` | A callback or follow-up is required |
+- `visit_report_number`
+- `due_date`
+- `owner_type`
+- `owner_id`
+- `created_by_user_id`
+- `message`
+- `status`
 
 ## 22. Placeholder CRM/ERP
 
-The MVP uses a local placeholder CRM/ERP service or API.
+The MVP uses an internal placeholder CRM/eNVenta gateway backed by local mock tables.
 
 The relevant external CRM/ERP product context is eNVenta by the eNVenta Group: https://www.enventa-group.com/.
 
 It simulates:
 
-- customer search
-- lead or address search
+- AKL-like account search
 - contact lookup
 - offer reference lookup
 - order reference lookup
-- visit report submission
-- inside sales task creation
+- CRM user and field sales representative lookup
+- mock visit report save
+- mock reminder creation
 
-The placeholder CRM/ERP is a counterpart, not the application core.
+The placeholder CRM/eNVenta gateway is a counterpart, not the application core.
 
 The frontend must never talk directly to CRM/ERP systems. All future CRM/ERP access goes through the application backend.
 
@@ -523,16 +528,18 @@ The first vertical slice needs these data areas:
 - report templates
 - report drafts
 - final reports
-- inside sales tasks
-- mock customers
-- mock leads
+- mock accounts
 - mock contacts
 - mock offers
 - mock orders
+- mock CRM users
+- mock field sales representatives
+- mock visit reports
+- mock reminders
 
-This list is not yet a final database schema. It defines the business storage areas needed for the first implementation.
+Legacy Phase 2 mock customer, lead, and inside-sales-task tables may remain during the transition, but the Phase 6 target contract uses accounts, mock visit reports, and reminders.
 
-The exact visit report fields from eNVenta CRM/ERP are expected as an external input on Friday, June 26, 2026. Until that field list is available, the MVP should not invent a final field mapping. The current report sections remain the internal working structure for the first vertical slice.
+This list is still not a final eNVenta API schema. It defines the local mock storage areas needed to prove the MVP flow.
 
 ## 24. Authentication And Registration
 
@@ -574,7 +581,7 @@ It should include:
 - order reference, if relevant
 - ratings with short explanations
 - final written report
-- inside sales tasks, if any
+- eNVenta-like reminders, if any
 - report status
 
 The assistant then asks for explicit confirmation.

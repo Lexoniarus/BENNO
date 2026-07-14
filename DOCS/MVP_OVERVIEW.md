@@ -81,7 +81,7 @@ Its job is to help turn free language into a usable report. This includes:
 - asking for missing visit report fields
 - asking targeted follow-up questions
 - processing corrections
-- suggesting ratings such as sales opportunity or urgency
+- suggesting the four eNVenta-oriented ratings for satisfaction, technical attractiveness, commercial attractiveness, and priority
 - wording the final report clearly
 
 Business decisions should not be blindly delegated to the AI. The application checks what may be saved, which information is missing, and whether the user has really confirmed the final result.
@@ -195,7 +195,7 @@ Not every visit report is finished when it is saved. Customer meetings often cre
 - Master data is missing or unclear.
 - Inside sales needs to clarify details.
 
-BENNO should detect this follow-up work and turn it into simple reminders or inside sales tasks.
+BENNO should detect this follow-up work and turn it into simple eNVenta-like reminders. Older inside-sales-task wording belongs to early scaffolding, not the current Phase 6 target.
 
 Example:
 
