@@ -1,5 +1,10 @@
 """Tests for BENNO AI provider configuration."""
 
+from types import SimpleNamespace
+from typing import Any
+
+import pytest
+
 from benno import create_app
 from benno.enums import UserIntent
 from benno.services.ai_prompts import (
@@ -15,6 +20,7 @@ from benno.services.ai_provider import (
 from benno.services.gemini_provider import (
     GeminiMessageAnalysis,
     GeminiSectionUpdate,
+    GeminiService,
     _build_analysis_content,
     _build_next_question_prompt,
     _convert_gemini_analysis,
@@ -175,3 +181,69 @@ def test_gemini_next_question_prompt_uses_conversation_system_instruction() -> N
     assert "Use next_step as the target" in NEXT_QUESTION_SYSTEM_INSTRUCTION
     assert "Validated conversation state:" in prompt
     assert "PerfSolar" in prompt
+
+
+def test_gemini_structured_content_rejects_malformed_json() -> None:
+    service = _fake_gemini_service(SimpleNamespace(text="{not-json"))
+
+    with pytest.raises(AiProviderError, match="malformed JSON"):
+        service._generate_structured_content(
+            name="test-analysis",
+            prompt="prompt",
+            response_schema=GeminiMessageAnalysis,
+            system_instruction="system",
+            temperature=0.1,
+        )
+
+
+def test_gemini_text_generation_trims_response_text() -> None:
+    service = _fake_gemini_service(SimpleNamespace(text="  Antwort auf Deutsch  "))
+
+    response = service._generate_text(
+        name="test-text",
+        prompt="prompt",
+        system_instruction="system",
+        temperature=0.2,
+    )
+
+    assert response == "Antwort auf Deutsch"
+
+
+def test_gemini_text_generation_returns_none_for_empty_text() -> None:
+    service = _fake_gemini_service(SimpleNamespace(text="   "))
+
+    response = service._generate_text(
+        name="test-text",
+        prompt="prompt",
+        system_instruction="system",
+        temperature=0.2,
+    )
+
+    assert response is None
+
+
+def _fake_gemini_service(response: Any) -> GeminiService:
+    service = object.__new__(GeminiService)
+    service._client = _FakeGeminiClient(response)
+    service._model = "gemini-test-model"
+    service._types = _FakeGeminiTypes
+    return service
+
+
+class _FakeGeminiClient:
+    def __init__(self, response: Any) -> None:
+        self.models = _FakeGeminiModels(response)
+
+
+class _FakeGeminiModels:
+    def __init__(self, response: Any) -> None:
+        self._response = response
+
+    def generate_content(self, **kwargs: Any) -> Any:
+        return self._response
+
+
+class _FakeGeminiTypes:
+    class GenerateContentConfig:
+        def __init__(self, **kwargs: Any) -> None:
+            self.values = kwargs
