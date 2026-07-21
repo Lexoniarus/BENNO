@@ -74,7 +74,7 @@ def test_wrong_password_stays_on_login_with_controlled_error(app) -> None:
         response = _login(client, "sales@benno.local", "wrong-password")
 
     assert response.status_code == 200
-    assert b"Invalid email or password." in response.data
+    assert "E-Mail oder Passwort ist ungültig.".encode() in response.data
 
 
 def test_inactive_user_cannot_log_in(app) -> None:
@@ -93,7 +93,7 @@ def test_inactive_user_cannot_log_in(app) -> None:
         response = _login(client, "inactive@example.invalid", "secret")
 
     assert response.status_code == 200
-    assert b"Invalid email or password." in response.data
+    assert "E-Mail oder Passwort ist ungültig.".encode() in response.data
 
 
 def test_logout_clears_access(app) -> None:

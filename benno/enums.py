@@ -164,6 +164,13 @@ class UserRole(StrEnum):
     ADMIN = "admin"
 
 
+class UserSetupTokenPurpose(StrEnum):
+    """Purpose codes for local setup and password reset links."""
+
+    SETUP = "setup"
+    RESET = "reset"
+
+
 class ValidationStatus(StrEnum):
     """Validation status for CRM/ERP references."""
 

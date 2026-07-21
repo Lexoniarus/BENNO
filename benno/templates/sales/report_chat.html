@@ -5,15 +5,23 @@
 
 {% block content %}
   <section class="page-section page-section--report" aria-labelledby="report-chat-title">
-    <p class="hero__eyebrow">Vertriebsbereich</p>
-    <h1 id="report-chat-title">Besuchsbericht #{{ chat.id }}</h1>
-    <p class="ai-status ai-status--{{ ai_status.state }}">{{ ai_status.label }}</p>
+    {% set answers = draft.draft_data_json.get("answers", {}) if draft else {} %}
+    <div class="report-context">
+      <div>
+        <p class="hero__eyebrow">Vertriebsbereich</p>
+        <h1 id="report-chat-title">Besuchsbericht</h1>
+        <p class="context-line">
+          {{ answers.get("visit_context") or answers.get("target_topic") or "Bericht #" ~ chat.id }}
+        </p>
+      </div>
+      <p class="ai-status ai-status--{{ ai_status.state }}">{{ ai_status.label }}</p>
+    </div>
 
     <div class="report-layout">
       <div class="chat-panel" data-chat-panel aria-label="Nachrichten im Berichts-Chat">
         {% for message in chat.messages %}
           <article class="chat-message chat-message--{{ message.sender }}">
-            <span>{{ message.sender }}</span>
+            <span>{{ "BENNO" if message.sender == "assistant" else "Du" }}</span>
             <p>{{ message.message_text }}</p>
           </article>
         {% endfor %}
@@ -21,11 +29,10 @@
 
       <aside class="progress-panel" aria-label="Berichtsfortschritt">
         <h2>Fortschritt</h2>
+        <div class="progress-strip">
+          <span>{{ status_labels.get(chat.status, chat.status) }}</span>
+        </div>
         <dl class="definition-list definition-list--compact">
-          <div>
-            <dt>Status</dt>
-            <dd>{{ status_labels.get(chat.status, chat.status) }}</dd>
-          </div>
           <div>
             <dt>Fehlende Bereiche</dt>
             <dd>
@@ -55,8 +62,10 @@
     {% elif chat.status == "in_progress" %}
       <form class="form-stack report-form" data-report-form method="post" action="{{ url_for('sales.report_message', chat_id=chat.id) }}">
         <label for="message">Deine Antwort</label>
-        <textarea id="message" name="message" rows="4" required></textarea>
-        <button class="button" type="submit">Senden</button>
+        <div class="message-composer">
+          <textarea id="message" name="message" rows="4" required></textarea>
+          <button class="button button--icon" type="submit" aria-label="Nachricht senden">Senden</button>
+        </div>
       </form>
     {% elif chat.status == "confirmed" and chat.final_report %}
       <div class="action-row">

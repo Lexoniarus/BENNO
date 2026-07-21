@@ -21,6 +21,7 @@ Use these documents for current implementation and product work:
 | `ENVENTA_FIELD_NOTES.md` | First eNVenta visit report field observations and source classification |
 | `USER_ADMIN_SETTINGS.md` | Users, roles, admin scope, language and provider settings |
 | `AI_VOICE_PRIVACY.md` | Provider strategy, Langfuse observability, voice layer, local provider direction, privacy |
+| `FRONTEND_UX_SPEC.md` | S:FLEX-near frontend direction, Sales/Admin UX rules, visual acceptance |
 
 ## Archived Source Mapping
 
@@ -48,7 +49,8 @@ The following topics appeared in earlier notes but are not current implementatio
 - Local AI is a later privacy-oriented provider step after the Gemini workflow is stable.
 - Langfuse is an optional development observability layer, not a business workflow dependency.
 - The exact eNVenta field mapping waits for Bernd's field list and must distinguish user input, derivation, master data, login context, and eNVenta system metadata.
-- The first slice uses seeded users instead of setup/reset links.
+- Seeded users remain available for local testing; Phase 8 adds local setup and
+  reset links without email delivery.
 
 ## Documentation Rule Going Forward
 

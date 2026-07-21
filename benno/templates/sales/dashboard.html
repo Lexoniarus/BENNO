@@ -4,26 +4,38 @@
 {% block shell_class %}app-shell--page{% endblock %}
 
 {% block content %}
-  <section class="page-section" aria-labelledby="sales-title">
-    <p class="hero__eyebrow">Vertriebsbereich</p>
-    <h1 id="sales-title">Besuchsberichte</h1>
-    <div class="action-grid">
-      <a class="action-card" href="{{ url_for('sales.open_reports') }}">
+  <section class="page-section page-section--wide" aria-labelledby="sales-title">
+    <div class="section-heading">
+      <div>
+        <p class="hero__eyebrow">Vertriebsbereich</p>
+        <h1 id="sales-title">Besuchsberichte</h1>
+      </div>
+      <a class="button button--link" href="{{ url_for('sales.new_report') }}">Neuen Bericht starten</a>
+    </div>
+
+    <div class="metric-grid">
+      <a class="metric-card metric-card--link" href="{{ url_for('sales.open_reports') }}">
         <span>Offene Berichte</span>
         <strong>{{ open_report_count }}</strong>
       </a>
-      <a class="action-card" href="{{ url_for('sales.completed_reports') }}">
+      <a class="metric-card metric-card--link" href="{{ url_for('sales.completed_reports') }}">
         <span>Fertige Berichte</span>
         <strong>{{ completed_report_count }}</strong>
       </a>
-      <a class="action-card" href="{{ url_for('sales.options') }}">
-        <span>Optionen</span>
-        <strong>{{ current_user.preferred_language }}</strong>
-      </a>
-      <a class="action-card" href="{{ url_for('sales.new_report') }}">
-        <span>Neuer Bericht</span>
-        <strong>Starten</strong>
+      <a class="metric-card metric-card--link" href="{{ url_for('sales.options') }}">
+        <span>Sprache</span>
+        <strong>{{ "Deutsch" if current_user.preferred_language == "de" else "Englisch" }}</strong>
       </a>
     </div>
+
+    <article class="surface-panel surface-panel--intro">
+      <h2>Nächster Bericht</h2>
+      <p>
+        Starte direkt aus dem Gespräch heraus. BENNO sammelt die Angaben für
+        den eNVenta-nahen Besuchsbericht und zeigt vor dem Speichern eine
+        prüfbare Zusammenfassung.
+      </p>
+      <a class="button button--link" href="{{ url_for('sales.new_report') }}">Loslegen</a>
+    </article>
   </section>
 {% endblock %}

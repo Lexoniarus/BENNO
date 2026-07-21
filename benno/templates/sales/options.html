@@ -9,12 +9,16 @@
     <h1 id="sales-options-title">Optionen</h1>
     <dl class="definition-list">
       <div>
-        <dt>Email</dt>
+        <dt>E-Mail</dt>
         <dd>{{ current_user.email }}</dd>
       </div>
       <div>
         <dt>Sprache</dt>
-        <dd>{{ current_user.preferred_language }}</dd>
+        <dd>{{ "Deutsch" if current_user.preferred_language == "de" else "Englisch" }}</dd>
+      </div>
+      <div>
+        <dt>Provider</dt>
+        <dd>{{ current_user.ai_provider_override or "Globaler Standard" }}</dd>
       </div>
       <div>
         <dt>Externe Vertriebs-ID</dt>

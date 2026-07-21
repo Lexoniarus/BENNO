@@ -134,7 +134,7 @@ def test_admin_dashboard_counts_phase_6_mock_reminders(app) -> None:
         response = client.get("/admin")
 
     assert response.status_code == 200
-    assert b"Open Reminders" in response.data
+    assert b"Offene Wiedervorlagen" in response.data
     assert b"1" in response.data
 
 

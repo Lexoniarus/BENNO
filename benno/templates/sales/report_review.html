@@ -1,16 +1,23 @@
 {% extends "base.html" %}
 
-{% block title %}Bericht pr&uuml;fen - BENNO{% endblock %}
+{% block title %}Bericht prüfen - BENNO{% endblock %}
 {% block shell_class %}app-shell--page{% endblock %}
 
 {% block content %}
-  <section class="page-section" aria-labelledby="report-review-title">
-    <p class="hero__eyebrow">Vertriebsbereich</p>
-    <h1 id="report-review-title">Bericht pr&uuml;fen</h1>
+  <section class="page-section page-section--wide" aria-labelledby="report-review-title">
+    <div class="section-heading">
+      <div>
+        <p class="hero__eyebrow">Vertriebsbereich</p>
+        <h1 id="report-review-title">Bericht prüfen</h1>
+      </div>
+      <a class="button button--link button--secondary" href="{{ url_for('sales.report_chat', chat_id=chat.id) }}">
+        Zurück zum Chat
+      </a>
+    </div>
 
     {% if review.review_text %}
-      <article class="review-block review-block--wide">
-        <span>Pr&uuml;fzusammenfassung</span>
+      <article class="surface-panel surface-panel--intro">
+        <h2>Prüfzusammenfassung</h2>
         <p>{{ review.review_text }}</p>
       </article>
     {% endif %}
@@ -39,16 +46,13 @@
 
       <label for="correction_text">Korrektur</label>
       <textarea id="correction_text" name="correction_text" rows="3" required></textarea>
-      <button class="button" type="submit">Korrektur &uuml;bernehmen</button>
+      <button class="button" type="submit">Korrektur übernehmen</button>
     </form>
 
     <div class="action-row">
       <form method="post" action="{{ url_for('sales.confirm_report_route', chat_id=chat.id) }}">
-        <button class="button" type="submit">Best&auml;tigen und speichern</button>
+        <button class="button" type="submit">Bestätigen und speichern</button>
       </form>
-      <a class="button button--link" href="{{ url_for('sales.report_chat', chat_id=chat.id) }}">
-        Zur&uuml;ck zum Chat
-      </a>
     </div>
   </section>
 {% endblock %}

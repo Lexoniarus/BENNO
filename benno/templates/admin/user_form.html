@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}{{ form_title }} - BENNO{% endblock %}
+{% block shell_class %}app-shell--page{% endblock %}
+
+{% block content %}
+  <section class="page-section" aria-labelledby="user-form-title">
+    <p class="hero__eyebrow">Adminbereich</p>
+    <h1 id="user-form-title">{{ form_title }}</h1>
+
+    <form class="form-stack admin-form" method="post" action="{{ form_action }}">
+      <label for="username">Name</label>
+      <input
+        id="username"
+        name="username"
+        value="{{ user.username if user else '' }}"
+        autocomplete="name"
+        required
+      >
+
+      <label for="email">E-Mail</label>
+      <input
+        id="email"
+        name="email"
+        type="email"
+        value="{{ user.email if user else '' }}"
+        autocomplete="email"
+        required
+      >
+
+      <label for="role">Rolle</label>
+      <select id="role" name="role" required>
+        {% for value, label in choices.roles %}
+          <option value="{{ value }}" {% if user and user.role == value %}selected{% endif %}>
+            {{ label }}
+          </option>
+        {% endfor %}
+      </select>
+
+      <label for="preferred_language">Sprache</label>
+      <select id="preferred_language" name="preferred_language" required>
+        {% for value, label in choices.languages %}
+          <option
+            value="{{ value }}"
+            {% if (user and user.preferred_language == value) or (not user and value == "de") %}selected{% endif %}
+          >
+            {{ label }}
+          </option>
+        {% endfor %}
+      </select>
+
+      <label for="ai_provider_override">Provider-Override</label>
+      <select id="ai_provider_override" name="ai_provider_override">
+        <option value="">Standard verwenden</option>
+        {% for value, label in choices.providers %}
+          <option
+            value="{{ value }}"
+            {% if user and user.ai_provider_override == value %}selected{% endif %}
+          >
+            {{ label }}
+          </option>
+        {% endfor %}
+      </select>
+
+      <label class="checkbox-row" for="is_active">
+        <input
+          id="is_active"
+          name="is_active"
+          type="checkbox"
+          {% if not user or user.is_active %}checked{% endif %}
+        >
+        Aktiv
+      </label>
+
+      <div class="action-row">
+        <button class="button" type="submit">{{ submit_label }}</button>
+        <a class="button button--link button--secondary" href="{{ url_for('admin.users') }}">Abbrechen</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}

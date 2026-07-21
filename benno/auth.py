@@ -8,7 +8,9 @@ from flask_login import current_user, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash
 
 from benno.enums import UserRole
+from benno.extensions import db
 from benno.models import User
+from benno.services.admin_users import find_valid_setup_token, set_password_from_token
 
 auth_blueprint = Blueprint("auth", __name__)
 
@@ -75,7 +77,7 @@ def login():
             password=request.form.get("password", ""),
         )
         if user is None:
-            error_message = "Invalid email or password."
+            error_message = "E-Mail oder Passwort ist ungültig."
         else:
             login_user(user)
             return redirect_for_user(user)
@@ -83,10 +85,49 @@ def login():
     return render_template("auth/login.html", error_message=error_message)
 
 
+@auth_blueprint.route("/setup/<token>", methods=["GET", "POST"])
+def setup_password(token: str):
+    """Set a password through a local one-time setup or reset link."""
+    setup_token = find_valid_setup_token(token)
+    if setup_token is None:
+        return render_template(
+            "auth/setup_password.html",
+            error_message="Dieser Link ist ungültig oder abgelaufen.",
+            token=token,
+            user=None,
+        )
+
+    error_message = None
+    if request.method == "POST":
+        try:
+            set_password_from_token(
+                token,
+                request.form.get("password", ""),
+                request.form.get("password_confirmation", ""),
+            )
+            db.session.commit()
+        except ValueError as error:
+            db.session.rollback()
+            error_message = str(error)
+        else:
+            flash(
+                "Dein Passwort wurde gespeichert. Du kannst dich jetzt anmelden.",
+                "success",
+            )
+            return redirect(url_for("auth.login"))
+
+    return render_template(
+        "auth/setup_password.html",
+        error_message=error_message,
+        token=token,
+        user=setup_token.user,
+    )
+
+
 @auth_blueprint.get("/logout")
 @login_required
 def logout():
     """Log the current user out of BENNO."""
     logout_user()
-    flash("You have been logged out.", "info")
+    flash("Du wurdest abgemeldet.", "info")
     return redirect(url_for("auth.login"))

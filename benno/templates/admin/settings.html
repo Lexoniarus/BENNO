@@ -1,25 +1,39 @@
 {% extends "base.html" %}
 
-{% block title %}Admin Settings - BENNO{% endblock %}
+{% block title %}Einstellungen - BENNO{% endblock %}
 {% block shell_class %}app-shell--page{% endblock %}
 
 {% block content %}
   <section class="page-section" aria-labelledby="settings-title">
-    <p class="hero__eyebrow">Admin workspace</p>
-    <h1 id="settings-title">Global Settings</h1>
-    {% if global_setting %}
-      <dl class="definition-list">
-        <div>
-          <dt>Default Language</dt>
-          <dd>{{ global_setting.default_language }}</dd>
-        </div>
-        <div>
-          <dt>AI Provider</dt>
-          <dd>{{ global_setting.ai_provider }}</dd>
-        </div>
-      </dl>
-    {% else %}
-      <p class="empty-state">No global settings have been seeded yet.</p>
-    {% endif %}
+    <p class="hero__eyebrow">Adminbereich</p>
+    <h1 id="settings-title">Globale Einstellungen</h1>
+
+    <form class="form-stack admin-form" method="post" action="{{ url_for('admin.settings') }}">
+      <label for="default_language">Standardsprache</label>
+      <select id="default_language" name="default_language" required>
+        {% for value, label in choices.languages %}
+          <option
+            value="{{ value }}"
+            {% if global_setting and global_setting.default_language == value %}selected{% endif %}
+          >
+            {{ label }}
+          </option>
+        {% endfor %}
+      </select>
+
+      <label for="ai_provider">Globaler KI-Provider</label>
+      <select id="ai_provider" name="ai_provider" required>
+        {% for value, label in choices.providers %}
+          <option
+            value="{{ value }}"
+            {% if global_setting and global_setting.ai_provider == value %}selected{% endif %}
+          >
+            {{ label }}
+          </option>
+        {% endfor %}
+      </select>
+
+      <button class="button" type="submit">Einstellungen speichern</button>
+    </form>
   </section>
 {% endblock %}

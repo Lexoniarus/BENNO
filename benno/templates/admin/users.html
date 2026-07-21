@@ -1,33 +1,57 @@
 {% extends "base.html" %}
 
-{% block title %}Users - BENNO{% endblock %}
+{% block title %}Benutzer - BENNO{% endblock %}
 {% block shell_class %}app-shell--page{% endblock %}
 
 {% block content %}
-  <section class="page-section" aria-labelledby="users-title">
-    <p class="hero__eyebrow">Admin workspace</p>
-    <h1 id="users-title">Users</h1>
-    <div class="table-wrap">
-      <table>
+  <section class="page-section page-section--wide" aria-labelledby="users-title">
+    <div class="section-heading">
+      <div>
+        <p class="hero__eyebrow">Adminbereich</p>
+        <h1 id="users-title">Benutzer</h1>
+      </div>
+      <a class="button button--link" href="{{ url_for('admin.new_user') }}">Benutzer hinzufügen</a>
+    </div>
+
+    <div class="table-wrap report-table-wrap">
+      <table class="report-table">
         <thead>
           <tr>
-            <th>Email</th>
-            <th>Name</th>
-            <th>Role</th>
-            <th>Language</th>
-            <th>Active</th>
-            <th>Provider Override</th>
+            <th>Benutzer</th>
+            <th>Rolle</th>
+            <th>Sprache</th>
+            <th>Provider</th>
+            <th>Status</th>
+            <th>Berichte</th>
+            <th>Aktionen</th>
           </tr>
         </thead>
         <tbody>
-          {% for user in users %}
+          {% for row in user_rows %}
+            {% set user = row.user %}
             <tr>
-              <td>{{ user.email }}</td>
-              <td>{{ user.username }}</td>
-              <td>{{ user.role }}</td>
-              <td>{{ user.preferred_language }}</td>
-              <td>{{ "yes" if user.is_active else "no" }}</td>
-              <td>{{ user.ai_provider_override or "default" }}</td>
+              <td data-label="Benutzer">
+                <strong>{{ user.username }}</strong>
+                <span class="table-note">{{ user.email }}</span>
+              </td>
+              <td data-label="Rolle">{{ user.role }}</td>
+              <td data-label="Sprache">{{ user.preferred_language }}</td>
+              <td data-label="Provider">{{ user.ai_provider_override or "Standard" }}</td>
+              <td data-label="Status">{{ "Aktiv" if user.is_active else "Inaktiv" }}</td>
+              <td data-label="Berichte">
+                {{ row.open_chats }} offen / {{ row.completed_reports }} fertig
+              </td>
+              <td data-label="Aktionen">
+                <div class="table-actions">
+                  <a href="{{ url_for('admin.edit_user', user_id=user.id) }}">Bearbeiten</a>
+                  <form method="post" action="{{ url_for('admin.setup_link', user_id=user.id) }}">
+                    <button class="text-button text-button--small" type="submit">Setup-Link</button>
+                  </form>
+                  <form method="post" action="{{ url_for('admin.reset_link', user_id=user.id) }}">
+                    <button class="text-button text-button--small" type="submit">Reset-Link</button>
+                  </form>
+                </div>
+              </td>
             </tr>
           {% endfor %}
         </tbody>

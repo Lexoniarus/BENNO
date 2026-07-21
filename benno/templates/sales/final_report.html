@@ -4,74 +4,69 @@
 {% block shell_class %}app-shell--page{% endblock %}
 
 {% block content %}
-  <section class="page-section" aria-labelledby="final-report-title">
-    <p class="hero__eyebrow">Vertriebsbereich</p>
-    <h1 id="final-report-title">
-      {% if report.mock_visit_report %}
-        Besuchsbericht {{ report.mock_visit_report.visit_report_number }}
-      {% else %}
-        Besuchsbericht #{{ report.id }}
-      {% endif %}
-    </h1>
-
-    <dl class="definition-list">
-      {% if report.mock_visit_report %}
-        <div>
-          <dt>Kunde/Lead</dt>
-          <dd>{{ report.mock_visit_report.account_search_name or "Nicht erkannt" }}</dd>
-        </div>
-        <div>
-          <dt>Ziel/Thema</dt>
-          <dd>{{ report.mock_visit_report.target_topic }}</dd>
-        </div>
-        <div>
-          <dt>Info</dt>
-          <dd>{{ report.mock_visit_report.info_text }}</dd>
-        </div>
-        <div>
-          <dt>Vereinbarung</dt>
-          <dd>{{ report.mock_visit_report.agreement_text }}</dd>
-        </div>
-        <div>
-          <dt>Stärke</dt>
-          <dd>{{ report.mock_visit_report.strength_text or "Nicht angegeben" }}</dd>
-        </div>
-        <div>
-          <dt>Schwäche</dt>
-          <dd>{{ report.mock_visit_report.weakness_text or "Nicht angegeben" }}</dd>
-        </div>
-      {% endif %}
+  <section class="page-section page-section--wide" aria-labelledby="final-report-title">
+    <div class="section-heading">
       <div>
-        <dt>Status</dt>
-        <dd>{{ status_labels.get(report.status, report.status) }}</dd>
-      </div>
-      <div>
-        <dt>Interne Zusammenfassung</dt>
-        <dd>{{ report.summary }}</dd>
-      </div>
-      <div>
-        <dt>Interne Vereinbarung</dt>
-        <dd>{{ report.outcome or "Nicht angegeben" }}</dd>
-      </div>
-      <div>
-        <dt>Nächster Schritt</dt>
-        <dd>{{ report.next_action or "Nicht angegeben" }}</dd>
-      </div>
-      <div>
-        <dt>Wiedervorlagen</dt>
-        <dd>
+        <p class="hero__eyebrow">Vertriebsbereich</p>
+        <h1 id="final-report-title">
           {% if report.mock_visit_report %}
-            {{ report.mock_visit_report.reminders | length }}
+            Besuchsbericht {{ report.mock_visit_report.visit_report_number }}
           {% else %}
-            0
+            Besuchsbericht #{{ report.id }}
           {% endif %}
-        </dd>
+        </h1>
       </div>
-    </dl>
+      <a class="button button--link button--secondary" href="{{ url_for('sales.completed_reports') }}">
+        Fertige Berichte
+      </a>
+    </div>
 
-    <article class="review-block review-block--wide">
-      <span>Finaler Berichtstext</span>
-      <pre>{{ report.final_report_text }}</pre>
-    </article>
+    <div class="final-report-layout">
+      <dl class="definition-list">
+        {% if report.mock_visit_report %}
+          <div>
+            <dt>Kunde/Lead</dt>
+            <dd>{{ report.mock_visit_report.account_search_name or "Nicht erkannt" }}</dd>
+          </div>
+          <div>
+            <dt>Ziel/Thema</dt>
+            <dd>{{ report.mock_visit_report.target_topic }}</dd>
+          </div>
+          <div>
+            <dt>Info</dt>
+            <dd>{{ report.mock_visit_report.info_text }}</dd>
+          </div>
+          <div>
+            <dt>Vereinbarung</dt>
+            <dd>{{ report.mock_visit_report.agreement_text }}</dd>
+          </div>
+          <div>
+            <dt>Stärke</dt>
+            <dd>{{ report.mock_visit_report.strength_text or "Nicht angegeben" }}</dd>
+          </div>
+          <div>
+            <dt>Schwäche</dt>
+            <dd>{{ report.mock_visit_report.weakness_text or "Nicht angegeben" }}</dd>
+          </div>
+        {% endif %}
+        <div>
+          <dt>Status</dt>
+          <dd>{{ status_labels.get(report.status, report.status) }}</dd>
+        </div>
+        <div>
+          <dt>Nächster Schritt</dt>
+          <dd>{{ report.next_action or "Nicht angegeben" }}</dd>
+        </div>
+        <div>
+          <dt>Wiedervorlagen</dt>
+          <dd>{{ report.mock_visit_report.reminders | length if report.mock_visit_report else 0 }}</dd>
+        </div>
+      </dl>
+
+      <article class="review-block review-block--wide">
+        <span>Finaler Berichtstext</span>
+        <pre>{{ report.final_report_text }}</pre>
+      </article>
+    </div>
   </section>
 {% endblock %}
