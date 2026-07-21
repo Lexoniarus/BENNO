@@ -660,7 +660,8 @@ The following decisions define the current MVP direction:
 | Follow-up work | Phase 6 writes eNVenta-like reminders instead of the legacy inside-sales task target |
 | CRM | Placeholder CRM/ERP counterpart, not application core |
 | Database | SQLite is the current local mock backend; Postgres can be introduced later behind the same CRM/eNVenta gateway |
-| Admin status overview | Keep it simple in the first slice; expand later only if time allows |
+| Observability | Langfuse is available as an optional development tracing layer and must not affect business logic |
+| Admin status overview | Read-only basics exist; minimal editable admin configuration is the next planned step |
 | Voice | Target layer after text workflow, not part of Vertical Slice 1 |
 | STT/TTS timing | Add and test STT/TTS after a stable text-based report can be created and saved with Gemini |
 | Audio persistence | No long-term raw audio archive |
@@ -673,24 +674,34 @@ The following decisions remain open, deferred, or dependent on external input:
 | Topic | Current status |
 |---|---|
 | Gemini model | Current local test setting is `gemini-3.1-flash-lite`; Gemini Free Tier rate limits make a local LM Studio/OpenAI-compatible fallback important for continued testing |
-| Local LLM candidates | Next provider work should evaluate LM Studio through an OpenAI-compatible local API |
+| Local LLM candidates | Later provider work should evaluate LM Studio through an OpenAI-compatible local API after admin configuration and demo stabilization |
 | eNVenta visit report fields | First screenshot-based field mapping is documented; Phase 6 uses an eNVenta-shaped mock target rather than a real eNVenta API |
 | Placeholder CRM/ERP API contract | Phase 6 defines an internal CRM/eNVenta gateway boundary backed by local mock tables; Postgres or real eNVenta access can replace the backend later |
 | Setup/password reset token flow | Needs clarification: decide whether the first slice needs real setup/reset tokens or only seeded demo users |
 
 ## 30. Next Implementation Step
 
-The next practical step is to define the Flask project structure for Vertical Slice 1:
+The current implementation baseline includes:
 
-- app package layout
-- routes
-- templates
-- services
-- database tables
-- seed data
-- first chat turn flow
-- report draft object
-- Gemini provider abstraction
-- placeholder CRM/ERP service
+- Flask app structure
+- login and role routing
+- SQLAlchemy-backed SQLite development storage
+- eNVenta-shaped mock CRM/writeback data
+- Gemini-assisted text report loop
+- internal CRM/eNVenta gateway boundary
+- optional Langfuse observability
 
-The first implementation should stay small and prove the full report lifecycle before adding audio, real CRM/ERP integration, or local LLM complexity.
+The next practical step is minimal admin completion:
+
+- edit users without exposing report content
+- set roles and preferred language
+- edit global provider and language defaults
+- set optional per-user AI provider overrides
+- keep status counts simple and non-surveillance-oriented
+
+After that, BENNO should move into repeatable demo-scenario stabilization and
+then provider fallback experiments such as LM Studio or another
+OpenAI-compatible local API.
+
+Voice, Postgres, and real eNVenta integration should stay behind the stabilized
+text workflow and the existing CRM/eNVenta gateway boundary.

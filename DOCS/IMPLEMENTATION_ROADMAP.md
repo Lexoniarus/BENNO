@@ -332,7 +332,38 @@ Done when:
 - Existing tests and seed/mock data use the Phase 6 account, visit report,
   reminder, and rating target structure.
 
-## Phase 7: Minimal Admin Completion
+## Phase 7: Langfuse Observability
+
+Status: complete.
+
+Goal:
+
+BENNO can trace AI-assisted report turns for debugging without making
+observability part of the business workflow.
+
+Scope:
+
+- Optional Langfuse configuration through environment variables
+- One root trace for a report turn
+- Gemini calls as generation observations
+- Assistant reply and backend decision metadata on the root trace
+- Defensive no-op behavior when Langfuse is disabled, unavailable, or failing
+- Local trace privacy controls and secret masking
+
+Important:
+
+- Langfuse must not validate, advance, save, or alter report data.
+- BENNO must run normally without Langfuse credentials.
+- Trace output is for development and debugging, not for admin surveillance.
+
+Done:
+
+- Langfuse is integrated as an optional observability layer.
+- Report turns and Gemini calls can be traced.
+- Langfuse failures do not block the report loop.
+- The local development database path is stable at the project root.
+
+## Phase 8: Minimal Admin Completion
 
 Goal:
 
@@ -361,7 +392,7 @@ Done when:
 - The status overview is simple but useful.
 - The admin area does not become a content surveillance interface.
 
-## Phase 8: Stabilization And Demo Scenarios
+## Phase 9: Stabilization And Demo Scenarios
 
 Goal:
 
@@ -384,7 +415,35 @@ Done when:
 - Error cases are handled understandably.
 - The text loop is stable enough to build voice on top.
 
-## Phase 9: STT And TTS
+## Phase 10: Local Or OpenAI-Compatible Provider Fallback
+
+Goal:
+
+The privacy direction and Gemini rate-limit fallback are tested practically.
+
+Scope:
+
+- local provider through an OpenAI-compatible API
+- for example LM Studio
+- same provider contract shape as the Gemini provider
+- comparison against the same demo cases
+- no change to backend validation or report state rules
+
+Questions to test:
+
+- Does the local model understand German visit-report inputs well enough?
+- Does it provide stable structured suggestions?
+- Does it need tighter prompts?
+- Do extraction and conversation wording need to be split more strongly?
+- Is local performance acceptable for the hands-free target?
+
+Done when:
+
+- The same text loop can be tested with a local provider.
+- Differences to Gemini are documented.
+- There is enough evidence to decide how far BENNO can run locally.
+
+## Phase 11: STT And TTS
 
 Goal:
 
@@ -416,45 +475,44 @@ Done when:
 - BENNO can read responses aloud.
 - The user can still see text and intervene manually if needed.
 
-## Phase 10: Local Provider
+## Later MVP: Postgres And Real eNVenta Integration
 
 Goal:
 
-The privacy direction is tested practically.
+The local mock backend can be replaced by a more production-like persistence
+and integration setup without changing the report loop's CRM/eNVenta boundary.
 
 Scope:
 
-- local provider through an OpenAI-compatible API
-- for example LM Studio
-- same provider contract shape as the Gemini provider
-- comparison against the same demo cases
+- move persistence from local SQLite to Postgres behind SQLAlchemy
+- keep the internal CRM/eNVenta gateway contract stable
+- prepare later real eNVenta lookup and writeback
+- avoid introducing a real eNVenta API dependency before the mock contract is stable
 
 Questions to test:
 
-- Does the local model understand the inputs well enough?
-- Does it provide stable structured suggestions?
-- Does it need tighter prompts?
-- Do tasks need to be split more strongly in code?
-- Is performance acceptable?
+- Which SQLite assumptions need adjustment for Postgres?
+- Which mock gateway calls become database-backed service calls?
+- Which eNVenta fields still need real API clarification?
 
 Done when:
 
-- The same text loop can be tested with a local provider.
-- Differences to Gemini are documented.
-- There is enough evidence to decide how far BENNO can run locally.
+- The same report loop works against Postgres-backed persistence.
+- The gateway boundary remains the report loop's integration surface.
+- Real eNVenta integration can be planned without reshaping the core workflow.
 
-## Recommended Start
+## Current Recommended Next Step
 
-Next, implement Phase 1 and Phase 2:
+The completed baseline now includes Flask, data model, login, the text report
+loop, Gemini, eNVenta-shaped mock writeback, the internal CRM/eNVenta gateway,
+and optional Langfuse observability.
 
-1. Flask project structure
-2. SQLite connection
-3. Data models
-4. Seed data
-5. Login foundation
+The next practical step is Phase 8:
 
-Then move directly to Phase 4:
+1. complete the minimal admin configuration UI
+2. keep admin content boundaries intact
+3. make provider and language settings editable through admin routes
+4. then move into repeatable demo-scenario stabilization
 
-> A complete report loop from "New report" to "saved".
-
-This loop is the foundation. Once it works, Gemini, voice, eNVenta field mapping, and the local provider are extensions on a stable core.
+After Phase 8, BENNO should be tested through the fixed demo scenarios before
+adding local provider support, voice, Postgres, or real eNVenta integration.
