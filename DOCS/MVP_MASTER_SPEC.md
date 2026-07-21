@@ -661,7 +661,7 @@ The following decisions define the current MVP direction:
 | CRM | Placeholder CRM/ERP counterpart, not application core |
 | Database | SQLite is the current local mock backend; Postgres can be introduced later behind the same CRM/eNVenta gateway |
 | Observability | Langfuse is available as an optional development tracing layer and must not affect business logic |
-| Admin status overview | Read-only basics exist; minimal editable admin configuration is the next planned step |
+| Frontend/Admin UX | The next planned step is a focused frontend and admin UX overhaul before demo stabilization |
 | Voice | Target layer after text workflow, not part of Vertical Slice 1 |
 | STT/TTS timing | Add and test STT/TTS after a stable text-based report can be created and saved with Gemini |
 | Audio persistence | No long-term raw audio archive |
@@ -691,8 +691,11 @@ The current implementation baseline includes:
 - internal CRM/eNVenta gateway boundary
 - optional Langfuse observability
 
-The next practical step is minimal admin completion:
+The next practical step is a frontend and admin UX overhaul:
 
+- improve Sales dashboards, report lists, chat, review, and final report detail
+- make the main workflow usable on desktop, tablet, and phone
+- keep German user-facing workflow text consistent for the current MVP
 - edit users without exposing report content
 - set roles and preferred language
 - edit global provider and language defaults

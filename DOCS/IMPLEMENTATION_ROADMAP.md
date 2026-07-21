@@ -363,18 +363,35 @@ Done:
 - Langfuse failures do not block the report loop.
 - The local development database path is stable at the project root.
 
-## Phase 8: Minimal Admin Completion
+## Phase 8: Frontend And Admin UX Overhaul
 
 Goal:
 
-The admin area is functional, but not overbuilt.
+BENNO becomes easier to use and test as a browser-based MVP before more
+provider, voice, or database complexity is added.
 
-Admins can:
+This phase combines a frontend overhaul with the missing minimal admin
+configuration features.
+
+Frontend goals:
+
+- make the Sales report workflow feel coherent on desktop, tablet, and phone
+- improve dashboard, open report, completed report, chat, review, and final
+  report detail screens
+- show report context clearly, including account or lead, topic, status,
+  progress, and provider/debug state where useful
+- keep German user-facing workflow text consistent for the current MVP
+- avoid changing report business rules, eNVenta mapping, or provider behavior
+  unless a frontend issue exposes a concrete bug
+
+Admin goals:
 
 - see users
 - view or change roles
 - set user language
 - set global provider
+- set global language defaults
+- set optional per-user provider overrides
 - count open chats per user
 - count completed reports
 - count problematic chats
@@ -388,7 +405,9 @@ Admins must not:
 
 Done when:
 
-- Admin configuration works.
+- Sales and admin screens are usable for manual MVP testing.
+- The main report loop can be tested on desktop and narrow mobile widths.
+- Admin configuration works without exposing report or chat content.
 - The status overview is simple but useful.
 - The admin area does not become a content surveillance interface.
 
@@ -509,10 +528,11 @@ and optional Langfuse observability.
 
 The next practical step is Phase 8:
 
-1. complete the minimal admin configuration UI
-2. keep admin content boundaries intact
-3. make provider and language settings editable through admin routes
-4. then move into repeatable demo-scenario stabilization
+1. perform a focused frontend and admin UX overhaul
+2. complete the minimal admin configuration UI
+3. keep admin content boundaries intact
+4. make provider and language settings editable through admin routes
+5. then move into repeatable demo-scenario stabilization
 
 After Phase 8, BENNO should be tested through the fixed demo scenarios before
 adding local provider support, voice, Postgres, or real eNVenta integration.
