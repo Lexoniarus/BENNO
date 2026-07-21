@@ -4,34 +4,50 @@
 {% block shell_class %}app-shell--page{% endblock %}
 
 {% block content %}
-  <section class="page-section" aria-labelledby="settings-title">
-    <p class="hero__eyebrow">Adminbereich</p>
-    <h1 id="settings-title">Globale Einstellungen</h1>
+  <section class="page-section page-section--wide workspace-shell" aria-labelledby="settings-title">
+    <div class="section-heading workspace-header">
+      <div>
+        <h1 id="settings-title">Globale Einstellungen</h1>
+        <p class="workspace-subtitle">Standardsprache und globalen KI-Provider für BENNO setzen.</p>
+      </div>
+    </div>
+
+    <nav class="workspace-tabs" aria-label="Adminbereiche">
+      <a href="{{ url_for('admin.dashboard') }}">Übersicht</a>
+      <a href="{{ url_for('admin.users') }}">Benutzer</a>
+      <a href="{{ url_for('admin.settings') }}">Provider</a>
+      <a class="is-active" href="{{ url_for('admin.settings') }}" aria-current="page">Einstellungen</a>
+      <a href="{{ url_for('admin.settings') }}">System</a>
+    </nav>
 
     <form class="form-stack admin-form" method="post" action="{{ url_for('admin.settings') }}">
-      <label for="default_language">Standardsprache</label>
-      <select id="default_language" name="default_language" required>
-        {% for value, label in choices.languages %}
-          <option
-            value="{{ value }}"
-            {% if global_setting and global_setting.default_language == value %}selected{% endif %}
-          >
-            {{ label }}
-          </option>
-        {% endfor %}
-      </select>
+      <div class="form-field">
+        <label for="default_language">Standardsprache</label>
+        <select id="default_language" name="default_language" required>
+          {% for value, label in choices.languages %}
+            <option
+              value="{{ value }}"
+              {% if global_setting and global_setting.default_language == value %}selected{% endif %}
+            >
+              {{ label }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
 
-      <label for="ai_provider">Globaler KI-Provider</label>
-      <select id="ai_provider" name="ai_provider" required>
-        {% for value, label in choices.providers %}
-          <option
-            value="{{ value }}"
-            {% if global_setting and global_setting.ai_provider == value %}selected{% endif %}
-          >
-            {{ label }}
-          </option>
-        {% endfor %}
-      </select>
+      <div class="form-field">
+        <label for="ai_provider">Globaler KI-Provider</label>
+        <select id="ai_provider" name="ai_provider" required>
+          {% for value, label in choices.providers %}
+            <option
+              value="{{ value }}"
+              {% if global_setting and global_setting.ai_provider == value %}selected{% endif %}
+            >
+              {{ label }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
 
       <button class="button" type="submit">Einstellungen speichern</button>
     </form>

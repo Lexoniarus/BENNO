@@ -4,16 +4,24 @@
 {% block shell_class %}app-shell--page{% endblock %}
 
 {% block content %}
-  <section class="page-section page-section--wide" aria-labelledby="users-title">
-    <div class="section-heading">
+  <section class="page-section page-section--wide workspace-shell" aria-labelledby="users-title">
+    <div class="section-heading workspace-header">
       <div>
-        <p class="hero__eyebrow">Adminbereich</p>
         <h1 id="users-title">Benutzer</h1>
+        <p class="workspace-subtitle">Rollen, Sprachen, Status und lokale Setup-/Reset-Links.</p>
       </div>
       <a class="button button--link" href="{{ url_for('admin.new_user') }}">Benutzer hinzufügen</a>
     </div>
 
-    <div class="table-wrap report-table-wrap">
+    <nav class="workspace-tabs" aria-label="Adminbereiche">
+      <a href="{{ url_for('admin.dashboard') }}">Übersicht</a>
+      <a class="is-active" href="{{ url_for('admin.users') }}" aria-current="page">Benutzer</a>
+      <a href="{{ url_for('admin.settings') }}">Provider</a>
+      <a href="{{ url_for('admin.settings') }}">Einstellungen</a>
+      <a href="{{ url_for('admin.settings') }}">System</a>
+    </nav>
+
+    <div class="table-wrap report-table-wrap workspace-card workspace-card--flush">
       <table class="report-table">
         <thead>
           <tr>

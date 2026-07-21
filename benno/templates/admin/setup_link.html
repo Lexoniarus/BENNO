@@ -4,11 +4,23 @@
 {% block shell_class %}app-shell--page{% endblock %}
 
 {% block content %}
-  <section class="page-section" aria-labelledby="setup-link-title">
-    <p class="hero__eyebrow">Adminbereich</p>
-    <h1 id="setup-link-title">{{ link_label }}</h1>
+  <section class="page-section page-section--wide workspace-shell" aria-labelledby="setup-link-title">
+    <div class="section-heading workspace-header">
+      <div>
+        <h1 id="setup-link-title">{{ link_label }}</h1>
+        <p class="workspace-subtitle">Lokaler MVP-Link für die Passwortanlage oder Zurücksetzung.</p>
+      </div>
+    </div>
 
-    <article class="surface-panel">
+    <nav class="workspace-tabs" aria-label="Adminbereiche">
+      <a href="{{ url_for('admin.dashboard') }}">Übersicht</a>
+      <a class="is-active" href="{{ url_for('admin.users') }}" aria-current="page">Benutzer</a>
+      <a href="{{ url_for('admin.settings') }}">Provider</a>
+      <a href="{{ url_for('admin.settings') }}">Einstellungen</a>
+      <a href="{{ url_for('admin.settings') }}">System</a>
+    </nav>
+
+    <article class="surface-panel workspace-card">
       <h2>{{ user.username }}</h2>
       <p>
         Der Link wird nur hier angezeigt. Er ist lokal für das MVP gedacht und

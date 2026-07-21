@@ -4,63 +4,85 @@
 {% block shell_class %}app-shell--page{% endblock %}
 
 {% block content %}
-  <section class="page-section" aria-labelledby="user-form-title">
-    <p class="hero__eyebrow">Adminbereich</p>
-    <h1 id="user-form-title">{{ form_title }}</h1>
+  <section class="page-section page-section--wide workspace-shell" aria-labelledby="user-form-title">
+    <div class="section-heading workspace-header">
+      <div>
+        <h1 id="user-form-title">{{ form_title }}</h1>
+        <p class="workspace-subtitle">Benutzerzugang und MVP-relevante Provideroptionen pflegen.</p>
+      </div>
+    </div>
+
+    <nav class="workspace-tabs" aria-label="Adminbereiche">
+      <a href="{{ url_for('admin.dashboard') }}">Übersicht</a>
+      <a class="is-active" href="{{ url_for('admin.users') }}" aria-current="page">Benutzer</a>
+      <a href="{{ url_for('admin.settings') }}">Provider</a>
+      <a href="{{ url_for('admin.settings') }}">Einstellungen</a>
+      <a href="{{ url_for('admin.settings') }}">System</a>
+    </nav>
 
     <form class="form-stack admin-form" method="post" action="{{ form_action }}">
-      <label for="username">Name</label>
-      <input
-        id="username"
-        name="username"
-        value="{{ user.username if user else '' }}"
-        autocomplete="name"
-        required
-      >
+      <div class="form-field">
+        <label for="username">Name</label>
+        <input
+          id="username"
+          name="username"
+          value="{{ user.username if user else '' }}"
+          autocomplete="name"
+          required
+        >
+      </div>
 
-      <label for="email">E-Mail</label>
-      <input
-        id="email"
-        name="email"
-        type="email"
-        value="{{ user.email if user else '' }}"
-        autocomplete="email"
-        required
-      >
+      <div class="form-field">
+        <label for="email">E-Mail</label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          value="{{ user.email if user else '' }}"
+          autocomplete="email"
+          required
+        >
+      </div>
 
-      <label for="role">Rolle</label>
-      <select id="role" name="role" required>
-        {% for value, label in choices.roles %}
-          <option value="{{ value }}" {% if user and user.role == value %}selected{% endif %}>
-            {{ label }}
-          </option>
-        {% endfor %}
-      </select>
+      <div class="form-field">
+        <label for="role">Rolle</label>
+        <select id="role" name="role" required>
+          {% for value, label in choices.roles %}
+            <option value="{{ value }}" {% if user and user.role == value %}selected{% endif %}>
+              {{ label }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
 
-      <label for="preferred_language">Sprache</label>
-      <select id="preferred_language" name="preferred_language" required>
-        {% for value, label in choices.languages %}
-          <option
-            value="{{ value }}"
-            {% if (user and user.preferred_language == value) or (not user and value == "de") %}selected{% endif %}
-          >
-            {{ label }}
-          </option>
-        {% endfor %}
-      </select>
+      <div class="form-field">
+        <label for="preferred_language">Sprache</label>
+        <select id="preferred_language" name="preferred_language" required>
+          {% for value, label in choices.languages %}
+            <option
+              value="{{ value }}"
+              {% if (user and user.preferred_language == value) or (not user and value == "de") %}selected{% endif %}
+            >
+              {{ label }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
 
-      <label for="ai_provider_override">Provider-Override</label>
-      <select id="ai_provider_override" name="ai_provider_override">
-        <option value="">Standard verwenden</option>
-        {% for value, label in choices.providers %}
-          <option
-            value="{{ value }}"
-            {% if user and user.ai_provider_override == value %}selected{% endif %}
-          >
-            {{ label }}
-          </option>
-        {% endfor %}
-      </select>
+      <div class="form-field">
+        <label for="ai_provider_override">Provider-Override</label>
+        <select id="ai_provider_override" name="ai_provider_override">
+          <option value="">Standard verwenden</option>
+          {% for value, label in choices.providers %}
+            <option
+              value="{{ value }}"
+              {% if user and user.ai_provider_override == value %}selected{% endif %}
+            >
+              {{ label }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
 
       <label class="checkbox-row" for="is_active">
         <input

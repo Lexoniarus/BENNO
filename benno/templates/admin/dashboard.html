@@ -4,31 +4,39 @@
 {% block shell_class %}app-shell--page{% endblock %}
 
 {% block content %}
-  <section class="page-section page-section--wide" aria-labelledby="admin-title">
-    <div class="section-heading">
+  <section class="page-section page-section--wide workspace-shell" aria-labelledby="admin-title">
+    <div class="section-heading workspace-header">
       <div>
-        <p class="hero__eyebrow">Adminbereich</p>
         <h1 id="admin-title">Übersicht & Einstellungen</h1>
+        <p class="workspace-subtitle">Status, Benutzer und globale BENNO-Konfiguration.</p>
       </div>
-      <a class="button button--link" href="{{ url_for('admin.new_user') }}">Benutzer hinzufügen</a>
     </div>
 
-    <div class="metric-grid">
+    <nav class="workspace-tabs" aria-label="Adminbereiche">
+      <a class="is-active" href="{{ url_for('admin.dashboard') }}" aria-current="page">Übersicht</a>
+      <a href="{{ url_for('admin.users') }}">Benutzer</a>
+      <a href="{{ url_for('admin.settings') }}">Provider</a>
+      <a href="{{ url_for('admin.settings') }}">Einstellungen</a>
+      <a href="{{ url_for('admin.settings') }}">System</a>
+    </nav>
+
+    <div class="metric-grid metric-grid--workspace">
       {% for card in status_cards %}
         <article class="metric-card">
           <span>{{ card.label }}</span>
           <strong>{{ card.value }}</strong>
+          <small>Anzeigen</small>
         </article>
       {% endfor %}
     </div>
 
     <div class="admin-layout">
-      <section class="surface-panel" aria-labelledby="admin-users-title">
+      <section class="surface-panel workspace-card" aria-labelledby="admin-users-title">
         <div class="panel-heading">
           <h2 id="admin-users-title">Benutzerstatus</h2>
-          <a href="{{ url_for('admin.users') }}">Alle Benutzer</a>
+          <a class="button button--link" href="{{ url_for('admin.new_user') }}">Benutzer hinzufügen</a>
         </div>
-        <div class="table-wrap report-table-wrap">
+        <div class="table-wrap report-table-wrap workspace-card workspace-card--flush">
           <table class="report-table">
             <thead>
               <tr>
@@ -57,7 +65,7 @@
         </div>
       </section>
 
-      <aside class="surface-panel surface-panel--compact" aria-labelledby="admin-boundary-title">
+      <aside class="surface-panel surface-panel--compact workspace-card" aria-labelledby="admin-boundary-title">
         <h2 id="admin-boundary-title">Admin-Grenze</h2>
         <p>
           Diese Übersicht zeigt technische und organisatorische Statusdaten.
