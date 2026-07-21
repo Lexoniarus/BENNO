@@ -7,9 +7,9 @@
   <section class="page-section" aria-labelledby="completed-reports-title">
     <p class="hero__eyebrow">Vertriebsbereich</p>
     <h1 id="completed-reports-title">Abgeschlossene Berichte</h1>
-    {% if reports %}
-      <div class="table-wrap">
-        <table>
+    {% if report_rows %}
+      <div class="table-wrap report-table-wrap">
+        <table class="report-table">
           <thead>
             <tr>
               <th>Bericht</th>
@@ -20,33 +20,20 @@
             </tr>
           </thead>
           <tbody>
-            {% for report in reports %}
+            {% for row in report_rows %}
+              {% set report = row.report %}
               <tr data-report-id="{{ report.id }}">
-                <td>
-                  <a href="{{ url_for('sales.final_report_detail', report_id=report.id) }}">
-                    {% if report.mock_visit_report %}
-                      {{ report.mock_visit_report.visit_report_number }}
-                    {% else %}
-                      #{{ report.id }}
-                    {% endif %}
+                <td data-label="Bericht">
+                  <a class="report-link" href="{{ url_for('sales.final_report_detail', report_id=report.id) }}">
+                    <span class="report-link__title">{{ row.customer_label }}</span>
+                    <span class="report-link__meta">{{ row.topic_label }}</span>
+                    <span class="report-link__meta">{{ row.report_number }}</span>
                   </a>
                 </td>
-                <td>
-                  {% if report.mock_visit_report %}
-                    {{ report.mock_visit_report.account_search_name or "Nicht erkannt" }}
-                  {% else %}
-                    Nicht erkannt
-                  {% endif %}
-                </td>
-                <td>
-                  {% if report.mock_visit_report %}
-                    {{ report.mock_visit_report.target_topic }}
-                  {% else %}
-                    {{ report.summary }}
-                  {% endif %}
-                </td>
-                <td>{{ status_labels.get(report.status, report.status) }}</td>
-                <td>{{ report.visit_date or "Nicht gesetzt" }}</td>
+                <td data-label="Kunde/Lead">{{ row.customer_label }}</td>
+                <td data-label="Ziel/Thema">{{ row.topic_label }}</td>
+                <td data-label="Status">{{ row.status_label }}</td>
+                <td data-label="Besuchsdatum">{{ row.visit_date_label }}</td>
               </tr>
             {% endfor %}
           </tbody>

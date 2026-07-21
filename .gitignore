@@ -18,6 +18,7 @@ ENV/
 
 # Flask / local runtime
 instance/
+benno-dev.sqlite3
 *.sqlite
 *.sqlite3
 *.db

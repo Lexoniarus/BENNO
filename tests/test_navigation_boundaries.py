@@ -52,7 +52,18 @@ def test_sales_completed_reports_only_include_own_reports(app) -> None:
     other_chat = Chat(sales_user=other_user, status=ReportStatus.CONFIRMED.value)
     own_report = _create_final_report(own_chat, sales_user, "Own report text")
     other_report = _create_final_report(other_chat, other_user, "Other report text")
-    db.session.add_all([own_chat, other_chat, own_report, other_report])
+    own_visit_report = MockVisitReport(
+        visit_report_number="VR-OWN-001",
+        final_report=own_report,
+        visit_type=VisitType.IN_PERSON.value,
+        account_search_name="Nordlicht Solar",
+        target_topic="Angebot und Wartung",
+        info_text="Project discussion.",
+        agreement_text="Follow up.",
+    )
+    db.session.add_all(
+        [own_chat, other_chat, own_report, other_report, own_visit_report]
+    )
     db.session.commit()
 
     with app.test_client() as client:
@@ -61,6 +72,9 @@ def test_sales_completed_reports_only_include_own_reports(app) -> None:
 
     assert response.status_code == 200
     assert f'data-report-id="{own_report.id}"'.encode() in response.data
+    assert b"Nordlicht Solar" in response.data
+    assert b"Angebot und Wartung" in response.data
+    assert b"VR-OWN-001" in response.data
     assert f'data-report-id="{other_report.id}"'.encode() not in response.data
 
 

@@ -68,12 +68,12 @@ def test_development_configuration_reads_langfuse_environment(monkeypatch) -> No
     assert app.config["LANGFUSE_FLUSH_ON_TURN"] is True
 
 
-def test_relative_sqlite_url_uses_instance_folder(monkeypatch) -> None:
-    monkeypatch.setenv("DATABASE_URL", "sqlite:///benno.sqlite3")
+def test_default_development_database_uses_project_root(monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", "")
 
     app = create_app("development")
 
     with app.app_context():
         database_path = Path(db.engine.url.database)
 
-    assert database_path == Path(app.instance_path) / "benno.sqlite3"
+    assert database_path == Path.cwd() / "benno-dev.sqlite3"

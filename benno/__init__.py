@@ -105,7 +105,7 @@ def _configure_database(app: Flask) -> None:
         app.config["SQLALCHEMY_DATABASE_URI"] = configured_uri
         return
 
-    database_path = Path(app.instance_path) / "benno.sqlite3"
+    database_path = Path.cwd() / "benno-dev.sqlite3"
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{database_path.as_posix()}"
 
 

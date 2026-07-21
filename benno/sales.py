@@ -92,8 +92,7 @@ def completed_reports():
 
     return render_template(
         "sales/completed_reports.html",
-        reports=reports,
-        status_labels=REPORT_STATUS_LABELS_DE,
+        report_rows=_build_completed_report_rows(reports),
     )
 
 
@@ -259,6 +258,12 @@ def _build_open_report_rows(chats: list[Chat]) -> list[dict[str, object]]:
     return [_build_open_report_row(chat) for chat in chats]
 
 
+def _build_completed_report_rows(
+    reports: list[FinalReport],
+) -> list[dict[str, object]]:
+    return [_build_completed_report_row(report) for report in reports]
+
+
 def _build_open_report_row(chat: Chat) -> dict[str, object]:
     draft = chat.report_draft
     answers = dict(draft.draft_data_json.get("answers", {})) if draft else {}
@@ -279,6 +284,35 @@ def _build_open_report_row(chat: Chat) -> dict[str, object]:
         "status_label": REPORT_STATUS_LABELS_DE.get(chat.status, chat.status),
         "last_question": getattr(draft, "last_question", None),
     }
+
+
+def _build_completed_report_row(report: FinalReport) -> dict[str, object]:
+    mock_visit_report = report.mock_visit_report
+    report_number = _completed_report_number(report)
+    return {
+        "report": report,
+        "report_number": report_number,
+        "customer_label": _first_present_text(
+            getattr(mock_visit_report, "account_search_name", None),
+            getattr(getattr(report, "account", None), "display_name", None),
+            getattr(getattr(report, "account", None), "search_name", None),
+            fallback="Nicht erkannt",
+        ),
+        "topic_label": _first_present_text(
+            getattr(mock_visit_report, "target_topic", None),
+            report.summary,
+            fallback="Kein Thema gespeichert",
+        ),
+        "status_label": REPORT_STATUS_LABELS_DE.get(report.status, report.status),
+        "visit_date_label": report.visit_date or "Nicht gesetzt",
+    }
+
+
+def _completed_report_number(report: FinalReport) -> str:
+    if report.mock_visit_report is None:
+        return f"#{report.id}"
+
+    return report.mock_visit_report.visit_report_number
 
 
 def _open_report_progress_label(draft) -> str:
