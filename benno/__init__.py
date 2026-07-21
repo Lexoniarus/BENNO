@@ -33,6 +33,7 @@ def _configure_app(app: Flask, config_name: str | None) -> None:
     config_class = CONFIG_BY_NAME.get(str(selected_name), DevelopmentConfig)
     app.config.from_object(config_class)
     _configure_ai(app)
+    _configure_langfuse(app)
     _configure_secret_key(app)
     _configure_database(app)
 
@@ -52,6 +53,40 @@ def _configure_ai(app: Flask) -> None:
     configured_gemini_model = os.environ.get("GEMINI_MODEL")
     if configured_gemini_model:
         app.config["GEMINI_MODEL"] = configured_gemini_model
+
+
+def _configure_langfuse(app: Flask) -> None:
+    if app.config.get("TESTING"):
+        return
+
+    _configure_boolean_from_env(app, "LANGFUSE_ENABLED")
+    _configure_boolean_from_env(app, "LANGFUSE_CAPTURE_FULL_CONTEXT")
+    _configure_boolean_from_env(app, "LANGFUSE_FLUSH_ON_TURN")
+    for key in (
+        "LANGFUSE_PUBLIC_KEY",
+        "LANGFUSE_SECRET_KEY",
+        "LANGFUSE_BASE_URL",
+        "LANGFUSE_HOST",
+    ):
+        configured_value = os.environ.get(key)
+        if configured_value:
+            app.config[key] = configured_value
+
+    if app.config.get("LANGFUSE_HOST"):
+        return
+    if not app.config.get("LANGFUSE_BASE_URL"):
+        return
+
+    app.config["LANGFUSE_HOST"] = app.config["LANGFUSE_BASE_URL"]
+    os.environ["LANGFUSE_HOST"] = app.config["LANGFUSE_BASE_URL"]
+
+
+def _configure_boolean_from_env(app: Flask, key: str) -> None:
+    configured_value = os.environ.get(key)
+    if configured_value is None:
+        return
+
+    app.config[key] = configured_value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _configure_secret_key(app: Flask) -> None:

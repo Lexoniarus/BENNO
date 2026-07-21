@@ -7,6 +7,13 @@ class BaseConfig:
     AI_PROVIDER = "gemini"
     GEMINI_API_KEY = None
     GEMINI_MODEL = "gemini-3.1-flash-lite"
+    LANGFUSE_BASE_URL = None
+    LANGFUSE_CAPTURE_FULL_CONTEXT = False
+    LANGFUSE_ENABLED = False
+    LANGFUSE_FLUSH_ON_TURN = False
+    LANGFUSE_HOST = None
+    LANGFUSE_PUBLIC_KEY = None
+    LANGFUSE_SECRET_KEY = None
     SECRET_KEY = "development-secret-key"
     SQLALCHEMY_DATABASE_URI = None
     SQLALCHEMY_TRACK_MODIFICATIONS = False

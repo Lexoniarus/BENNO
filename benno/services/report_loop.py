@@ -22,6 +22,7 @@ from benno.models import (
 from benno.services.ai_provider import AiMessageAnalysis, AiProviderError, AiService
 from benno.services.ai_registry import get_ai_service
 from benno.services.mock_crm import CrmGateway, get_crm_gateway
+from benno.services.observability import trace_report_decision, trace_report_turn
 from benno.services.report_account_resolution import (
     apply_lead_context_signal,
     resolve_visit_context,
@@ -168,21 +169,29 @@ def process_report_turn(
     if current_step is None:
         return _complete_report_turn(chat, _review_ready_message(chat))
 
-    analysis = _analyze_user_message(
-        draft,
-        current_step,
-        normalized_message,
-        ai_service,
-    )
-    applied_steps = _apply_report_answers(
-        draft,
-        current_step,
-        normalized_message,
-        analysis,
-        gateway,
-    )
-    next_step = _advance_after_applied_steps(draft, applied_steps)
-    next_question = _next_question(chat, next_step, analysis)
+    with trace_report_turn(chat, draft, current_step.key, normalized_message):
+        analysis = _analyze_user_message(
+            draft,
+            current_step,
+            normalized_message,
+            ai_service,
+        )
+        applied_steps = _apply_report_answers(
+            draft,
+            current_step,
+            normalized_message,
+            analysis,
+            gateway,
+        )
+        next_step = _advance_after_applied_steps(draft, applied_steps)
+        trace_report_decision(
+            draft,
+            analysis,
+            [step.key for step in applied_steps],
+            next_step.key if next_step else None,
+        )
+        next_question = _next_question(chat, next_step, analysis)
+
     return _complete_report_turn(chat, next_question)
 
 

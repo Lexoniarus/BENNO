@@ -94,6 +94,50 @@ Guiding principle:
 
 > The AI interprets and writes. The application validates and decides.
 
+## Langfuse Observability
+
+BENNO uses Langfuse as an optional development observability layer for AI debugging.
+
+Langfuse is not part of the business decision layer. It must not validate report data,
+advance workflow state, write CRM data, or replace backend tests. Its purpose is to help
+debug and compare AI behavior.
+
+When enabled, BENNO may trace:
+
+- one report turn as one trace
+- the report chat as a Langfuse session
+- the sales user id as the Langfuse user id
+- Gemini calls as `generation` observations
+- model name, prompt input, structured output, token usage when available, latency, and provider errors
+- backend decisions such as accepted AI update keys, applied requirement keys, missing sections, and next step
+
+Environment variables:
+
+```text
+LANGFUSE_ENABLED=false
+LANGFUSE_PUBLIC_KEY=replace-with-langfuse-public-key
+LANGFUSE_SECRET_KEY=replace-with-langfuse-secret-key
+LANGFUSE_BASE_URL=https://cloud.langfuse.com
+LANGFUSE_CAPTURE_FULL_CONTEXT=false
+LANGFUSE_FLUSH_ON_TURN=false
+```
+
+`LANGFUSE_ENABLED` defaults to `false`. The app must continue to work when Langfuse is
+disabled, not configured, unavailable, or missing from the local environment.
+
+`LANGFUSE_CAPTURE_FULL_CONTEXT=false` keeps the trace focused on the current user
+message, current step, missing sections, known answer keys, rating keys, generation
+input/output, and backend decision metadata. Setting it to `true` may capture fuller
+draft context for local debugging and should be used carefully.
+
+Secrets such as API keys, passwords, tokens, and Langfuse keys must never be logged.
+
+References:
+
+- [Langfuse SDK Instrumentation](https://langfuse.com/docs/observability/sdk/instrumentation)
+- [Langfuse Best Practices](https://langfuse.com/docs/observability/best-practices)
+- [Langfuse Masking](https://langfuse.com/docs/observability/features/masking)
+
 ## Local Provider Direction
 
 The local provider is planned after the Gemini workflow is stable.

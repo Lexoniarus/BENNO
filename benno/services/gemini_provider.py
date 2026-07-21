@@ -15,6 +15,12 @@ from benno.services.ai_prompts import (
     REVIEW_SYSTEM_INSTRUCTION,
 )
 from benno.services.ai_provider import AiMessageAnalysis, AiProviderError
+from benno.services.observability import (
+    trace_generation,
+    traced_generation_input,
+    traced_generation_output,
+    traced_usage_details,
+)
 
 
 class GeminiSectionUpdate(BaseModel):
@@ -66,6 +72,7 @@ class GeminiService:
         """Ask Gemini for a controlled analysis of one report message."""
         prompt = _build_analysis_content(context, message_text)
         response = self._generate_structured_content(
+            name="analyze-report-message",
             prompt=prompt,
             response_schema=GeminiMessageAnalysis,
             system_instruction=ANALYSIS_SYSTEM_INSTRUCTION,
@@ -84,6 +91,7 @@ class GeminiService:
         """Ask Gemini for the next conversational assistant question."""
         prompt = _build_next_question_prompt(question_context)
         return self._generate_text(
+            name="draft-next-question",
             prompt=prompt,
             system_instruction=NEXT_QUESTION_SYSTEM_INSTRUCTION,
             temperature=0.3,
@@ -93,6 +101,7 @@ class GeminiService:
         """Ask Gemini for concise review wording."""
         prompt = _build_review_prompt(draft_context)
         return self._generate_text(
+            name="draft-review-text",
             prompt=prompt,
             system_instruction=REVIEW_SYSTEM_INSTRUCTION,
             temperature=0.2,
@@ -102,6 +111,7 @@ class GeminiService:
         """Ask Gemini for a final visit report text."""
         prompt = _build_final_report_prompt(draft_context)
         return self._generate_text(
+            name="draft-final-report-text",
             prompt=prompt,
             system_instruction=FINAL_REPORT_SYSTEM_INSTRUCTION,
             temperature=0.2,
@@ -109,6 +119,7 @@ class GeminiService:
 
     def _generate_structured_content(
         self,
+        name: str,
         prompt: str,
         response_schema: type[BaseModel],
         system_instruction: str,
@@ -120,30 +131,65 @@ class GeminiService:
             system_instruction=system_instruction,
             temperature=temperature,
         )
-        try:
-            response = self._client.models.generate_content(
-                model=self._model,
-                contents=prompt,
-                config=config,
+        with trace_generation(
+            name=name,
+            model=self._model,
+            input_payload=traced_generation_input(prompt, system_instruction),
+            metadata={
+                "temperature": temperature,
+                "response_schema": response_schema.__name__,
+                "response_mime_type": "application/json",
+            },
+        ) as generation:
+            try:
+                response = self._client.models.generate_content(
+                    model=self._model,
+                    contents=prompt,
+                    config=config,
+                )
+            except Exception as error:
+                generation.update(
+                    output={
+                        "status": "error",
+                        "error_type": type(error).__name__,
+                    }
+                )
+                raise AiProviderError("Gemini message analysis failed.") from error
+
+            parsed_response = getattr(response, "parsed", None)
+            if parsed_response is not None:
+                generation.update(
+                    output=traced_generation_output(_dump_model(parsed_response)),
+                    usage_details=traced_usage_details(response),
+                )
+                return parsed_response
+
+            response_text = getattr(response, "text", None)
+            if not response_text:
+                generation.update(
+                    output=None,
+                    usage_details=traced_usage_details(response),
+                )
+                return None
+
+            try:
+                decoded_response = json.loads(response_text)
+            except json.JSONDecodeError as error:
+                generation.update(
+                    output={"status": "malformed_json"},
+                    usage_details=traced_usage_details(response),
+                )
+                raise AiProviderError("Gemini returned malformed JSON.") from error
+
+            generation.update(
+                output=traced_generation_output(decoded_response),
+                usage_details=traced_usage_details(response),
             )
-        except Exception as error:
-            raise AiProviderError("Gemini message analysis failed.") from error
-
-        parsed_response = getattr(response, "parsed", None)
-        if parsed_response is not None:
-            return parsed_response
-
-        response_text = getattr(response, "text", None)
-        if not response_text:
-            return None
-
-        try:
-            return json.loads(response_text)
-        except json.JSONDecodeError as error:
-            raise AiProviderError("Gemini returned malformed JSON.") from error
+            return decoded_response
 
     def _generate_text(
         self,
+        name: str,
         prompt: str,
         system_instruction: str,
         temperature: float,
@@ -152,21 +198,41 @@ class GeminiService:
             system_instruction=system_instruction,
             temperature=temperature,
         )
-        try:
-            response = self._client.models.generate_content(
-                model=self._model,
-                contents=prompt,
-                config=config,
+        with trace_generation(
+            name=name,
+            model=self._model,
+            input_payload=traced_generation_input(prompt, system_instruction),
+            metadata={"temperature": temperature},
+        ) as generation:
+            try:
+                response = self._client.models.generate_content(
+                    model=self._model,
+                    contents=prompt,
+                    config=config,
+                )
+            except Exception as error:
+                generation.update(
+                    output={
+                        "status": "error",
+                        "error_type": type(error).__name__,
+                    }
+                )
+                raise AiProviderError("Gemini text generation failed.") from error
+
+            response_text = getattr(response, "text", None)
+            if response_text is None:
+                generation.update(
+                    output=None,
+                    usage_details=traced_usage_details(response),
+                )
+                return None
+
+            normalized_text = response_text.strip()
+            generation.update(
+                output=traced_generation_output(normalized_text or None),
+                usage_details=traced_usage_details(response),
             )
-        except Exception as error:
-            raise AiProviderError("Gemini text generation failed.") from error
-
-        response_text = getattr(response, "text", None)
-        if response_text is None:
-            return None
-
-        normalized_text = response_text.strip()
-        return normalized_text or None
+            return normalized_text or None
 
 
 def _build_analysis_content(context: dict[str, Any], message_text: str) -> str:
@@ -178,6 +244,13 @@ Context:
 User message:
 {message_text}
 """.strip()
+
+
+def _dump_model(value: BaseModel | Any) -> Any:
+    if isinstance(value, BaseModel):
+        return value.model_dump(mode="json")
+
+    return value
 
 
 def _build_next_question_prompt(question_context: dict[str, Any]) -> str:
