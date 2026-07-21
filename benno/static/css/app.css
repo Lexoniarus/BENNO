@@ -718,6 +718,12 @@ td a {
   gap: 12px;
 }
 
+.chat-column {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
 .chat-panel,
 .progress-panel,
 .writeback-panel {

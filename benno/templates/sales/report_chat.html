@@ -17,13 +17,39 @@
     </div>
 
     <div class="report-layout">
-      <div class="chat-panel" data-chat-panel aria-label="Nachrichten im Berichts-Chat">
-        {% for message in chat.messages %}
-          <article class="chat-message chat-message--{{ message.sender }}">
-            <span>{{ "BENNO" if message.sender == "assistant" else "Du" }}</span>
-            <p>{{ message.message_text }}</p>
-          </article>
-        {% endfor %}
+      <div class="chat-column">
+        <div class="chat-panel" data-chat-panel aria-label="Nachrichten im Berichts-Chat">
+          {% for message in chat.messages %}
+            <article class="chat-message chat-message--{{ message.sender }}">
+              <span>{{ "BENNO" if message.sender == "assistant" else "Du" }}</span>
+              <p>{{ message.message_text }}</p>
+            </article>
+          {% endfor %}
+        </div>
+
+        {% if ready_for_review %}
+          <p class="empty-state empty-state--inline">Der Bericht ist bereit zur Prüfung.</p>
+        {% elif chat.status == "in_progress" %}
+          <form class="form-stack report-form" data-report-form method="post" action="{{ url_for('sales.report_message', chat_id=chat.id) }}">
+            <label for="message">Nachricht eingeben</label>
+            <div class="message-composer">
+              <textarea id="message" name="message" rows="2" placeholder="Nachricht eingeben..." required></textarea>
+              <button class="button button--icon button--send" type="submit" aria-label="Nachricht senden">
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M4 12l16-8-5 16-3-7-8-1z"></path>
+                </svg>
+              </button>
+            </div>
+          </form>
+        {% elif chat.status == "confirmed" and chat.final_report %}
+          <div class="action-row">
+            <a class="button button--link" href="{{ url_for('sales.final_report_detail', report_id=chat.final_report.id) }}">
+              Finalen Bericht öffnen
+            </a>
+          </div>
+        {% elif chat.status == "cancelled" %}
+          <p class="empty-state">Dieser Bericht wurde abgebrochen.</p>
+        {% endif %}
       </div>
 
       <aside class="report-rail" aria-label="Berichtsfortschritt und Mock-eNVenta">
@@ -67,30 +93,6 @@
         </section>
       </aside>
     </div>
-
-    {% if ready_for_review %}
-      <p class="empty-state empty-state--inline">Der Bericht ist bereit zur Prüfung.</p>
-    {% elif chat.status == "in_progress" %}
-      <form class="form-stack report-form" data-report-form method="post" action="{{ url_for('sales.report_message', chat_id=chat.id) }}">
-        <label for="message">Nachricht eingeben</label>
-        <div class="message-composer">
-          <textarea id="message" name="message" rows="2" placeholder="Nachricht eingeben..." required></textarea>
-          <button class="button button--icon button--send" type="submit" aria-label="Nachricht senden">
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              <path d="M4 12l16-8-5 16-3-7-8-1z"></path>
-            </svg>
-          </button>
-        </div>
-      </form>
-    {% elif chat.status == "confirmed" and chat.final_report %}
-      <div class="action-row">
-        <a class="button button--link" href="{{ url_for('sales.final_report_detail', report_id=chat.final_report.id) }}">
-          Finalen Bericht öffnen
-        </a>
-      </div>
-    {% elif chat.status == "cancelled" %}
-      <p class="empty-state">Dieser Bericht wurde abgebrochen.</p>
-    {% endif %}
 
     {% if chat.status in ["in_progress", "ready_for_review"] %}
       <form class="inline-form" method="post" action="{{ url_for('sales.cancel_report_route', chat_id=chat.id) }}">
