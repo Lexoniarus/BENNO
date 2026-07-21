@@ -25,8 +25,11 @@ The current S:FLEX-near token direction is:
 - green success accent: `#adce6d`
 - red warning accent: `#e7413b`
 
-The accepted direction uses more dark app surface than the first concept image.
-White and off-white panels are working areas, not the dominant page theme.
+The accepted fidelity target is the second app mockup: a dark petrol outer
+frame, compact top navigation, and a large bright workspace where chat,
+tables, forms, and writeback panels live. The current implementation must not
+stay a hero-like dashboard with large cards on petrol; it should feel like a
+focused internal application.
 
 ## Typography
 
@@ -56,13 +59,17 @@ screenshots, or UI copy.
 - Keep Flask, Jinja, and Vanilla JavaScript for Phase 8.
 - Build the actual usable application, not a landing page.
 - Use German for user-facing workflow text in the current MVP.
-- Keep dark petrol as the app frame and primary background.
-- Use off-white panels for chat, tables, review blocks, and forms.
+- Keep dark petrol as the outer app frame.
+- Use a bright workspace as the main application area.
+- Use panels for chat, tables, review blocks, forms, and Mock-eNVenta
+  writeback details.
 - Keep cards and panels simple with small radii.
 - Avoid nested cards.
 - Avoid decorative gradients, orbs, and marketing-style hero sections.
 - Preserve German umlauts end to end.
 - Mobile width around 390px must not create horizontal body overflow.
+- Work in separate commits for documentation, shell/sales surfaces,
+  report/review surfaces, admin surfaces, and QA fixes.
 
 ## Sales UX
 
@@ -81,12 +88,17 @@ Required screens:
 
 The report chat should feel conversational but controlled:
 
+- it is the visual reference for the whole Sales area
 - account or lead context is visible near the title
 - provider/debug-safe status can be visible, for example Gemini active
 - chat history is the main area
-- report progress is compact and secondary
+- report progress and Mock-eNVenta writeback details live in a compact right
+  rail on desktop
 - the message composer is easy to use on desktop and mobile
+- send action should feel like an icon action, not a large form button
 - review and final report screens show eNVenta-near target fields clearly
+- use `Mock-eNVenta speichern` or equivalent wording, never generic CRM
+  writeback wording
 
 ## Admin UX
 
@@ -114,6 +126,8 @@ Admins must not see:
 
 Phase 8 admin features include:
 
+- a compact tab or segmented navigation for overview, users, provider,
+  settings, and system-related areas
 - create users
 - edit users
 - set role, language, active status, and provider override
@@ -142,6 +156,7 @@ Before closing Phase 8, verify:
 - setup/reset password flow
 - global settings form
 - no admin exposure of chat or report content
+- no real-company-domain mock emails or unrelated CRM product names in visible UI
 
 Quality checks:
 
