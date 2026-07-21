@@ -4,31 +4,34 @@
 {% block shell_class %}app-shell--page{% endblock %}
 
 {% block content %}
-  <section class="page-section page-section--wide" aria-labelledby="sales-title">
-    <div class="section-heading">
+  <section class="page-section page-section--wide workspace-shell" aria-labelledby="sales-title">
+    <div class="section-heading workspace-header">
       <div>
-        <p class="hero__eyebrow">Vertriebsbereich</p>
         <h1 id="sales-title">Besuchsberichte</h1>
+        <p class="workspace-subtitle">Dein Arbeitsbereich für offene, fertige und neue Besuchsberichte.</p>
       </div>
       <a class="button button--link" href="{{ url_for('sales.new_report') }}">Neuen Bericht starten</a>
     </div>
 
-    <div class="metric-grid">
+    <div class="metric-grid metric-grid--workspace">
       <a class="metric-card metric-card--link" href="{{ url_for('sales.open_reports') }}">
         <span>Offene Berichte</span>
         <strong>{{ open_report_count }}</strong>
+        <small>Anzeigen</small>
       </a>
       <a class="metric-card metric-card--link" href="{{ url_for('sales.completed_reports') }}">
         <span>Fertige Berichte</span>
         <strong>{{ completed_report_count }}</strong>
+        <small>Anzeigen</small>
       </a>
       <a class="metric-card metric-card--link" href="{{ url_for('sales.options') }}">
         <span>Sprache</span>
         <strong>{{ "Deutsch" if current_user.preferred_language == "de" else "Englisch" }}</strong>
+        <small>Optionen öffnen</small>
       </a>
     </div>
 
-    <article class="surface-panel surface-panel--intro">
+    <article class="surface-panel surface-panel--intro workspace-card">
       <h2>Nächster Bericht</h2>
       <p>
         Starte direkt aus dem Gespräch heraus. BENNO sammelt die Angaben für

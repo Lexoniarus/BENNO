@@ -37,7 +37,14 @@
             <a class="{{ 'is-active' if request.endpoint in ['admin.users', 'admin.new_user', 'admin.edit_user'] else '' }}" href="{{ url_for('admin.users') }}">Benutzer</a>
             <a class="{{ 'is-active' if request.endpoint == 'admin.settings' else '' }}" href="{{ url_for('admin.settings') }}">Einstellungen</a>
           {% endif %}
-          <a href="{{ url_for('auth.logout') }}">Abmelden</a>
+          <a class="topbar__logout" href="{{ url_for('auth.logout') }}">
+            <span>Abmelden</span>
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M10 17l5-5-5-5"></path>
+              <path d="M15 12H3"></path>
+              <path d="M21 3v18h-7"></path>
+            </svg>
+          </a>
         </nav>
       </header>
     {% endif %}

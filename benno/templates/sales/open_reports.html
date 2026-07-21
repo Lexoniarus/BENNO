@@ -4,16 +4,16 @@
 {% block shell_class %}app-shell--page{% endblock %}
 
 {% block content %}
-  <section class="page-section page-section--wide" aria-labelledby="open-reports-title">
-    <div class="section-heading">
+  <section class="page-section page-section--wide workspace-shell" aria-labelledby="open-reports-title">
+    <div class="section-heading workspace-header">
       <div>
-        <p class="hero__eyebrow">Vertriebsbereich</p>
         <h1 id="open-reports-title">Offene Berichte</h1>
+        <p class="workspace-subtitle">Unfertige Berichte mit erkennbarem Account- und Themenbezug.</p>
       </div>
       <a class="button button--link" href="{{ url_for('sales.new_report') }}">Neuer Bericht</a>
     </div>
     {% if report_rows %}
-      <div class="table-wrap report-table-wrap">
+      <div class="table-wrap report-table-wrap workspace-card workspace-card--flush">
         <table class="report-table">
           <thead>
             <tr>

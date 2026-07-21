@@ -11,11 +11,13 @@
   --sflex-green: #adce6d;
   --sflex-red: #e7413b;
   --surface: #f8f8f4;
+  --workspace: #ffffff;
   --surface-muted: #eef0ea;
   --surface-dark: #0f3044;
   --line: rgba(20, 51, 71, 0.18);
   --line-strong: rgba(235, 229, 102, 0.42);
   --shadow: 0 20px 48px rgba(0, 0, 0, 0.28);
+  --workspace-shadow: 0 26px 60px rgba(0, 0, 0, 0.24);
   --radius: 6px;
   --font-display: "Space Grotesk", "Poppins", "Segoe UI", sans-serif;
   --font-body: "Poppins", "Space Grotesk", "Segoe UI", sans-serif;
@@ -35,7 +37,7 @@ body {
   color: var(--sflex-graphite);
   font-family: var(--font-body);
   background:
-    linear-gradient(90deg, rgba(235, 229, 102, 0.08), transparent 34%),
+    radial-gradient(circle at 10% 100%, rgba(235, 229, 102, 0.1), transparent 24%),
     var(--sflex-petrol);
 }
 
@@ -58,18 +60,18 @@ textarea {
 }
 
 .app-shell--page {
-  min-height: calc(100vh - 76px);
-  padding: 34px;
+  min-height: calc(100vh - 64px);
+  padding: 24px;
   place-items: start center;
 }
 
 .topbar {
   display: flex;
-  min-height: 76px;
+  min-height: 64px;
   align-items: center;
   justify-content: space-between;
-  gap: 28px;
-  padding: 16px 40px;
+  gap: 24px;
+  padding: 14px 34px;
   border-bottom: 1px solid rgba(235, 229, 102, 0.34);
   background: var(--sflex-petrol-dark);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
@@ -77,7 +79,7 @@ textarea {
 
 .topbar__brand {
   display: inline-flex;
-  width: 154px;
+  width: 150px;
   flex: 0 0 auto;
   align-items: center;
 }
@@ -104,14 +106,14 @@ textarea {
 .topbar__nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: 24px;
   justify-content: flex-end;
 }
 
 .topbar__nav a {
   position: relative;
   color: var(--sflex-white);
-  font-size: 0.92rem;
+  font-size: 0.82rem;
   font-weight: 800;
   text-decoration: none;
 }
@@ -135,13 +137,29 @@ textarea {
   background: var(--sflex-yellow);
 }
 
+.topbar__logout {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topbar__logout svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.2;
+}
+
 .auth-panel,
 .page-section {
   width: min(1040px, 100%);
 }
 
 .page-section--wide {
-  width: min(1320px, 100%);
+  width: min(1360px, 100%);
 }
 
 .page-section--report {
@@ -188,6 +206,36 @@ h3 {
   color: var(--sflex-white);
   font-size: clamp(2.25rem, 5vw, 4.8rem);
   line-height: 0.98;
+}
+
+.workspace-shell {
+  min-height: calc(100vh - 112px);
+  padding: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius);
+  background: var(--workspace);
+  box-shadow: var(--workspace-shadow);
+}
+
+.workspace-shell h1 {
+  color: var(--sflex-graphite);
+  font-size: clamp(1.9rem, 3vw, 2.65rem);
+  line-height: 1.05;
+}
+
+.workspace-subtitle {
+  max-width: 720px;
+  margin: 8px 0 0;
+  color: var(--sflex-muted);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.workspace-header {
+  align-items: center;
+  margin-bottom: 26px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
 }
 
 .auth-panel h1,
@@ -241,10 +289,10 @@ h3 {
 
 .button {
   display: inline-grid;
-  min-height: 46px;
+  min-height: 42px;
   align-items: center;
   justify-content: center;
-  padding: 0 18px;
+  padding: 0 17px;
   border: 0;
   border-radius: var(--radius);
   background: var(--sflex-yellow);
@@ -362,6 +410,12 @@ h3 {
   margin-bottom: 22px;
 }
 
+.metric-grid--workspace {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
 .metric-card,
 .surface-panel,
 .review-block {
@@ -374,9 +428,9 @@ h3 {
 .metric-card {
   display: grid;
   gap: 10px;
-  min-height: 128px;
+  min-height: 118px;
   align-content: space-between;
-  padding: 18px;
+  padding: 18px 20px;
   text-decoration: none;
 }
 
@@ -392,7 +446,13 @@ h3 {
 .metric-card strong {
   color: var(--sflex-petrol);
   font-family: var(--font-display);
-  font-size: 2.1rem;
+  font-size: 2rem;
+}
+
+.metric-card small {
+  color: var(--sflex-petrol);
+  font-size: 0.78rem;
+  font-weight: 900;
 }
 
 .metric-card--link:hover {
@@ -409,8 +469,18 @@ h3 {
 }
 
 .surface-panel--intro {
-  max-width: 760px;
+  max-width: 780px;
   color: var(--sflex-graphite);
+}
+
+.workspace-card {
+  border-color: var(--line);
+  background: var(--workspace);
+  box-shadow: none;
+}
+
+.workspace-card--flush {
+  padding: 0;
 }
 
 .surface-panel h2,
@@ -452,7 +522,7 @@ h3 {
   overflow-x: auto;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--workspace);
 }
 
 table {
@@ -462,7 +532,7 @@ table {
 
 th,
 td {
-  padding: 13px 15px;
+  padding: 12px 14px;
   border-bottom: 1px solid var(--line);
   color: var(--sflex-graphite);
   text-align: left;
@@ -471,7 +541,7 @@ td {
 
 th {
   color: var(--sflex-muted);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 900;
   text-transform: uppercase;
   white-space: nowrap;
@@ -732,12 +802,16 @@ td a {
     min-height: 52vh;
     max-height: 58vh;
   }
+
+  .metric-grid--workspace {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 760px) {
   .app-shell,
   .app-shell--page {
-    padding: 22px 14px;
+    padding: 16px 10px;
     place-items: start center;
   }
 
@@ -773,9 +847,19 @@ td a {
     flex-direction: column;
   }
 
+  .workspace-shell {
+    min-height: calc(100vh - 84px);
+    padding: 18px;
+  }
+
+  .workspace-header {
+    align-items: flex-start;
+    gap: 14px;
+  }
+
   .auth-panel h1,
   .page-section h1 {
-    font-size: clamp(2rem, 12vw, 3.2rem);
+    font-size: clamp(1.8rem, 9vw, 2.55rem);
   }
 
   .metric-grid {
