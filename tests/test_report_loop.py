@@ -142,6 +142,7 @@ def test_visit_type_is_inferred_from_free_visit_context_message(app) -> None:
 
     draft = chat.report_draft
     assert draft.visit_type == VisitType.IN_PERSON.value
+    assert draft.draft_data_json["answers"]["visit_type"] == VisitType.IN_PERSON.value
     assert "visit_type" in draft.draft_data_json["completed_steps"]
     assert draft.draft_data_json["current_step"] == "participants"
     assert chat.messages[-1].message_text != (
@@ -240,6 +241,34 @@ def test_four_enventa_ratings_complete_rating_section(app) -> None:
     assert chat.report_draft.draft_data_json["current_step"] == "review"
 
 
+def test_strict_question_answer_flow_reaches_review_without_optional_references(
+    app,
+) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    answers = [
+        "Nordlicht Maschinenbau GmbH",
+        "persoenlich",
+        "Mara Stein",
+        "2026-07-07",
+        "Forecast",
+        "Forecast und Lieferfaehigkeit besprochen.",
+        "Revidiertes Angebot wird geschickt.",
+        "Sales sendet die Unterlagen.",
+        "Zufriedenheit 8, technisch 7, kaufmaennisch 6, Prioritaet 9.",
+    ]
+
+    for answer in answers:
+        process_report_message_with_ai(chat, answer, _FakeAiService())
+
+    final_report = confirm_report(chat)
+
+    assert chat.report_draft.draft_data_json["current_step"] == "review"
+    assert final_report.mock_visit_report is not None
+    assert final_report.mock_visit_report.target_topic == "Forecast"
+    assert chat.status == ReportStatus.CONFIRMED.value
+
+
 def test_partial_rating_answer_keeps_rating_step_open(app) -> None:
     seed_database()
     chat = _start_sales_chat()
@@ -294,7 +323,7 @@ def test_unclear_visit_date_does_not_default_to_today(app) -> None:
     assert chat.report_draft.draft_data_json["current_step"] == "visit_date"
 
 
-def test_unrelated_follow_up_date_answer_keeps_date_step_open(app) -> None:
+def test_unrelated_conditional_answer_does_not_block_rating_step(app) -> None:
     seed_database()
     chat = _start_sales_chat()
     _process_until_next_appointment_date(chat)
@@ -306,12 +335,15 @@ def test_unrelated_follow_up_date_answer_keeps_date_step_open(app) -> None:
     )
 
     draft = chat.report_draft
-    assert draft.follow_up_date is None
-    assert "next_appointment_date" not in draft.draft_data_json["answers"]
-    assert draft.draft_data_json["current_step"] == "next_appointment_date"
+    assert draft.follow_up_date is not None
+    assert draft.draft_data_json["answers"]["next_appointment_date"] == (
+        draft.follow_up_date.isoformat()
+    )
+    assert draft.draft_data_json["answers"]["order_reference"] == "keiner"
+    assert draft.draft_data_json["current_step"] == "ratings"
 
 
-def test_relative_follow_up_date_can_complete_next_appointment_step(app) -> None:
+def test_relative_follow_up_date_can_be_stored_without_blocking_flow(app) -> None:
     seed_database()
     chat = _start_sales_chat()
     _process_until_next_appointment_date(chat)
@@ -319,7 +351,34 @@ def test_relative_follow_up_date_can_complete_next_appointment_step(app) -> None
     process_report_message_with_ai(chat, "naechste Woche", _FakeAiService())
 
     assert chat.report_draft.follow_up_date is not None
-    assert chat.report_draft.draft_data_json["current_step"] == "offer_reference"
+    assert chat.report_draft.draft_data_json["answers"]["next_appointment_date"] == (
+        chat.report_draft.follow_up_date.isoformat()
+    )
+    assert chat.report_draft.draft_data_json["current_step"] == "ratings"
+
+
+def test_conditional_fields_do_not_block_when_no_signal_exists(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    answers = [
+        "Nordlicht Maschinenbau GmbH",
+        "persoenlich",
+        "Mara Stein",
+        "2026-07-07",
+        "Forecast",
+        "Forecast und Lieferfaehigkeit besprochen.",
+        "Revidiertes Angebot wird geschickt.",
+        "Sales sendet die Unterlagen.",
+    ]
+
+    for answer in answers:
+        process_report_message_with_ai(chat, answer, _FakeAiService())
+
+    draft_answers = chat.report_draft.draft_data_json["answers"]
+    assert "next_appointment_date" not in draft_answers
+    assert "offer_reference" not in draft_answers
+    assert "order_reference" not in draft_answers
+    assert chat.report_draft.draft_data_json["current_step"] == "ratings"
 
 
 def test_inside_sales_nachfassen_creates_mock_reminder(app) -> None:

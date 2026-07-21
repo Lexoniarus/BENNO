@@ -134,6 +134,20 @@ def is_no_reference_message(message_text: str) -> bool:
     normalized_text = message_text.strip().lower()
     if is_none_answer(normalized_text):
         return True
+    if any(
+        phrase in normalized_text
+        for phrase in (
+            "kein angebot",
+            "keine angebot",
+            "keinen auftrag",
+            "kein auftrag",
+            "keine auftragsnummer",
+            "keine angebotsnummer",
+            "no offer",
+            "no order",
+        )
+    ):
+        return True
     if normalized_text.startswith(("nee", "nein", "no ")):
         return True
 

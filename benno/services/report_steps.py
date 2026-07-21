@@ -9,11 +9,23 @@ from benno.services.report_state import draft_data
 
 REVIEW_STEP = "review"
 OPTIONAL_STEP_KEYS = {"strength_text", "weakness_text", "reminders"}
+CONDITIONAL_STEP_KEYS = {
+    "next_appointment_date",
+    "offer_reference",
+    "order_reference",
+}
+NON_BLOCKING_STEP_KEYS = OPTIONAL_STEP_KEYS | CONDITIONAL_STEP_KEYS
 OPTIONAL_REPORT_SECTIONS = {
     ReportSection.STRENGTHS.value,
     ReportSection.WEAKNESSES.value,
     ReportSection.REMINDERS.value,
 }
+CONDITIONAL_REPORT_SECTIONS = {
+    ReportSection.NEXT_APPOINTMENT_DATE.value,
+    ReportSection.OFFER_REFERENCE.value,
+    ReportSection.ORDER_REFERENCE.value,
+}
+NON_BLOCKING_REPORT_SECTIONS = OPTIONAL_REPORT_SECTIONS | CONDITIONAL_REPORT_SECTIONS
 
 
 @dataclass(frozen=True)
@@ -213,14 +225,7 @@ def report_requirements(draft: ReportDraft) -> list[dict[str, Any]]:
 
 def requirement_required(step: ReportStep) -> bool:
     """Return whether a step is mandatory for review readiness."""
-    return step.key not in {
-        "next_appointment_date",
-        "offer_reference",
-        "order_reference",
-        "strength_text",
-        "weakness_text",
-        "reminders",
-    }
+    return step.key not in NON_BLOCKING_STEP_KEYS
 
 
 def requirement_status(
@@ -283,7 +288,8 @@ def first_incomplete_step(completed_steps: list[str]) -> ReportStep | None:
         (
             step
             for step in REPORT_STEPS
-            if step.key not in completed_step_set and step.key not in OPTIONAL_STEP_KEYS
+            if step.key not in completed_step_set
+            and step.key not in NON_BLOCKING_STEP_KEYS
         ),
         None,
     )
@@ -370,7 +376,7 @@ def missing_sections(section_statuses: dict[str, str]) -> list[str]:
         not in {
             ReportSection.FINAL_REPORT.value,
             ReportSection.USER_CONFIRMATION.value,
-            *OPTIONAL_REPORT_SECTIONS,
+            *NON_BLOCKING_REPORT_SECTIONS,
         }
     ]
 
@@ -390,7 +396,7 @@ def missing_step_keys(draft: ReportDraft) -> list[str]:
     return [
         step.key
         for step in REPORT_STEPS
-        if step.key not in completed_steps and step.key not in OPTIONAL_STEP_KEYS
+        if step.key not in completed_steps and step.key not in NON_BLOCKING_STEP_KEYS
     ]
 
 

@@ -45,8 +45,9 @@ from benno.services.report_shortcuts import (
     is_not_assessable_rating_answer,
     looks_like_follow_up_action,
     looks_like_rating_answer,
+    looks_like_reference,
     mentions_inside_sales_follow_up,
-    parse_iso_date,
+    mentions_lead,
     parse_rating_values,
     parse_visit_date,
     parse_visit_type,
@@ -403,9 +404,17 @@ def _store_requirement_answer(
     requirement: ReportStep,
     answer_text: str,
 ) -> None:
+    _replace_requirement_answer(draft, requirement.key, answer_text)
+
+
+def _replace_requirement_answer(
+    draft: ReportDraft,
+    requirement_key: str,
+    answer_text: str,
+) -> None:
     data = draft_data(draft)
     answers = dict(data.get("answers", {}))
-    answers[requirement.key] = answer_text
+    answers[requirement_key] = answer_text
     data["answers"] = answers
     draft.draft_data_json = data
 
@@ -420,11 +429,31 @@ def _apply_requirement_specific_update(
         _apply_gateway_requirement_answer(draft, requirement, answer_text, crm_gateway)
         return True
     if requirement.key == "visit_type":
-        return _apply_visit_type_answer(draft, answer_text)
+        if not _apply_visit_type_answer(draft, answer_text):
+            return False
+
+        _replace_requirement_answer(draft, requirement.key, draft.visit_type)
+        return True
     if requirement.key == "visit_date":
-        return _apply_visit_date_answer(draft, answer_text)
+        if not _apply_visit_date_answer(draft, answer_text):
+            return False
+
+        _replace_requirement_answer(
+            draft,
+            requirement.key,
+            draft.visit_date.isoformat(),
+        )
+        return True
     if requirement.key == "next_appointment_date":
-        return _apply_next_appointment_answer(draft, answer_text)
+        if not _apply_next_appointment_answer(draft, answer_text):
+            return False
+
+        _replace_requirement_answer(
+            draft,
+            requirement.key,
+            _canonical_follow_up_date_answer(draft),
+        )
+        return True
 
     _apply_local_requirement_answer(draft, requirement, answer_text)
     return True
@@ -493,6 +522,13 @@ def _apply_next_appointment_answer(draft: ReportDraft, answer_text: str) -> bool
 
     draft.follow_up_date = follow_up_date
     return True
+
+
+def _canonical_follow_up_date_answer(draft: ReportDraft) -> str:
+    if draft.follow_up_date is None:
+        return "keine"
+
+    return draft.follow_up_date.isoformat()
 
 
 def _reject_requirement_answer(draft: ReportDraft, requirement: ReportStep) -> None:
@@ -671,6 +707,8 @@ def _rule_based_hint_handlers() -> tuple[Any, ...]:
     return (
         _apply_visit_type_hint,
         _apply_no_reference_hint,
+        _apply_document_reference_hint,
+        _apply_next_appointment_hint,
         _apply_next_action_hint,
         _apply_rating_hint,
     )
@@ -724,9 +762,7 @@ def _apply_no_reference_hint(
     applied_steps: list[ReportStep],
     crm_gateway: CrmGateway,
 ) -> None:
-    if current_step.key not in {"offer_reference", "order_reference"}:
-        return
-    if not is_no_reference_message(message_text):
+    if not _should_apply_no_reference_hint(current_step, message_text):
         return
 
     for step_key in ("offer_reference", "order_reference"):
@@ -738,6 +774,126 @@ def _apply_no_reference_hint(
 
         if _apply_requirement_answer(draft, step, "keiner", crm_gateway):
             applied_steps.append(step)
+
+
+def _should_apply_no_reference_hint(
+    current_step: ReportStep,
+    message_text: str,
+) -> bool:
+    if not is_no_reference_message(message_text):
+        return False
+    if current_step.key in {"offer_reference", "order_reference"}:
+        return True
+
+    return mentions_lead(message_text) or _mentions_offer_or_order_topic(message_text)
+
+
+def _mentions_offer_or_order_topic(message_text: str) -> bool:
+    normalized_text = message_text.lower()
+    return any(
+        keyword in normalized_text
+        for keyword in ("angebot", "angebots", "auftrag", "auftrags", "offer", "order")
+    )
+
+
+def _apply_document_reference_hint(
+    draft: ReportDraft,
+    current_step: ReportStep,
+    message_text: str,
+    completed_before_message: set[str],
+    applied_steps: list[ReportStep],
+    crm_gateway: CrmGateway,
+) -> None:
+    for step_key, detector in (
+        ("offer_reference", _looks_like_offer_reference),
+        ("order_reference", _looks_like_order_reference),
+    ):
+        if not detector(message_text):
+            continue
+
+        _apply_optional_requirement_hint(
+            draft,
+            step_key,
+            message_text,
+            completed_before_message,
+            applied_steps,
+            crm_gateway,
+        )
+
+
+def _looks_like_offer_reference(message_text: str) -> bool:
+    normalized_text = message_text.lower()
+    if is_no_reference_message(message_text):
+        return False
+
+    return looks_like_reference(normalized_text) and any(
+        keyword in normalized_text for keyword in ("off", "ang", "angebot", "offer")
+    )
+
+
+def _looks_like_order_reference(message_text: str) -> bool:
+    normalized_text = message_text.lower()
+    if is_no_reference_message(message_text):
+        return False
+
+    return looks_like_reference(normalized_text) and any(
+        keyword in normalized_text for keyword in ("ord", "auftrag", "order")
+    )
+
+
+def _apply_next_appointment_hint(
+    draft: ReportDraft,
+    current_step: ReportStep,
+    message_text: str,
+    completed_before_message: set[str],
+    applied_steps: list[ReportStep],
+    crm_gateway: CrmGateway,
+) -> None:
+    if not _looks_like_next_appointment_answer(current_step, message_text):
+        return
+
+    _apply_optional_requirement_hint(
+        draft,
+        "next_appointment_date",
+        message_text,
+        completed_before_message,
+        applied_steps,
+        crm_gateway,
+    )
+
+
+def _looks_like_next_appointment_answer(
+    current_step: ReportStep,
+    message_text: str,
+) -> bool:
+    if current_step.key == "next_appointment_date":
+        return parse_visit_date(message_text) is not None or is_none_answer(
+            message_text
+        )
+    if step_index(current_step) < step_index(step_by_key("next_action")):
+        return False
+
+    return parse_visit_date(message_text) is not None and looks_like_follow_up_action(
+        message_text
+    )
+
+
+def _apply_optional_requirement_hint(
+    draft: ReportDraft,
+    step_key: str,
+    answer_text: str,
+    completed_before_message: set[str],
+    applied_steps: list[ReportStep],
+    crm_gateway: CrmGateway,
+) -> None:
+    step = step_by_key(step_key)
+    if step.key in completed_before_message:
+        return
+    if any(applied_step.key == step.key for applied_step in applied_steps):
+        return
+
+    if _apply_requirement_answer(draft, step, answer_text, crm_gateway):
+        applied_steps.append(step)
 
 
 def _apply_next_action_hint(
@@ -953,7 +1109,7 @@ def _apply_agreement_answer(draft: ReportDraft, answer_text: str) -> None:
 
 def _apply_next_action_answer(draft: ReportDraft, answer_text: str) -> None:
     draft.next_action = answer_text
-    draft.follow_up_date = parse_iso_date(answer_text)
+    draft.follow_up_date = parse_visit_date(answer_text)
 
 
 def _apply_offer_reference_answer(
