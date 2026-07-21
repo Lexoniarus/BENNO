@@ -82,7 +82,7 @@ function submitReportMessage(event) {
   }
   if (button) {
     button.disabled = true;
-    button.textContent = "BENNO analysiert";
+    button.setAttribute("aria-label", "BENNO analysiert");
   }
 
   window.setTimeout(() => {

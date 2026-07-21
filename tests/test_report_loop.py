@@ -269,6 +269,31 @@ def test_strict_question_answer_flow_reaches_review_without_optional_references(
     assert chat.status == ReportStatus.CONFIRMED.value
 
 
+def test_confirm_report_keeps_unmatched_visit_context_as_account_label(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    answers = [
+        "SonnenTest GmbH",
+        "telefonisch",
+        "Frau Becker",
+        "2026-07-07",
+        "Kooperation",
+        "Pilotprojekt und Datenblaetter besprochen.",
+        "Unterlagen werden geschickt.",
+        "Innendienst soll telefonisch nachfassen.",
+        "Zufriedenheit 8, technisch 7, kaufmaennisch 6, Prioritaet 9.",
+    ]
+
+    for answer in answers:
+        process_report_message_with_ai(chat, answer, _FakeAiService())
+
+    final_report = confirm_report(chat)
+
+    assert final_report.mock_visit_report is not None
+    assert final_report.mock_visit_report.account_id is None
+    assert final_report.mock_visit_report.account_search_name == "SonnenTest GmbH"
+
+
 def test_partial_rating_answer_keeps_rating_step_open(app) -> None:
     seed_database()
     chat = _start_sales_chat()

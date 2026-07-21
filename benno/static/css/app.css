@@ -169,9 +169,9 @@ textarea {
 .auth-panel {
   max-width: 520px;
   padding: 30px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid rgba(235, 229, 102, 0.35);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: linear-gradient(155deg, var(--sflex-petrol-dark), var(--sflex-petrol));
   box-shadow: var(--shadow);
 }
 
@@ -190,7 +190,7 @@ textarea {
 }
 
 .auth-panel .hero__eyebrow {
-  color: var(--sflex-petrol);
+  color: var(--sflex-yellow);
 }
 
 h1,
@@ -282,7 +282,7 @@ h3 {
 
 .auth-panel h1,
 .auth-panel .hero__subtitle {
-  color: var(--sflex-graphite);
+  color: var(--sflex-white);
 }
 
 .hero__subtitle,
@@ -294,7 +294,7 @@ h3 {
 }
 
 .auth-panel .hero__subtitle {
-  color: var(--sflex-graphite);
+  color: rgba(255, 255, 255, 0.84);
 }
 
 .section-heading,
@@ -405,6 +405,10 @@ h3 {
   color: var(--sflex-graphite);
   font-size: 0.88rem;
   font-weight: 900;
+}
+
+.auth-panel .form-stack label {
+  color: var(--sflex-white);
 }
 
 .form-stack input,
