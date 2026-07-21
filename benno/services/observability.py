@@ -27,7 +27,10 @@ class ObservationHandle:
         if self._observation is None:
             return
 
-        self._observation.update(**kwargs)
+        try:
+            self._observation.update(**kwargs)
+        except Exception:
+            return
 
 
 @contextmanager
@@ -38,26 +41,27 @@ def trace_report_turn(
     message_text: str,
 ):
     """Create one trace for a report chat turn when Langfuse is enabled."""
-    langfuse = _langfuse_client()
+    langfuse = _safe_langfuse_client()
     if langfuse is None:
         yield ObservationHandle()
         return
 
-    from langfuse import propagate_attributes
+    try:
+        from langfuse import propagate_attributes
 
-    with propagate_attributes(
-        user_id=str(chat.sales_user_id),
-        session_id=f"benno-chat-{chat.id}",
-        tags=["benno", "report-loop", "phase-7"],
-        metadata={
-            "feature": "sales-report-loop",
-            "chat_id": chat.id,
-            "report_status": draft.report_status,
-        },
-        environment=_langfuse_environment(),
-        trace_name=REPORT_LOOP_TRACE_NAME,
-    ):
-        with langfuse.start_as_current_observation(
+        attribute_context = propagate_attributes(
+            user_id=str(chat.sales_user_id),
+            session_id=f"benno-chat-{chat.id}",
+            tags=["benno", "report-loop", "phase-7"],
+            metadata={
+                "feature": "sales-report-loop",
+                "chat_id": chat.id,
+                "report_status": draft.report_status,
+            },
+            environment=_langfuse_environment(),
+            trace_name=REPORT_LOOP_TRACE_NAME,
+        )
+        observation_context = langfuse.start_as_current_observation(
             as_type="span",
             name=REPORT_LOOP_TRACE_NAME,
             input=_report_turn_input(draft, current_step, message_text),
@@ -66,20 +70,70 @@ def trace_report_turn(
                 "chat_id": chat.id,
                 "sales_user_id": chat.sales_user_id,
             },
-        ) as span:
-            handle = ObservationHandle(span)
-            try:
-                yield handle
-            except Exception as error:
-                handle.update(
-                    output={
-                        "status": "error",
-                        "error_type": type(error).__name__,
-                    }
-                )
-                raise
-            finally:
-                _flush_if_configured()
+        )
+    except Exception:
+        yield ObservationHandle()
+        return
+
+    with _safe_observation_context(attribute_context, observation_context) as handle:
+        yield handle
+
+
+@contextmanager
+def _safe_observation_context(attribute_context: Any, observation_context: Any):
+    attribute_entered, _attribute_value = _enter_observability_context(
+        attribute_context
+    )
+    if not attribute_entered:
+        yield ObservationHandle()
+        return
+
+    observation_entered, span = _enter_observability_context(observation_context)
+    if not observation_entered:
+        _exit_observability_context(attribute_context, None, None, None)
+        yield ObservationHandle()
+        return
+
+    handle = ObservationHandle(span)
+    error_type = None
+    error = None
+    traceback = None
+    try:
+        yield handle
+    except Exception as caught_error:
+        error_type = type(caught_error)
+        error = caught_error
+        traceback = caught_error.__traceback__
+        handle.update(
+            output={
+                "status": "error",
+                "error_type": error_type.__name__,
+            }
+        )
+        raise
+    finally:
+        _exit_observability_context(observation_context, error_type, error, traceback)
+        _exit_observability_context(attribute_context, error_type, error, traceback)
+        _flush_if_configured()
+
+
+def _enter_observability_context(context: Any) -> tuple[bool, Any | None]:
+    try:
+        return True, context.__enter__()
+    except Exception:
+        return False, None
+
+
+def _exit_observability_context(
+    context: Any,
+    error_type: type[BaseException] | None,
+    error: BaseException | None,
+    traceback: Any | None,
+) -> None:
+    try:
+        context.__exit__(error_type, error, traceback)
+    except Exception:
+        return
 
 
 @contextmanager
@@ -90,19 +144,32 @@ def trace_generation(
     metadata: dict[str, Any] | None = None,
 ):
     """Create a generation observation under the active trace."""
-    langfuse = _langfuse_client()
+    langfuse = _safe_langfuse_client()
     if langfuse is None:
         yield ObservationHandle()
         return
 
-    with langfuse.start_as_current_observation(
-        as_type="generation",
-        name=name,
-        model=model,
-        input=_safe_capture(input_payload),
-        metadata=_safe_capture(metadata or {}),
-    ) as generation:
+    try:
+        observation_context = langfuse.start_as_current_observation(
+            as_type="generation",
+            name=name,
+            model=model,
+            input=_safe_capture(input_payload),
+            metadata=_safe_capture(metadata or {}),
+        )
+    except Exception:
+        yield ObservationHandle()
+        return
+
+    entered, generation = _enter_observability_context(observation_context)
+    if not entered:
+        yield ObservationHandle()
+        return
+
+    try:
         yield ObservationHandle(generation)
+    finally:
+        _exit_observability_context(observation_context, None, None, None)
 
 
 def trace_report_decision(
@@ -110,30 +177,35 @@ def trace_report_decision(
     analysis: AiMessageAnalysis | None,
     applied_step_keys: list[str],
     next_step_key: str | None,
+    assistant_reply: str,
 ) -> None:
     """Attach backend validation and flow decisions to the active trace."""
-    langfuse = _langfuse_client()
+    langfuse = _safe_langfuse_client()
     if langfuse is None:
         return
 
-    langfuse.update_current_span(
-        output=_safe_capture(
-            {
-                "status": draft.report_status,
-                "next_step": next_step_key or "review",
-                "missing_sections": draft.missing_sections_json,
-                "applied_step_keys": applied_step_keys,
-                "accepted_ai_update_keys": _ai_update_keys(analysis),
-            }
-        ),
-        metadata=_safe_capture(
-            {
-                "completed_steps": draft_data(draft).get("completed_steps", []),
-                "rating_keys": list(draft.ratings_json.keys()),
-                "last_ai_error": draft_data(draft).get("last_ai_error"),
-            }
-        ),
-    )
+    try:
+        langfuse.update_current_span(
+            output=_safe_capture(
+                {
+                    "status": draft.report_status,
+                    "next_step": next_step_key or "review",
+                    "assistant_reply": assistant_reply,
+                    "missing_sections": draft.missing_sections_json,
+                    "applied_step_keys": applied_step_keys,
+                    "accepted_ai_update_keys": _ai_update_keys(analysis),
+                }
+            ),
+            metadata=_safe_capture(
+                {
+                    "completed_steps": draft_data(draft).get("completed_steps", []),
+                    "rating_keys": list(draft.ratings_json.keys()),
+                    "last_ai_error": draft_data(draft).get("last_ai_error"),
+                }
+            ),
+        )
+    except Exception:
+        return
 
 
 def traced_generation_input(
@@ -179,7 +251,7 @@ def observability_status() -> dict[str, str]:
         return {"label": "Langfuse: disabled", "state": "inactive"}
     if not _langfuse_configured():
         return {"label": "Langfuse: missing credentials", "state": "inactive"}
-    if _langfuse_client() is None:
+    if _safe_langfuse_client() is None:
         return {"label": "Langfuse: SDK unavailable", "state": "inactive"}
 
     return {"label": "Langfuse: active", "state": "active"}
@@ -187,11 +259,14 @@ def observability_status() -> dict[str, str]:
 
 def flush_observability() -> None:
     """Flush pending Langfuse observations when available."""
-    langfuse = _langfuse_client()
+    langfuse = _safe_langfuse_client()
     if langfuse is None:
         return
 
-    langfuse.flush()
+    try:
+        langfuse.flush()
+    except Exception:
+        return
 
 
 def _report_turn_input(
@@ -283,10 +358,20 @@ def _langfuse_client() -> Any | None:
 
     try:
         from langfuse import get_client
-    except ImportError:
+    except Exception:
         return None
 
-    return get_client()
+    try:
+        return get_client()
+    except Exception:
+        return None
+
+
+def _safe_langfuse_client() -> Any | None:
+    try:
+        return _langfuse_client()
+    except Exception:
+        return None
 
 
 def _langfuse_enabled() -> bool:

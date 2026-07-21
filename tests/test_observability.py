@@ -6,8 +6,11 @@ from benno.models import User
 from benno.seed import seed_database
 from benno.services.ai_provider import AiMessageAnalysis
 from benno.services.observability import (
+    ObservationHandle,
+    flush_observability,
     observability_status,
     trace_report_decision,
+    trace_report_turn,
     traced_generation_input,
     traced_usage_details,
 )
@@ -72,11 +75,78 @@ def test_report_decision_updates_current_span(app, monkeypatch) -> None:
         analysis,
         ["visit_context"],
         "visit_type",
+        "Welche Besuchsart war es?",
     )
 
     assert captured_update["output"]["next_step"] == "visit_type"
+    assert captured_update["output"]["assistant_reply"] == "Welche Besuchsart war es?"
     assert captured_update["output"]["applied_step_keys"] == ["visit_context"]
     assert captured_update["output"]["accepted_ai_update_keys"] == ["visit_context"]
+
+
+def test_observation_update_errors_do_not_escape() -> None:
+    class BrokenObservation:
+        def update(self, **kwargs):
+            raise RuntimeError("Langfuse update failed")
+
+    ObservationHandle(BrokenObservation()).update(output={"status": "ok"})
+
+
+def test_flush_errors_do_not_escape(app, monkeypatch) -> None:
+    class BrokenLangfuseClient:
+        def flush(self):
+            raise RuntimeError("Langfuse flush failed")
+
+    monkeypatch.setattr(
+        "benno.services.observability._langfuse_client",
+        lambda: BrokenLangfuseClient(),
+    )
+
+    flush_observability()
+
+
+def test_trace_report_turn_uses_noop_when_client_lookup_fails(app, monkeypatch) -> None:
+    seed_database()
+    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    chat = start_report_chat(sales_user)
+    entered_trace_body = False
+
+    def raise_client_error():
+        raise RuntimeError("Langfuse client lookup failed")
+
+    monkeypatch.setattr(
+        "benno.services.observability._langfuse_client",
+        raise_client_error,
+    )
+
+    with trace_report_turn(
+        chat,
+        chat.report_draft,
+        "visit_context",
+        "PerfSolar",
+    ):
+        entered_trace_body = True
+
+    assert entered_trace_body is True
+
+
+def test_report_loop_continues_when_trace_update_fails(app, monkeypatch) -> None:
+    seed_database()
+    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    chat = start_report_chat(sales_user)
+
+    class BrokenLangfuseClient:
+        def update_current_span(self, **kwargs):
+            raise RuntimeError("Langfuse span update failed")
+
+    monkeypatch.setattr(
+        "benno.services.observability._langfuse_client",
+        lambda: BrokenLangfuseClient(),
+    )
+
+    process_report_message_with_ai(chat, "PerfSolar", None)
+
+    assert chat.messages[-1].sender == "assistant"
 
 
 def test_report_loop_wraps_turn_with_observability_trace(app, monkeypatch) -> None:

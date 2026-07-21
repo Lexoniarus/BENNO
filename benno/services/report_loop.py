@@ -184,13 +184,14 @@ def process_report_turn(
             gateway,
         )
         next_step = _advance_after_applied_steps(draft, applied_steps)
+        next_question = _next_question(chat, next_step, analysis)
         trace_report_decision(
             draft,
             analysis,
             [step.key for step in applied_steps],
             next_step.key if next_step else None,
+            next_question,
         )
-        next_question = _next_question(chat, next_step, analysis)
 
     return _complete_report_turn(chat, next_question)
 
