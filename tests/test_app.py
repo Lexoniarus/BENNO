@@ -8,6 +8,10 @@ from benno import create_app
 from benno.extensions import db
 
 
+def _project_root() -> Path:
+    return Path(__file__).resolve().parent.parent
+
+
 def test_create_app_uses_testing_configuration() -> None:
     app = create_app("testing")
 
@@ -76,4 +80,19 @@ def test_default_development_database_uses_project_root(monkeypatch) -> None:
     with app.app_context():
         database_path = Path(db.engine.url.database)
 
-    assert database_path == Path.cwd() / "benno-dev.sqlite3"
+    assert database_path == _project_root() / "benno-dev.sqlite3"
+
+
+def test_default_development_database_ignores_current_working_directory(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", "")
+    monkeypatch.chdir(tmp_path)
+
+    app = create_app("development")
+
+    with app.app_context():
+        database_path = Path(db.engine.url.database)
+
+    assert database_path == _project_root() / "benno-dev.sqlite3"

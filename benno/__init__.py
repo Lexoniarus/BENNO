@@ -12,6 +12,8 @@ from benno.config import CONFIG_BY_NAME, DevelopmentConfig
 from benno.extensions import db, login_manager
 from benno.routes import main_blueprint
 
+LOCAL_DATABASE_FILENAME = "benno-dev.sqlite3"
+
 
 def create_app(config_name: str | None = None) -> Flask:
     """Create and configure the BENNO Flask application."""
@@ -105,8 +107,12 @@ def _configure_database(app: Flask) -> None:
         app.config["SQLALCHEMY_DATABASE_URI"] = configured_uri
         return
 
-    database_path = Path.cwd() / "benno-dev.sqlite3"
+    database_path = _project_root() / LOCAL_DATABASE_FILENAME
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{database_path.as_posix()}"
+
+
+def _project_root() -> Path:
+    return Path(__file__).resolve().parent.parent
 
 
 def _ensure_instance_folder(app: Flask) -> None:
