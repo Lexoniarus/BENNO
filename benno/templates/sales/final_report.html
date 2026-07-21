@@ -4,10 +4,9 @@
 {% block shell_class %}app-shell--page{% endblock %}
 
 {% block content %}
-  <section class="page-section page-section--wide" aria-labelledby="final-report-title">
-    <div class="section-heading">
+  <section class="page-section page-section--wide workspace-shell" aria-labelledby="final-report-title">
+    <div class="section-heading workspace-header">
       <div>
-        <p class="hero__eyebrow">Vertriebsbereich</p>
         <h1 id="final-report-title">
           {% if report.mock_visit_report %}
             Besuchsbericht {{ report.mock_visit_report.visit_report_number }}
@@ -15,6 +14,7 @@
             Besuchsbericht #{{ report.id }}
           {% endif %}
         </h1>
+        <p class="workspace-subtitle">Lokal bestätigter Mock-eNVenta-Besuchsbericht.</p>
       </div>
       <a class="button button--link button--secondary" href="{{ url_for('sales.completed_reports') }}">
         Fertige Berichte
@@ -63,7 +63,7 @@
         </div>
       </dl>
 
-      <article class="review-block review-block--wide">
+      <article class="review-block review-block--wide writeback-panel">
         <span>Finaler Berichtstext</span>
         <pre>{{ report.final_report_text }}</pre>
       </article>
