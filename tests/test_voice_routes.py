@@ -54,8 +54,54 @@ def test_voice_turn_transcribes_and_advances_own_chat(app, monkeypatch) -> None:
     assert response.status_code == 200
     assert payload["transcript"] == "Ich war vor Ort bei Nordlicht Solar."
     assert payload["assistant_reply"]
+    assert payload["assistant_message_id"]
+    assert payload["assistant_speech_url"].endswith(
+        f"/sales/reports/{chat_id}/messages/"
+        f"{payload['assistant_message_id']}/speech"
+    )
     assert payload["audio"] == "d2F2LWJ5dGVz"
+    assert payload["tts_error"] is None
     assert user_messages[-1].message_text == "Ich war vor Ort bei Nordlicht Solar."
+
+
+def test_voice_turn_keeps_chat_turn_when_tts_fails(app, monkeypatch) -> None:
+    seed_database()
+    monkeypatch.setattr(
+        "benno.sales.transcribe_audio",
+        lambda *_args: "Ich war virtuell bei Nordlicht Solar.",
+    )
+
+    def fail_speech(_text):
+        raise VoiceServiceError("Lokaler Sprachdienst ist nicht verfügbar.")
+
+    monkeypatch.setattr("benno.sales.synthesize_speech", fail_speech)
+
+    with app.test_client() as client:
+        _login(client)
+        new_response = client.get("/sales/reports/new")
+        chat_id = int(new_response.location.rsplit("/", 1)[-1])
+        response = client.post(
+            f"/sales/reports/{chat_id}/voice-turn",
+            data={"audio": (BytesIO(b"audio-bytes"), "answer.webm")},
+            content_type="multipart/form-data",
+        )
+
+    payload = response.get_json()
+    chat = db.session.get(Chat, chat_id)
+    user_messages = [
+        message
+        for message in chat.messages
+        if message.sender == MessageSender.USER.value
+    ]
+
+    assert response.status_code == 200
+    assert payload["transcript"] == "Ich war virtuell bei Nordlicht Solar."
+    assert payload["assistant_reply"]
+    assert payload["assistant_speech_url"]
+    assert payload["audio"] is None
+    assert payload["audio_mime_type"] is None
+    assert payload["tts_error"] == "Sprachausgabe nicht verfügbar."
+    assert user_messages[-1].message_text == "Ich war virtuell bei Nordlicht Solar."
 
 
 def test_voice_turn_requires_own_chat(app, monkeypatch) -> None:
@@ -84,7 +130,7 @@ def test_voice_turn_returns_controlled_error_when_stt_fails(app, monkeypatch) ->
     seed_database()
 
     def fail_transcription(*_args):
-        raise VoiceServiceError("Lokaler Sprachdienst ist nicht verfuegbar.")
+        raise VoiceServiceError("Lokaler Sprachdienst ist nicht verfügbar.")
 
     monkeypatch.setattr("benno.sales.transcribe_audio", fail_transcription)
 
@@ -99,9 +145,7 @@ def test_voice_turn_returns_controlled_error_when_stt_fails(app, monkeypatch) ->
         )
 
     assert response.status_code == 503
-    assert response.get_json() == {
-        "error": "Lokaler Sprachdienst ist nicht verfuegbar."
-    }
+    assert response.get_json() == {"error": "Lokaler Sprachdienst ist nicht verfügbar."}
 
 
 def test_assistant_speech_rejects_user_messages(app, monkeypatch) -> None:

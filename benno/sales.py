@@ -185,11 +185,16 @@ def report_voice_turn(chat_id: int):
             "transcript": transcript,
             "assistant_reply": assistant_message.message_text,
             "assistant_message_id": assistant_message.id,
+            "assistant_speech_url": url_for(
+                "sales.assistant_message_speech",
+                chat_id=chat.id,
+                message_id=assistant_message.id,
+            ),
             "chat_status": chat.status,
             "ready_for_review": is_ready_for_review(chat),
             "audio": speech.as_base64() if speech else None,
             "audio_mime_type": speech.mimetype if speech else None,
-            "tts_error": None if speech else "Sprachausgabe nicht verfuegbar.",
+            "tts_error": None if speech else "Sprachausgabe nicht verfügbar.",
         }
     )
 

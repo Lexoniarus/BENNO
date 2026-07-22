@@ -69,6 +69,22 @@ def test_transcribe_audio_rejects_empty_transcript(app, monkeypatch) -> None:
         transcribe_audio(b"audio-bytes", "answer.webm", "audio/webm")
 
 
+def test_transcribe_audio_reports_invalid_json_with_umlauts(app, monkeypatch) -> None:
+    class BrokenJsonResponse(_FakeResponse):
+        def json(self):
+            raise ValueError("not json")
+
+    monkeypatch.setattr(
+        "benno.services.voice.httpx.post",
+        lambda *_args, **_kwargs: BrokenJsonResponse(content=b"not-json"),
+    )
+
+    with app.app_context(), pytest.raises(VoiceServiceError) as error:
+        transcribe_audio(b"audio-bytes", "answer.webm", "audio/webm")
+
+    assert str(error.value) == "Speaches hat keine gültige JSON-Antwort geliefert."
+
+
 def test_synthesize_speech_posts_kokoro_payload(app, monkeypatch) -> None:
     captured = {}
 
@@ -103,5 +119,14 @@ def test_sidecar_http_errors_are_controlled(app, monkeypatch) -> None:
 
     monkeypatch.setattr("benno.services.voice.httpx.post", fake_post)
 
-    with app.app_context(), pytest.raises(VoiceServiceError):
+    with app.app_context(), pytest.raises(VoiceServiceError) as error:
         synthesize_speech("Hallo.")
+
+    assert str(error.value) == "Lokaler Sprachdienst ist nicht verfügbar."
+
+
+def test_synthesize_speech_rejects_empty_text_with_umlauts(app) -> None:
+    with app.app_context(), pytest.raises(VoiceServiceError) as error:
+        synthesize_speech(" ")
+
+    assert str(error.value) == "Kein Text für die Sprachausgabe vorhanden."

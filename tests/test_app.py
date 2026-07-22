@@ -28,6 +28,19 @@ def test_report_form_script_adds_pending_typing_state() -> None:
     assert 'reportForm.setAttribute("aria-busy", "true")' in script_text
 
 
+def test_voice_script_marks_dynamic_assistant_replies_for_speech() -> None:
+    script_text = (_project_root() / "benno" / "static" / "js" / "app.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert "article.dataset.assistantMessage" in script_text
+    assert "article.dataset.speechUrl = options.speechUrl" in script_text
+    assert "payload.assistant_speech_url" in script_text
+    assert "payload.tts_error || !payload.audio" in script_text
+    assert "stopVoiceMode();" in script_text
+    assert "Ich höre zu. Sprich deine Antwort." in script_text
+
+
 def test_create_app_uses_testing_configuration() -> None:
     app = create_app("testing")
 

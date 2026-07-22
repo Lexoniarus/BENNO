@@ -46,7 +46,7 @@ def synthesize_speech(text: str) -> SynthesizedSpeech:
     _ensure_voice_enabled()
     clean_text = text.strip()
     if not clean_text:
-        raise VoiceServiceError("Kein Text fuer die Sprachausgabe vorhanden.")
+        raise VoiceServiceError("Kein Text für die Sprachausgabe vorhanden.")
 
     response = _post_kokoro_speech(clean_text)
     if not response.content:
@@ -105,7 +105,7 @@ def _post_to_sidecar(url: str, **kwargs) -> httpx.Response:
         response = httpx.post(url, timeout=60.0, **kwargs)
         response.raise_for_status()
     except httpx.HTTPError as error:
-        raise VoiceServiceError("Lokaler Sprachdienst ist nicht verfuegbar.") from error
+        raise VoiceServiceError("Lokaler Sprachdienst ist nicht verfügbar.") from error
 
     return response
 
@@ -119,7 +119,7 @@ def _extract_transcript(response: httpx.Response) -> str:
         payload = response.json()
     except ValueError as error:
         raise VoiceServiceError(
-            "Speaches hat keine gueltige JSON-Antwort geliefert."
+            "Speaches hat keine gültige JSON-Antwort geliefert."
         ) from error
 
     return str(payload.get("text", "")).strip()

@@ -40,13 +40,22 @@ function scrollChatToBottom() {
   chatPanel.scrollTop = chatPanel.scrollHeight;
 }
 
-function addChatMessage(sender, text, extraClass = "") {
+function addChatMessage(sender, text, extraClass = "", options = {}) {
   if (!chatPanel) {
     return;
   }
 
   const article = document.createElement("article");
   article.className = `chat-message chat-message--${sender} ${extraClass}`.trim();
+  if (options.messageId) {
+    article.dataset.messageId = options.messageId;
+  }
+  if (sender === "assistant" && (options.messageId || options.speechUrl)) {
+    article.dataset.assistantMessage = "";
+  }
+  if (options.speechUrl) {
+    article.dataset.speechUrl = options.speechUrl;
+  }
 
   const label = document.createElement("span");
   label.textContent = sender === "assistant" ? "BENNO" : "Du";
@@ -166,8 +175,7 @@ async function playLatestAssistantSpeech() {
 
   const response = await fetch(message.dataset.speechUrl, { method: "POST" });
   if (!response.ok) {
-    setVoiceStatus("Sprachausgabe nicht verfuegbar, Aufnahme startet trotzdem.");
-    return;
+    throw new Error("Sprachausgabe ist nicht verfügbar.");
   }
 
   const audioBlob = await response.blob();
@@ -225,7 +233,7 @@ async function startVoiceRecording() {
   voiceState.levelTimer = window.setInterval(checkVoiceLevel, 160);
   voiceState.maxTimer = window.setTimeout(stopActiveRecording, maxRecordingMs);
   setVoiceControlsRecording(true);
-  setVoiceStatus("Ich hoere zu. Sprich deine Antwort.");
+  setVoiceStatus("Ich höre zu. Sprich deine Antwort.");
 }
 
 function prepareAudioAnalyser(stream) {
@@ -329,7 +337,18 @@ async function submitVoiceRecording() {
     }
 
     addChatMessage("user", payload.transcript);
-    addChatMessage("assistant", payload.assistant_reply);
+    addChatMessage("assistant", payload.assistant_reply, "", {
+      messageId: payload.assistant_message_id,
+      speechUrl: payload.assistant_speech_url,
+    });
+    if (payload.tts_error || !payload.audio) {
+      stopVoiceMode();
+      setVoiceStatus(
+        payload.tts_error ||
+          "Sprachausgabe ist nicht verfügbar. Bitte nutze die Texteingabe.",
+      );
+      return;
+    }
     setVoiceStatus("BENNO antwortet.");
     await playBase64Audio(payload.audio, payload.audio_mime_type);
     await continueVoiceMode(payload);
