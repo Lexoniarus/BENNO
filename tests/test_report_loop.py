@@ -344,6 +344,18 @@ def test_report_display_text_removes_markdown_artifacts() -> None:
     )
 
 
+def test_report_display_text_uses_mock_enventa_wording() -> None:
+    normalized_text = normalize_report_display_text(
+        "### CRM-Besuchsbericht\n\nCRM Besuchsbericht fuer Nordlicht"
+    )
+
+    assert "CRM-Besuchsbericht" not in normalized_text
+    assert "CRM Besuchsbericht" not in normalized_text
+    assert normalized_text == (
+        "Mock-eNVenta-Besuchsbericht\n\n" "Mock-eNVenta-Besuchsbericht fuer Nordlicht"
+    )
+
+
 def test_review_uses_normalized_ai_text_and_german_visit_type_label(app) -> None:
     seed_database()
     chat = _start_sales_chat()
@@ -362,6 +374,30 @@ def test_review_uses_normalized_ai_text_and_german_visit_type_label(app) -> None
     assert section_values["Besuchsart"] == "Vor Ort"
     assert review["review_text"] == "Pruefung\nAlles passt."
     assert review["final_report_text"] == "Bericht\nBesuchsart: Vor-Ort-Termin"
+
+
+def test_review_uses_follow_up_date_for_next_appointment(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    draft = chat.report_draft
+    draft.follow_up_date = date(2026, 7, 29)
+    draft.draft_data_json = {
+        "answers": {
+            "visit_context": "Nordlicht Maschinenbau GmbH",
+            "visit_type": "in_person",
+            "participants": "Mara Stein",
+            "visit_date": "2026-07-22",
+            "target_topic": "Forecast",
+            "info_text": "Forecast besprochen.",
+            "agreement_text": "Unterlagen werden geschickt.",
+            "next_action": "Innendienst ruft naechste Woche nach.",
+        }
+    }
+
+    review = build_report_review(draft)
+
+    section_values = dict(review["sections"])
+    assert section_values["Termin ab"] == "2026-07-29"
 
 
 def test_strict_question_answer_flow_reaches_review_without_optional_references(

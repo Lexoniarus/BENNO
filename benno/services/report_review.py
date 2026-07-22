@@ -37,7 +37,7 @@ def _build_review_sections(draft: ReportDraft) -> list[tuple[str, str]]:
     answers = draft_data(draft).get("answers", {})
     return [
         *_core_review_sections(draft, answers),
-        *_reference_review_sections(answers),
+        *_reference_review_sections(draft, answers),
         *_closing_review_sections(draft, answers),
     ]
 
@@ -58,11 +58,14 @@ def _core_review_sections(
     ]
 
 
-def _reference_review_sections(answers: dict[str, Any]) -> list[tuple[str, str]]:
+def _reference_review_sections(
+    draft: ReportDraft,
+    answers: dict[str, Any],
+) -> list[tuple[str, str]]:
     return [
         _review_section(
             "Termin ab",
-            answers.get("next_appointment_date"),
+            draft.follow_up_date or answers.get("next_appointment_date"),
             empty="Nicht relevant",
         ),
         _review_section(
@@ -198,7 +201,8 @@ def normalize_report_display_text(text: str) -> str:
 
         normalized_lines.append(cleaned_line)
 
-    return "\n".join(_collapse_blank_lines(normalized_lines)).strip()
+    normalized_text = "\n".join(_collapse_blank_lines(normalized_lines)).strip()
+    return _normalize_report_context_wording(normalized_text)
 
 
 def _normalize_report_line(line: str) -> str | None:
@@ -233,6 +237,15 @@ def _collapse_blank_lines(lines: list[str]) -> list[str]:
         previous_blank = is_blank
 
     return collapsed_lines
+
+
+def _normalize_report_context_wording(text: str) -> str:
+    return re.sub(
+        r"\bCRM[\s-]+Besuchsbericht\b",
+        "Mock-eNVenta-Besuchsbericht",
+        text,
+        flags=re.IGNORECASE,
+    )
 
 
 def format_ratings(ratings: dict[str, Any]) -> str:
