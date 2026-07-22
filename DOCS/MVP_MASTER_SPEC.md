@@ -38,7 +38,7 @@ The assistant should help with:
 
 The MVP focuses on the standard B2B sales visit report.
 
-The first vertical slice is text-based. Voice input and voice output remain part of the target vision, but they are not required for the first technical proof.
+The first vertical slice is text-based. Voice input and voice output remain part of the target vision. After the stable text workflow, Phase 9 adds voice as a layer over the same workflow.
 
 The core flow is:
 
@@ -73,7 +73,7 @@ The MVP includes:
 Current scope boundaries:
 
 - The first vertical slice is text-based.
-- STT and TTS are added after the text-based Gemini workflow can create and save a stable report.
+- STT and TTS are added after the text-based Gemini workflow can create and save a stable report. This condition is now met by the Phase 6/8 baseline, so voice is the next planned implementation phase.
 - The MVP uses a local placeholder CRM/ERP service before any real eNVenta integration.
 - The first screenshot-based eNVenta visit report field mapping is documented and used for the Phase 6 mock target.
 - The admin area stays simple in the first slice.
@@ -96,7 +96,7 @@ The slice should demonstrate that a sales representative can:
 9. explicitly confirm the report
 10. save the final report locally
 
-The first slice intentionally excludes STT and TTS so the core dialog, draft, validation, and review workflow can be stabilized before audio is added.
+The first slice intentionally excluded STT and TTS so the core dialog, draft, validation, and review workflow could be stabilized before audio is added.
 
 ## 6. Target Voice Vision
 
@@ -279,18 +279,27 @@ If local models are used, they may require tighter application-side control:
 
 ## 13. STT And TTS Strategy
 
-Speech-to-text and text-to-speech are later layers over the text workflow.
+Speech-to-text and text-to-speech are layers over the text workflow.
 
-They should preferably run locally through the Python backend.
+The next implementation phase adds the first practical voice layer.
 
-The frontend records or plays audio. The backend coordinates or performs transcription and speech synthesis.
+The frontend records microphone audio and plays generated audio. The backend coordinates transcription and speech synthesis.
+
+Browser microphone access is used for capture. BENNO should not rely on
+browser-native speech recognition as the primary MVP path because support and
+behavior vary between browsers. Instead, recorded audio should be sent to a
+backend STT boundary, and the resulting transcript should enter the existing
+text report loop.
+
+The current TTS integration target is the local Docker-based Kokoro/Martin
+service available in the development environment.
 
 Initial test candidates from earlier research:
 
-- STT first candidate: `primeline/whisper-large-v3-turbo-german`
+- STT first candidate: browser microphone capture plus backend STT with `primeline/whisper-large-v3-turbo-german`
 - STT fallback: `primeline/whisper-tiny-german`
 - STT performance path: GGML / whisper.cpp / faster-whisper
-- TTS first candidate: `Godelaune/Kokoro-82M-ONNX-German-Martin`
+- TTS first candidate: local Kokoro/Martin Docker service using `Godelaune/Kokoro-82M-ONNX-German-Martin`
 - TTS fallback: Thorsten / Piper voices
 
 These model choices are candidates, not final implementation commitments.

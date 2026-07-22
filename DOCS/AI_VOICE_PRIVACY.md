@@ -163,7 +163,7 @@ Voice is a layer over the text workflow.
 The target flow is:
 
 ```text
-voice input -> STT -> text turn -> same chat workflow -> assistant text -> TTS -> voice output
+browser microphone capture -> STT -> text turn -> same chat workflow -> assistant text -> TTS -> browser audio playback
 ```
 
 Speech-to-text only replaces manual text input.
@@ -171,6 +171,21 @@ Speech-to-text only replaces manual text input.
 Text-to-speech only adds spoken output. It does not replace the visible text interface.
 
 The core report workflow remains text-based internally.
+
+For the next implementation phase, BENNO should start with explicit voice
+controls rather than immediate full hands-free automation:
+
+- record button in the report chat
+- visible recording state
+- transcript preview or direct transcript insertion as a normal chat message
+- assistant audio playback after the text answer is produced
+- text input remains available at all times
+
+The browser should handle microphone access and recording. The backend should
+coordinate the actual transcription path so BENNO keeps one stable server-side
+STT boundary. Browser-native speech recognition may be tested as an experiment,
+but it should not be the primary MVP path because its availability and behavior
+vary by browser.
 
 ## Hands-Free Target
 
@@ -191,7 +206,13 @@ The visible chat remains available as fallback and transparency layer.
 
 ## STT And TTS Candidates
 
-Initial STT candidate:
+Initial STT direction:
+
+- browser microphone capture through standard web media APIs
+- backend STT endpoint that receives a temporary audio upload
+- transcript is stored as a normal chat message
+
+Initial local STT candidate:
 
 - `primeline/whisper-large-v3-turbo-german`
 
@@ -201,7 +222,14 @@ STT fallback or performance paths:
 - faster-whisper
 - whisper.cpp or GGML-based runtime
 
-Initial TTS candidate:
+Initial TTS direction:
+
+- use the local Docker-based Kokoro/Martin service already available in the
+  development environment
+- backend TTS endpoint sends assistant text to that service
+- browser plays the returned audio
+
+Initial local TTS candidate:
 
 - `Godelaune/Kokoro-82M-ONNX-German-Martin`
 
@@ -209,7 +237,8 @@ TTS fallback:
 
 - Thorsten/Piper voices
 
-These are test candidates, not final commitments.
+These are test candidates and current local integration targets, not final
+production commitments.
 
 ## Privacy Direction
 
@@ -230,10 +259,10 @@ Raw audio should not become a long-term business record.
 Target behavior:
 
 - frontend keeps audio only as recording/upload buffer
-- backend processes audio for transcription
+- backend processes audio for transcription through a controlled STT boundary
 - transcript becomes the relevant chat input
 - raw audio is discarded after transcription, completion, or cancellation
-- generated TTS audio is not stored as a long-term archive
+- generated TTS audio is returned for playback and not stored as a long-term archive
 
 During development, temporary audio may exist for processing, but the product direction is no raw-audio archive.
 

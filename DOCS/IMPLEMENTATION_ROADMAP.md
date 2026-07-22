@@ -8,7 +8,9 @@ It is not a product concept document. It is a practical implementation roadmap: 
 
 Guiding principle:
 
-> Build a small, complete text loop first. Then add depth, voice, real eNVenta integration, Postgres, and local AI.
+> Build a small, complete text loop first. Then add voice on top of that
+> workflow, stabilize the demo scenarios, and only then add Postgres, local AI,
+> or real eNVenta integration depth.
 
 BENNO must not be built as one large big-bang application. Every phase should be runnable, testable, and committable.
 
@@ -411,7 +413,53 @@ Done when:
 - The status overview is simple but useful.
 - The admin area does not become a content surveillance interface.
 
-## Phase 9: Stabilization And Demo Scenarios
+## Phase 9: Voice STT/TTS Foundation
+
+Goal:
+
+Voice is added as an input and output layer over the existing text report
+workflow.
+
+Principle:
+
+```text
+browser microphone capture -> STT -> text turn -> same report loop -> assistant text -> TTS -> browser audio playback
+```
+
+Current implementation direction:
+
+- Keep the text chat as the source-of-truth interaction surface.
+- Add browser microphone capture through standard web media APIs.
+- Send recorded audio to the backend for transcription unless a browser STT
+  experiment is explicitly enabled.
+- Treat the transcript exactly like a manually typed chat message.
+- Use the existing local Kokoro/Martin Docker TTS service for spoken BENNO
+  responses.
+- Return playable audio to the browser without storing generated audio as a
+  long-term business record.
+- Start with push-to-talk or an explicit recording control before attempting a
+  mostly hands-free mode.
+
+Important:
+
+- The report loop, Gemini extraction, validation, review, and mock-eNVenta
+  writeback must not be rewritten for voice.
+- STT only creates text input.
+- TTS only reads assistant output.
+- Visual text remains available for correction, transparency, and fallback.
+- Browser `SpeechRecognition` may be tested as an experiment, but it is not the
+  primary MVP path because browser support and behavior are less predictable
+  than microphone capture plus backend-controlled STT.
+
+Done when:
+
+- A sales user can record a voice answer in the report chat.
+- The transcript appears as a normal chat message.
+- The same Phase 6/8 report loop processes that transcript.
+- BENNO can read the next assistant response aloud through local TTS.
+- The user can continue by text if microphone, STT, or TTS fails.
+
+## Phase 10: Stabilization And Demo Scenarios
 
 Goal:
 
@@ -432,9 +480,9 @@ Done when:
 
 - All demo scenarios can be played through.
 - Error cases are handled understandably.
-- The text loop is stable enough to build voice on top.
+- The text and first voice-assisted loop are stable enough for a mentor demo.
 
-## Phase 10: Local Or OpenAI-Compatible Provider Fallback
+## Phase 11: Local Or OpenAI-Compatible Provider Fallback
 
 Goal:
 
@@ -461,38 +509,6 @@ Done when:
 - The same text loop can be tested with a local provider.
 - Differences to Gemini are documented.
 - There is enough evidence to decide how far BENNO can run locally.
-
-## Phase 11: STT And TTS
-
-Goal:
-
-Voice is added as a layer over the same workflow.
-
-Principle:
-
-```text
-voice input -> STT -> text turn -> same chat workflow -> assistant text -> TTS -> voice output
-```
-
-Scope:
-
-- capture voice input
-- convert speech to text
-- treat transcript as a normal chat message
-- read BENNO responses aloud
-- read the final review aloud
-
-Important:
-
-- The business workflow stays the same.
-- STT only replaces text input.
-- TTS does not replace visual output; it adds voice output.
-
-Done when:
-
-- A report can be started by voice input.
-- BENNO can read responses aloud.
-- The user can still see text and intervene manually if needed.
 
 ## Later MVP: Postgres And Real eNVenta Integration
 
@@ -526,13 +542,14 @@ The completed baseline now includes Flask, data model, login, the text report
 loop, Gemini, eNVenta-shaped mock writeback, the internal CRM/eNVenta gateway,
 and optional Langfuse observability.
 
-The next practical step is Phase 8:
+Phase 8 is complete. The next practical step is Phase 9:
 
-1. perform a focused frontend and admin UX overhaul
-2. complete the minimal admin configuration UI
-3. keep admin content boundaries intact
-4. make provider and language settings editable through admin routes
-5. then move into repeatable demo-scenario stabilization
+1. add browser microphone capture to the report chat
+2. transcribe recorded speech into the existing text turn flow
+3. connect local Kokoro/Martin TTS for assistant playback
+4. keep text input and visible transcript as the fallback path
+5. test the same eNVenta-shaped report scenarios with voice-assisted input
 
-After Phase 8, BENNO should be tested through the fixed demo scenarios before
-adding local provider support, voice, Postgres, or real eNVenta integration.
+After Phase 9, BENNO should move into repeatable demo-scenario stabilization
+before adding Postgres, local LLM provider experiments, or real eNVenta
+integration.
