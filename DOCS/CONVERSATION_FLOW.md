@@ -73,7 +73,7 @@ already completed or marked not applicable.
 
 | Key | German label | Required | Section | Fallback question |
 |---|---|---|---|---|
-| `visit_context` | Besuchskontext | Yes | `customer_context` | `Um welchen Kunden, Lead oder Kontakt ging es bei dem Besuch?` |
+| `visit_context` | AKL-Kontext | Yes | `customer_context` | `Um welchen AKL-Eintrag ging es: Adresse, Kunde oder Lieferant? Falls es ein neuer Interessent ist, sag das bitte dazu.` |
 | `visit_type` | Besuchsart | Yes | `visit_type` | `War der Besuch persönlich, virtuell oder telefonisch?` |
 | `participants` | Teilnehmer | Yes | `contacts` | `Wer hat an dem Gespräch teilgenommen?` |
 | `visit_date` | Besuchsdatum | Yes | `visit_date` | `War der Besuch heute oder an einem anderen Datum?` |
@@ -205,11 +205,25 @@ Provider-facing AI responses may use a different wire shape than BENNO's interna
 
 The backend converts this into the internal section map only after validation. Unknown section names, empty values, malformed update objects, and provider errors must not break the report loop. They are ignored or handled through deterministic fallback behavior.
 
-## Account And Visit Context
+## AKL And Visit Context
 
 `visit_context` is mandatory.
 
-BENNO distinguishes:
+Phase 6 and later should use eNVenta-oriented AKL language instead of the older
+generic "customer/lead/contact" wording. AKL is one account/address domain with
+three account types:
+
+| AKL type | Meaning in BENNO |
+|---|---|
+| `A` | Adresse, including existing address/lead-like entries |
+| `K` | Kunde |
+| `L` | Lieferant |
+
+Contacts are not a fourth AKL type. They are separate `MockContact` or later
+eNVenta contact records linked to an AKL record.
+
+BENNO still needs a conversational business classification around the AKL
+record:
 
 | Context | Meaning |
 |---|---|
@@ -217,6 +231,10 @@ BENNO distinguishes:
 | `existing_lead` | AKL account of type `A` is known and can be referenced |
 | `new_lead` | New lead or address was mentioned and must not be created automatically |
 | `unclear` | BENNO cannot decide and must ask |
+
+The UI and review should make this distinction visible. A report should not only
+show a generic "Kunde/Lead/Kontakt" label when the relevant eNVenta target is an
+AKL account plus separately linked contacts.
 
 New accounts, contacts, offers, or orders must not be created automatically.
 BENNO may capture the information as report text. Follow-up work is handled
@@ -330,7 +348,8 @@ set. This confirmation step can be deterministic; it does not need an LLM call.
 
 It should include:
 
-- customer or lead context
+- AKL context, including whether the record is an address, customer, supplier,
+  known address/lead, or new address/lead case
 - participants
 - visit type and visit date
 - target topic
@@ -353,6 +372,33 @@ During review, the user may:
 - reject and correct a field
 - ask to repeat the review
 - cancel the report
+
+Phase 9 manual voice testing showed that this review must become more directly
+editable. STT can mishear company names, contact names, and German business
+terms. The review should therefore not rely only on one correction dropdown plus
+one free text field. It should allow direct field-level correction for at least:
+
+- AKL display/search name
+- AKL type or lead/address classification
+- contact or participant name
+- target topic
+- info text
+- agreement text
+- next action
+- offer and order references
+- reminder decision and reminder message
+- eNVenta ratings
+
+The Phase 9 stabilization patch implements these corrections as structured
+review fields that still feed the existing backend correction path. This keeps
+the review safe while making common STT corrections much faster.
+
+Follow-up reminders also need special review attention. If the transcript or
+assistant summary clearly says that inside sales should call, follow up, or
+prepare something, BENNO should surface a pending `MockReminder` before final
+confirmation. This should be robust against imperfect STT such as "Indienst" or
+other near misses when the surrounding sentence still means inside-sales
+follow-up.
 
 ## Core Safety Rules
 

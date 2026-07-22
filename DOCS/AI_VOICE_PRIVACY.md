@@ -190,6 +190,37 @@ The first implementation uses direct send rather than an editable transcript
 preview. This matches the hands-free target more closely, while the visible chat
 still provides transparency and later correction options.
 
+Manual Phase 9 testing showed an important practical boundary: STT transcripts
+can be noisy even when the final report remains useful. German speech can
+produce distorted company names, contact names, and business terms. BENNO should
+therefore treat STT as a lossy input layer, not as authoritative master data.
+The LLM may still produce a good report by filtering irrelevant conversational
+details, such as coffee or casual small talk, but the user must be able to
+correct the structured review before saving.
+
+Voice review findings to keep visible for stabilization:
+
+- distinguish the eNVenta-like AKL account type clearly instead of showing only
+  generic "Kunde/Lead/Kontakt" wording; the Phase 9 stabilization patch starts
+  this by showing AKL name, AKL type, and contact/participants separately in
+  review/final screens
+- keep contacts or participants separate from the AKL account
+- make account/lead names directly editable in review because STT may mishear
+  names; direct structured review fields are the MVP correction path
+- detect inside-sales follow-up semantically enough to create a pending
+  `MockReminder`, even when STT slightly distorts "Innendienst"; known
+  near-misses such as "Indienst" are handled by deterministic rules
+- preserve useful LLM filtering of irrelevant speech details while keeping the
+  accepted structured fields reviewable
+
+TTS needs a separate pronunciation layer. Visible and stored text should keep
+the correct business spelling, for example `Lead`, `Mock-eNVenta`, or company
+names. The text sent to Kokoro may need audio-only normalization for better
+German playback, such as phonetic spellings for English terms. This
+pronunciation map must not change report text, database values, or user-visible
+labels. The first implementation applies this only inside the TTS
+orchestration layer before snippet caching and Kokoro generation.
+
 Because browser microphone and autoplay behavior depend on a user gesture, voice
 mode may still require one manual fallback click when the browser blocks
 autostart. BENNO should attempt voice autostart for in-progress report chats,

@@ -17,7 +17,7 @@ from benno.services.voice import SynthesizedSpeech, synthesize_speech
 STANDARD_TTS_SNIPPETS = (
     "Hallo ",
     ", ich bin bereit für deinen Besuchsbericht.",
-    "Um welchen Kunden, Lead oder Kontakt ging es bei dem Besuch?",
+    "Um welchen AKL-Eintrag ging es: Adresse, Kunde oder Lieferant?",
     "Danke für die Informationen zu ",
     "Wann genau hat der Besuch stattgefunden?",
     "Was war die Besuchsart: vor Ort, virtuell oder telefonisch?",
@@ -45,6 +45,12 @@ CONTEXT_TERM_KEYS = (
     "account_name",
     "contact_name",
 )
+TTS_PRONUNCIATION_REPLACEMENTS = (
+    (re.compile(r"\bMock-eNVenta\b", re.IGNORECASE), "Mock Enventa"),
+    (re.compile(r"\beNVenta\b", re.IGNORECASE), "Enventa"),
+    (re.compile(r"\bLead\b"), "Lied"),
+    (re.compile(r"\bLeads\b"), "Lieds"),
+)
 
 
 @dataclass(frozen=True)
@@ -61,17 +67,18 @@ def synthesize_assistant_speech(
     clean_text = _normalized_text(text)
     if not clean_text:
         return synthesize_speech(text)
+    tts_text = _tts_pronunciation_text(clean_text)
     if not _tts_cache_enabled():
-        return synthesize_speech(clean_text)
+        return synthesize_speech(tts_text)
 
-    segments = _assistant_text_segments(clean_text, context or {})
+    segments = _assistant_text_segments(tts_text, context or {})
     if len(segments) <= 1:
-        return _cached_snippet(clean_text)
+        return _cached_snippet(tts_text)
 
     try:
         return _compose_cached_segments(segments)
     except (OSError, wave.Error, ValueError):
-        return synthesize_speech(clean_text)
+        return synthesize_speech(tts_text)
 
 
 def prewarm_voice_cache() -> int:
@@ -81,10 +88,11 @@ def prewarm_voice_cache() -> int:
 
     warmed_count = 0
     for snippet_text in STANDARD_TTS_SNIPPETS:
-        cache_path = _cache_path_for_text(snippet_text)
+        spoken_snippet_text = _tts_pronunciation_text(_normalized_text(snippet_text))
+        cache_path = _cache_path_for_text(spoken_snippet_text)
         if cache_path.exists():
             continue
-        _cached_snippet(snippet_text)
+        _cached_snippet(spoken_snippet_text)
         warmed_count += 1
 
     return warmed_count
@@ -249,3 +257,11 @@ def _tts_cache_enabled() -> bool:
 
 def _normalized_text(text: object) -> str:
     return re.sub(r"\s+", " ", str(text)).strip()
+
+
+def _tts_pronunciation_text(text: str) -> str:
+    spoken_text = text
+    for pattern, replacement in TTS_PRONUNCIATION_REPLACEMENTS:
+        spoken_text = pattern.sub(replacement, spoken_text)
+
+    return spoken_text

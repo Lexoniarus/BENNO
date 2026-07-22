@@ -6,13 +6,21 @@ from typing import Any
 from benno.models import ReportDraft
 
 AI_CACHE_KEY = "ai_cache"
+ACCOUNT_TYPE_OVERRIDE_KEY = "account_type_override"
 CRM_REFERENCES_KEY = "crm_references"
 INSIDE_SALES_FOLLOW_UP_KEY = "inside_sales_follow_up_requested"
 DISPLAY_VALUE_LABELS = {
+    "A": "Adresse",
+    "K": "Kunde",
+    "L": "Lieferant",
+    "existing_customer": "Kunde",
+    "existing_lead": "Adresse / bestehender Interessent",
     "in_person": "Vor Ort",
+    "new_lead": "Adresse / neuer Interessent",
     "virtual": "Virtuell",
     "phone": "Telefonisch",
     "not_applicable": "Nicht relevant",
+    "unclear": "Unklar",
 }
 
 
@@ -34,6 +42,18 @@ def remove_draft_answer(draft: ReportDraft, key: str) -> None:
     answers.pop(key, None)
     data["answers"] = answers
     draft.draft_data_json = data
+
+
+def set_draft_metadata(
+    draft: ReportDraft,
+    key: str,
+    value: Any,
+) -> None:
+    """Set one top-level draft metadata value."""
+    draft.draft_data_json = {
+        **draft_data(draft),
+        key: value,
+    }
 
 
 def store_crm_reference(

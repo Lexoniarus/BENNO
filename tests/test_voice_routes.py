@@ -7,6 +7,8 @@ from benno.enums import MessageSender
 from benno.extensions import db
 from benno.models import Chat, ChatMessage, User
 from benno.seed import seed_database
+from benno.services.ai_provider import AiMessageAnalysis
+from benno.services.report_loop import process_report_message_with_ai, start_report_chat
 from benno.services.voice import VoiceServiceError
 
 
@@ -271,6 +273,20 @@ def test_assistant_speech_returns_audio(app, monkeypatch) -> None:
     assert response.mimetype == "audio/wav"
 
 
+def test_report_review_renders_structured_correction_fields(app) -> None:
+    seed_database()
+    chat = _ready_report_chat()
+
+    with app.test_client() as client:
+        _login(client)
+        response = client.get(f"/sales/reports/{chat.id}/review")
+
+    assert response.status_code == 200
+    assert b"correction_visit_context" in response.data
+    assert b"correction_account_type" in response.data
+    assert b"correction_priority_rating" in response.data
+
+
 class _FakeSpeech:
     mimetype = "audio/wav"
 
@@ -293,3 +309,27 @@ def _login(client):
 
 def _chat_id_from_location(location: str) -> int:
     return int(urlparse(location).path.rsplit("/", 1)[-1])
+
+
+def _ready_report_chat() -> Chat:
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
+    chat = start_report_chat(sales_user)
+    for answer in (
+        "Nordlicht Maschinenbau GmbH",
+        "persoenlich",
+        "Mara Stein",
+        "2026-07-07",
+        "Forecast",
+        "Forecast und Lieferfaehigkeit besprochen.",
+        "Revidiertes Angebot wird geschickt.",
+        "Innendienst soll anrufen.",
+        "8 7 6 9",
+    ):
+        process_report_message_with_ai(chat, answer, _NoAiService())
+
+    return chat
+
+
+class _NoAiService:
+    def analyze_report_message(self, _context, _message_text):
+        return AiMessageAnalysis()

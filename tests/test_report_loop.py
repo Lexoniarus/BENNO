@@ -16,6 +16,7 @@ from benno.services.mock_crm import (
 )
 from benno.services.report_ai_context import ai_message_context
 from benno.services.report_loop import (
+    apply_report_correction,
     build_report_review,
     confirm_report,
     process_report_message_with_ai,
@@ -40,7 +41,8 @@ def test_service_creates_phase_6_chat_draft_and_initial_question(app) -> None:
     assert len(chat.messages) == 1
     assert chat.messages[0].sender == MessageSender.ASSISTANT.value
     assert "Laura Schneider" in chat.messages[0].message_text
-    assert "Kunden, Lead oder Kontakt" in chat.messages[0].message_text
+    assert "AKL-Eintrag" in chat.messages[0].message_text
+    assert "Adresse, Kunde oder Lieferant" in chat.messages[0].message_text
 
 
 def test_fresh_ai_context_lists_phase_6_report_requirements(app) -> None:
@@ -740,6 +742,75 @@ def test_review_shows_enventa_target_sections(app) -> None:
     assert "Stärke" in labels
     assert "Schwäche" in labels
     assert "Wiedervorlagen" in labels
+
+
+def test_review_uses_akl_labels_and_structured_correction_fields(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+
+    review = build_report_review(chat.report_draft, _FakeAiService())
+    labels = [label for label, _value in review["sections"]]
+    field_keys = {field["key"] for field in review["structured_correction_fields"]}
+
+    assert "AKL-Name" in labels
+    assert "AKL-Typ" in labels
+    assert "Kontakt/Teilnehmer" in labels
+    assert "Kunde/Lead/Kontakt" not in labels
+    assert {
+        "visit_context",
+        "account_type",
+        "participants",
+        "reminder_message",
+        "priority_rating",
+    }.issubset(field_keys)
+
+
+def test_structured_review_corrections_update_akl_and_rating_fields(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+
+    apply_report_correction(chat, "visit_context", "Solar Sales Test GmbH")
+    apply_report_correction(chat, "account_type", "A")
+    apply_report_correction(chat, "priority_rating", "10")
+
+    draft = chat.report_draft
+    answers = draft.draft_data_json["answers"]
+    review = build_report_review(draft, _FakeAiService())
+
+    assert answers["visit_context"] == "Solar Sales Test GmbH"
+    assert draft.draft_data_json["account_type_override"] == "A"
+    assert draft.ratings_json["priority_rating"]["value"] == 10
+    assert "Adresse" in dict(review["sections"])["AKL-Typ"]
+    assert "ai_cache" not in draft.draft_data_json
+
+
+def test_indienst_near_miss_creates_mock_reminder_on_confirm(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    answers = [
+        "Nordlicht Maschinenbau GmbH",
+        "persoenlich",
+        "Mara Stein",
+        "2026-07-07",
+        "Forecast",
+        "Forecast und Lieferfaehigkeit besprochen.",
+        "Revidiertes Angebot wird geschickt.",
+        "Indienst soll anrufen.",
+        "8 7 6 9",
+    ]
+    for answer in answers:
+        process_report_message_with_ai(chat, answer, _FakeAiService())
+
+    assert chat.report_draft.draft_data_json["inside_sales_follow_up_requested"]
+
+    final_report = confirm_report(chat, _FakeAiService())
+    reminder = MockReminder.query.filter_by(
+        visit_report_number=final_report.mock_visit_report.visit_report_number
+    ).one()
+
+    assert "Indienst soll anrufen" in reminder.message
 
 
 def test_provider_error_falls_back_to_deterministic_flow(app) -> None:

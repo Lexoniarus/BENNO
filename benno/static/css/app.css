@@ -443,6 +443,12 @@ h3 {
   resize: vertical;
 }
 
+.review-correction-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .form-stack input:focus,
 .form-stack select:focus,
 .form-stack textarea:focus {
@@ -1072,6 +1078,10 @@ td a {
 
   .voice-controls__actions {
     justify-content: flex-start;
+  }
+
+  .review-correction-grid {
+    grid-template-columns: 1fr;
   }
 
   .metric-grid--workspace {

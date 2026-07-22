@@ -92,8 +92,11 @@ REPORT_STEPS = (
     ReportStep(
         key="visit_context",
         section=ReportSection.CUSTOMER_CONTEXT,
-        question="Which customer, lead, or contact was this visit about?",
-        question_de="Um welchen Kunden, Lead oder Kontakt ging es bei dem Besuch?",
+        question="Which AKL account was this visit about?",
+        question_de=(
+            "Um welchen AKL-Eintrag ging es: Adresse, Kunde oder Lieferant? "
+            "Falls es ein neuer Interessent ist, sag das bitte dazu."
+        ),
     ),
     ReportStep(
         key="visit_type",

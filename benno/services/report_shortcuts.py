@@ -315,7 +315,16 @@ def mentions_inside_sales_follow_up(message_text: str) -> bool:
     normalized_text = message_text.lower()
     owner_signal = any(
         keyword in normalized_text
-        for keyword in ("innendienst", "sachbearbeiter", "inside sales")
+        for keyword in (
+            "indienst",
+            "in den dienst",
+            "in die dienst",
+            "inendienst",
+            "innen dienst",
+            "innendienst",
+            "sachbearbeiter",
+            "inside sales",
+        )
     )
     action_signal = any(
         keyword in normalized_text

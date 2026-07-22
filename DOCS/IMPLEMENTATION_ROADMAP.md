@@ -490,6 +490,26 @@ Demo scenarios:
 7. Review is rejected and corrected
 8. Review is confirmed and saved
 
+Manual Phase 9 voice testing adds these stabilization topics:
+
+- noisy German STT must be expected; BENNO should keep text fallback and make
+  structured review correction easy
+- AKL wording must be eNVenta-oriented: address, customer, supplier, with
+  contacts handled separately
+- BENNO must visibly distinguish known customer/account cases from new
+  address/lead cases before writing to Mock-eNVenta
+- inside-sales follow-up should create a pending reminder even when STT
+  slightly distorts words such as "Innendienst"
+- TTS should use an audio-only pronunciation map for English or product terms,
+  while visible and stored text keeps the correct spelling
+- useful LLM filtering should be preserved: irrelevant speech details may be
+  omitted from the final report when they do not belong in the visit report
+
+The Phase 9 stabilization patch addresses the application-side items above with
+AKL-aware review/final labels, structured review correction fields, near-miss
+follow-up detection, and a first TTS pronunciation map. Remaining Phase 10 work
+is mainly repeatable demo hardening and STT model/configuration quality.
+
 Done when:
 
 - All demo scenarios can be played through.

@@ -261,8 +261,13 @@ def report_correction(chat_id: int):
     chat = _get_own_chat_or_404(chat_id)
     field_key = request.form.get("field_key", "").strip()
     correction_text = request.form.get("correction_text", "").strip()
+    structured_corrections = _structured_review_corrections(request.form)
     try:
-        apply_report_correction(chat, field_key, correction_text)
+        if structured_corrections:
+            for structured_field_key, structured_text in structured_corrections:
+                apply_report_correction(chat, structured_field_key, structured_text)
+        else:
+            apply_report_correction(chat, field_key, correction_text)
     except ValueError as error:
         flash(str(error), "warning")
 
@@ -407,6 +412,23 @@ def _voice_mimetype_is_supported(mimetype: str | None) -> bool:
     return (mimetype or "").lower() in SUPPORTED_VOICE_MIME_TYPES
 
 
+def _structured_review_corrections(form_data: Any) -> list[tuple[str, str]]:
+    corrections = []
+    for key in form_data:
+        if not key.startswith("correction_"):
+            continue
+
+        field_key = key.removeprefix("correction_")
+        value = form_data.get(key, "").strip()
+        original_value = form_data.get(f"original_{field_key}", "").strip()
+        if not value or value == original_value:
+            continue
+
+        corrections.append((field_key, value))
+
+    return corrections
+
+
 def _voice_should_auto_start(chat: Chat) -> bool:
     if not current_app.config.get("VOICE_ENABLED", False):
         return False
@@ -502,9 +524,10 @@ def _build_final_report_sections(report: FinalReport) -> list[tuple[str, str]]:
         return _fallback_final_report_sections(report)
 
     return [
-        ("Kunde/Lead", display_value(mock_visit_report.account_search_name)),
+        ("AKL-Name", display_value(mock_visit_report.account_search_name)),
+        ("AKL-Typ", display_value(mock_visit_report.account_type)),
         ("Besuchsart", display_value(mock_visit_report.visit_type)),
-        ("Teilnehmer", display_value(mock_visit_report.contact_name)),
+        ("Kontakt/Teilnehmer", display_value(mock_visit_report.contact_name)),
         ("Besuchsdatum", display_value(mock_visit_report.visit_date)),
         ("Ziel/Thema", display_value(mock_visit_report.target_topic)),
         ("Info", display_value(mock_visit_report.info_text)),
@@ -538,7 +561,14 @@ def _build_final_report_sections(report: FinalReport) -> list[tuple[str, str]]:
 
 def _fallback_final_report_sections(report: FinalReport) -> list[tuple[str, str]]:
     return [
-        ("Kunde/Lead", display_value(getattr(report.account, "search_name", None))),
+        ("AKL-Name", display_value(getattr(report.account, "search_name", None))),
+        (
+            "AKL-Typ",
+            display_value(
+                getattr(report.account, "account_type", None),
+                empty="Unklar",
+            ),
+        ),
         ("Besuchsart", display_value(report.visit_type)),
         ("Besuchsdatum", display_value(report.visit_date)),
         ("Info", display_value(report.summary)),

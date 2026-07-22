@@ -221,6 +221,32 @@ def test_assistant_speech_cache_can_be_disabled(app, monkeypatch, tmp_path) -> N
     assert calls == ["Hallo BENNO.", "Hallo BENNO."]
 
 
+def test_assistant_speech_pronunciation_changes_only_tts_input(
+    app,
+    monkeypatch,
+    tmp_path,
+) -> None:
+    app.config["VOICE_TTS_CACHE_DIR"] = str(tmp_path)
+    app.config["VOICE_TTS_CACHE_ENABLED"] = False
+    calls = []
+    visible_text = "Der Lead bleibt als Lead im Bericht sichtbar."
+
+    def fake_synthesize(text: str):
+        calls.append(text)
+        return _FakeSpeech(_wav_bytes(b"spoken"))
+
+    monkeypatch.setattr(
+        "benno.services.voice_tts_cache.synthesize_speech",
+        fake_synthesize,
+    )
+
+    with app.app_context():
+        synthesize_assistant_speech(visible_text)
+
+    assert visible_text == "Der Lead bleibt als Lead im Bericht sichtbar."
+    assert calls == ["Der Lied bleibt als Lied im Bericht sichtbar."]
+
+
 def test_assistant_speech_falls_back_when_cached_wav_is_invalid(
     app,
     monkeypatch,
