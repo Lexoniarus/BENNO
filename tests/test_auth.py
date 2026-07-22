@@ -1,6 +1,6 @@
 """Tests for BENNO authentication and role routing."""
 
-from werkzeug.security import generate_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from benno.enums import SessionLanguage, UserRole
 from benno.extensions import db
@@ -29,17 +29,44 @@ def test_valid_admin_login_redirects_to_admin_dashboard(app) -> None:
     seed_database()
 
     with app.test_client() as client:
-        response = _login(client, "admin@benno.local", "admin-demo-password")
+        response = _login(client, "nina.hartmann@solar-sales.example", "Admin123")
 
     assert response.status_code == 302
     assert response.location == "/admin"
+
+
+def test_seed_database_updates_admin_password_and_creates_sales_reps(app) -> None:
+    old_admin = User(
+        email="nina.hartmann@solar-sales.example",
+        username="Old Admin",
+        password_hash=generate_password_hash("admin-demo-password"),
+        role=UserRole.ADMIN.value,
+        preferred_language=SessionLanguage.DE.value,
+        is_active=True,
+    )
+    db.session.add(old_admin)
+    db.session.commit()
+
+    seed_database()
+
+    admin = User.query.filter_by(email="nina.hartmann@solar-sales.example").one()
+    sales_users = User.query.filter_by(role=UserRole.SALES_REP.value).all()
+
+    assert admin.username == "Nina Hartmann"
+    assert check_password_hash(admin.password_hash, "Admin123")
+    assert {user.email: user.external_sales_rep_id for user in sales_users} == {
+        "laura.schneider@solar-sales.example": "REP-001",
+        "markus.weber@solar-sales.example": "REP-002",
+        "sophie.klein@solar-sales.example": "REP-003",
+        "tobias.fischer@solar-sales.example": "REP-004",
+    }
 
 
 def test_valid_sales_login_redirects_to_sales_dashboard(app) -> None:
     seed_database()
 
     with app.test_client() as client:
-        response = _login(client, "sales@benno.local", "sales-demo-password")
+        response = _login(client, "laura.schneider@solar-sales.example", "Sales123")
 
     assert response.status_code == 302
     assert response.location == "/sales"
@@ -49,7 +76,7 @@ def test_root_redirects_logged_in_admin_to_admin_dashboard(app) -> None:
     seed_database()
 
     with app.test_client() as client:
-        _login(client, "admin@benno.local", "admin-demo-password")
+        _login(client, "nina.hartmann@solar-sales.example", "Admin123")
         response = client.get("/")
 
     assert response.status_code == 302
@@ -60,7 +87,7 @@ def test_root_redirects_logged_in_sales_user_to_sales_dashboard(app) -> None:
     seed_database()
 
     with app.test_client() as client:
-        _login(client, "sales@benno.local", "sales-demo-password")
+        _login(client, "laura.schneider@solar-sales.example", "Sales123")
         response = client.get("/")
 
     assert response.status_code == 302
@@ -71,7 +98,11 @@ def test_wrong_password_stays_on_login_with_controlled_error(app) -> None:
     seed_database()
 
     with app.test_client() as client:
-        response = _login(client, "sales@benno.local", "wrong-password")
+        response = _login(
+            client,
+            "laura.schneider@solar-sales.example",
+            "wrong-password",
+        )
 
     assert response.status_code == 200
     assert "E-Mail oder Passwort ist ungültig.".encode() in response.data
@@ -100,7 +131,7 @@ def test_logout_clears_access(app) -> None:
     seed_database()
 
     with app.test_client() as client:
-        _login(client, "sales@benno.local", "sales-demo-password")
+        _login(client, "laura.schneider@solar-sales.example", "Sales123")
         logout_response = client.get("/logout")
         protected_response = client.get("/sales")
 
@@ -125,7 +156,7 @@ def test_sales_user_cannot_access_admin_pages(app) -> None:
     seed_database()
 
     with app.test_client() as client:
-        _login(client, "sales@benno.local", "sales-demo-password")
+        _login(client, "laura.schneider@solar-sales.example", "Sales123")
         response = client.get("/admin")
 
     assert response.status_code == 403
@@ -135,7 +166,7 @@ def test_admin_user_cannot_access_sales_pages(app) -> None:
     seed_database()
 
     with app.test_client() as client:
-        _login(client, "admin@benno.local", "admin-demo-password")
+        _login(client, "nina.hartmann@solar-sales.example", "Admin123")
         response = client.get("/sales")
 
     assert response.status_code == 403

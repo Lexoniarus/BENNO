@@ -3,7 +3,7 @@
 from decimal import Decimal
 from typing import Any
 
-from werkzeug.security import generate_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from benno.enums import AccountType, AiProvider, SessionLanguage, UserRole
 from benno.extensions import db
@@ -160,12 +160,12 @@ MOCK_CRM_USERS = [
     {
         "username": "inside.sales",
         "display_name": "Inside Sales Team",
-        "email": "inside.sales@example.invalid",
+        "email": "inside.sales@solar-sales.example",
     },
     {
         "username": "service.backoffice",
         "display_name": "Service Backoffice",
-        "email": "service.backoffice@example.invalid",
+        "email": "service.backoffice@solar-sales.example",
     },
 ]
 
@@ -173,9 +173,24 @@ MOCK_CRM_USERS = [
 MOCK_FIELD_SALES_REPRESENTATIVES = [
     {
         "representative_number": "REP-001",
-        "display_name": "BENNO Sales Rep",
-        "email": "sales@example.invalid",
-    }
+        "display_name": "Laura Schneider",
+        "email": "laura.schneider@solar-sales.example",
+    },
+    {
+        "representative_number": "REP-002",
+        "display_name": "Markus Weber",
+        "email": "markus.weber@solar-sales.example",
+    },
+    {
+        "representative_number": "REP-003",
+        "display_name": "Sophie Klein",
+        "email": "sophie.klein@solar-sales.example",
+    },
+    {
+        "representative_number": "REP-004",
+        "display_name": "Tobias Fischer",
+        "email": "tobias.fischer@solar-sales.example",
+    },
 ]
 
 
@@ -204,17 +219,38 @@ def _seed_global_settings() -> None:
 
 def _seed_users() -> None:
     _create_user_if_missing(
-        email="admin@benno.local",
-        username="BENNO Admin",
-        password="admin-demo-password",
+        email="nina.hartmann@solar-sales.example",
+        username="Nina Hartmann",
+        password="Admin123",
         role=UserRole.ADMIN.value,
     )
     _create_user_if_missing(
-        email="sales@benno.local",
-        username="BENNO Sales Rep",
-        password="sales-demo-password",
+        email="laura.schneider@solar-sales.example",
+        username="Laura Schneider",
+        password="Sales123",
         role=UserRole.SALES_REP.value,
-        external_sales_rep_id="SALES-DEMO-001",
+        external_sales_rep_id="REP-001",
+    )
+    _create_user_if_missing(
+        email="markus.weber@solar-sales.example",
+        username="Markus Weber",
+        password="Sales123",
+        role=UserRole.SALES_REP.value,
+        external_sales_rep_id="REP-002",
+    )
+    _create_user_if_missing(
+        email="sophie.klein@solar-sales.example",
+        username="Sophie Klein",
+        password="Sales123",
+        role=UserRole.SALES_REP.value,
+        external_sales_rep_id="REP-003",
+    )
+    _create_user_if_missing(
+        email="tobias.fischer@solar-sales.example",
+        username="Tobias Fischer",
+        password="Sales123",
+        role=UserRole.SALES_REP.value,
+        external_sales_rep_id="REP-004",
     )
 
 
@@ -227,6 +263,13 @@ def _create_user_if_missing(
 ) -> None:
     existing_user = db.session.query(User).filter_by(email=email).one_or_none()
     if existing_user:
+        existing_user.username = username
+        existing_user.role = role
+        existing_user.preferred_language = SessionLanguage.DE.value
+        existing_user.external_sales_rep_id = external_sales_rep_id
+        existing_user.is_active = True
+        if not check_password_hash(existing_user.password_hash, password):
+            existing_user.password_hash = generate_password_hash(password)
         return
 
     db.session.add(
@@ -357,6 +400,9 @@ def _create_crm_user_if_missing(
 ) -> None:
     crm_user = db.session.query(MockCrmUser).filter_by(username=username).one_or_none()
     if crm_user:
+        crm_user.display_name = display_name
+        crm_user.email = email
+        crm_user.is_active = True
         return
 
     db.session.add(
@@ -380,6 +426,9 @@ def _create_field_sales_representative_if_missing(
         .one_or_none()
     )
     if representative:
+        representative.display_name = display_name
+        representative.email = email
+        representative.is_active = True
         return
 
     db.session.add(

@@ -39,7 +39,7 @@ def test_admin_can_create_user_and_receive_setup_link(app) -> None:
 
 def test_admin_can_edit_user_role_language_status_and_provider(app) -> None:
     seed_database()
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
 
     with app.test_client() as client:
         _login(client)
@@ -65,7 +65,7 @@ def test_admin_can_edit_user_role_language_status_and_provider(app) -> None:
 
 def test_setup_link_sets_password_and_marks_token_used(app) -> None:
     seed_database()
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     _, raw_token = create_user_setup_token(
         sales_user,
         UserSetupTokenPurpose.RESET,
@@ -90,7 +90,7 @@ def test_setup_link_sets_password_and_marks_token_used(app) -> None:
 
 def test_expired_setup_link_is_rejected(app) -> None:
     seed_database()
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     setup_token, raw_token = create_user_setup_token(
         sales_user,
         UserSetupTokenPurpose.RESET,
@@ -114,7 +114,7 @@ def test_expired_setup_link_is_rejected(app) -> None:
 
 def test_used_setup_link_is_rejected(app) -> None:
     seed_database()
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     setup_token, raw_token = create_user_setup_token(
         sales_user,
         UserSetupTokenPurpose.RESET,
@@ -152,7 +152,7 @@ def _login(client) -> None:
     client.post(
         "/login",
         data={
-            "email": "admin@benno.local",
-            "password": "admin-demo-password",
+            "email": "nina.hartmann@solar-sales.example",
+            "password": "Admin123",
         },
     )

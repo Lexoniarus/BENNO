@@ -41,8 +41,11 @@ Open `http://127.0.0.1:5000` in a browser.
 
 After running `seed-db`, these mock users are available:
 
-- `admin@benno.local` / `admin-demo-password`
-- `sales@benno.local` / `sales-demo-password`
+- `nina.hartmann@solar-sales.example` / `Admin123`
+- `laura.schneider@solar-sales.example` / `Sales123`
+- `markus.weber@solar-sales.example` / `Sales123`
+- `sophie.klein@solar-sales.example` / `Sales123`
+- `tobias.fischer@solar-sales.example` / `Sales123`
 
 ## Quality Checks
 

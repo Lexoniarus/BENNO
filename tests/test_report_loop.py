@@ -24,7 +24,7 @@ from benno.services.report_steps import step_by_key
 
 def test_service_creates_phase_6_chat_draft_and_initial_question(app) -> None:
     seed_database()
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
 
     chat = start_report_chat(sales_user)
 
@@ -32,13 +32,13 @@ def test_service_creates_phase_6_chat_draft_and_initial_question(app) -> None:
     assert chat.status == ReportStatus.IN_PROGRESS.value
     assert len(chat.messages) == 1
     assert chat.messages[0].sender == MessageSender.ASSISTANT.value
-    assert "BENNO Sales Rep" in chat.messages[0].message_text
+    assert "Laura Schneider" in chat.messages[0].message_text
     assert "Kunden, Lead oder Kontakt" in chat.messages[0].message_text
 
 
 def test_fresh_ai_context_lists_phase_6_report_requirements(app) -> None:
     seed_database()
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     chat = start_report_chat(sales_user)
 
     context = ai_message_context(chat.report_draft, step_by_key("visit_context"))
@@ -63,7 +63,7 @@ def test_fresh_ai_context_lists_phase_6_report_requirements(app) -> None:
 
 def test_ai_analysis_can_fill_multiple_phase_6_sections_from_one_message(app) -> None:
     seed_database()
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     chat = start_report_chat(sales_user)
     ai_service = _FakeAiService(
         analysis=AiMessageAnalysis(
@@ -154,7 +154,7 @@ def test_rating_clues_are_extracted_from_later_bundle_without_ai_rating_update(
     app,
 ) -> None:
     seed_database()
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     chat = start_report_chat(sales_user)
     ai_service = _FakeAiService(
         analysis=AiMessageAnalysis(
@@ -517,7 +517,7 @@ def test_report_loop_can_use_injected_crm_gateway(app) -> None:
 
 
 def _start_sales_chat():
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     return start_report_chat(sales_user)
 
 

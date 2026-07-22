@@ -89,12 +89,19 @@ def test_crm_users_and_representatives_are_listed_separately(app) -> None:
     seed_database()
 
     crm_users = list_crm_users("inside")
-    representatives = list_field_sales_representatives("BENNO")
+    representatives = list_field_sales_representatives("Schneider")
+    all_representatives = list_field_sales_representatives()
 
     assert len(crm_users) == 1
     assert crm_users[0].username == "inside.sales"
     assert len(representatives) == 1
     assert representatives[0].representative_number == "REP-001"
+    assert [rep.representative_number for rep in all_representatives] == [
+        "REP-001",
+        "REP-002",
+        "REP-003",
+        "REP-004",
+    ]
 
 
 def test_save_mock_visit_report_persists_enventa_payload(app) -> None:
@@ -163,7 +170,7 @@ def test_save_mock_visit_report_requires_core_payload(app) -> None:
 
 
 def _create_final_report() -> FinalReport:
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     final_report = FinalReport(
         chat_id=_create_chat_id(sales_user),
         sales_user=sales_user,
