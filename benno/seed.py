@@ -219,7 +219,7 @@ def _seed_global_settings() -> None:
 
 def _seed_users() -> None:
     _create_user_if_missing(
-        email="nina.hartmann@solar-sales.example",
+        email="admin@solar-sales.local",
         username="Nina Hartmann",
         password="Admin123",
         role=UserRole.ADMIN.value,

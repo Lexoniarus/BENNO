@@ -152,7 +152,7 @@ def _login(client) -> None:
     client.post(
         "/login",
         data={
-            "email": "nina.hartmann@solar-sales.example",
+            "email": "admin@solar-sales.local",
             "password": "Admin123",
         },
     )

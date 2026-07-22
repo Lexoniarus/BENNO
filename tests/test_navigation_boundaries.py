@@ -93,7 +93,7 @@ def test_admin_pages_do_not_render_chat_or_report_content(app) -> None:
     db.session.commit()
 
     with app.test_client() as client:
-        _login(client, "nina.hartmann@solar-sales.example", "Admin123")
+        _login(client, "admin@solar-sales.local", "Admin123")
         responses = [
             client.get("/admin"),
             client.get("/admin/users"),
@@ -130,7 +130,7 @@ def test_admin_dashboard_counts_phase_6_mock_reminders(app) -> None:
     db.session.commit()
 
     with app.test_client() as client:
-        _login(client, "nina.hartmann@solar-sales.example", "Admin123")
+        _login(client, "admin@solar-sales.local", "Admin123")
         response = client.get("/admin")
 
     assert response.status_code == 200

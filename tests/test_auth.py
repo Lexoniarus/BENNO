@@ -29,7 +29,7 @@ def test_valid_admin_login_redirects_to_admin_dashboard(app) -> None:
     seed_database()
 
     with app.test_client() as client:
-        response = _login(client, "nina.hartmann@solar-sales.example", "Admin123")
+        response = _login(client, "admin@solar-sales.local", "Admin123")
 
     assert response.status_code == 302
     assert response.location == "/admin"
@@ -37,7 +37,7 @@ def test_valid_admin_login_redirects_to_admin_dashboard(app) -> None:
 
 def test_seed_database_updates_admin_password_and_creates_sales_reps(app) -> None:
     old_admin = User(
-        email="nina.hartmann@solar-sales.example",
+        email="admin@solar-sales.local",
         username="Old Admin",
         password_hash=generate_password_hash("admin-demo-password"),
         role=UserRole.ADMIN.value,
@@ -49,7 +49,7 @@ def test_seed_database_updates_admin_password_and_creates_sales_reps(app) -> Non
 
     seed_database()
 
-    admin = User.query.filter_by(email="nina.hartmann@solar-sales.example").one()
+    admin = User.query.filter_by(email="admin@solar-sales.local").one()
     sales_users = User.query.filter_by(role=UserRole.SALES_REP.value).all()
 
     assert admin.username == "Nina Hartmann"
@@ -76,7 +76,7 @@ def test_root_redirects_logged_in_admin_to_admin_dashboard(app) -> None:
     seed_database()
 
     with app.test_client() as client:
-        _login(client, "nina.hartmann@solar-sales.example", "Admin123")
+        _login(client, "admin@solar-sales.local", "Admin123")
         response = client.get("/")
 
     assert response.status_code == 302
@@ -166,7 +166,7 @@ def test_admin_user_cannot_access_sales_pages(app) -> None:
     seed_database()
 
     with app.test_client() as client:
-        _login(client, "nina.hartmann@solar-sales.example", "Admin123")
+        _login(client, "admin@solar-sales.local", "Admin123")
         response = client.get("/sales")
 
     assert response.status_code == 403
