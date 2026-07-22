@@ -25,6 +25,7 @@ class BaseConfig:
     SPEACHES_STT_MODEL = "Systran/faster-whisper-base"
     TESTING = False
     VOICE_ENABLED = True
+    VOICE_MAX_UPLOAD_BYTES = 10_485_760
 
 
 class DevelopmentConfig(BaseConfig):

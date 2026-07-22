@@ -40,6 +40,16 @@ OPEN_REPORT_STATUSES = (
     ReportStatus.INSIDE_SALES_INPUT_REQUIRED.value,
     ReportStatus.BLOCKED.value,
 )
+SUPPORTED_VOICE_MIME_TYPES = frozenset(
+    {
+        "audio/mp4",
+        "audio/mpeg",
+        "audio/ogg",
+        "audio/wav",
+        "audio/webm",
+        "audio/x-wav",
+    }
+)
 REPORT_STATUS_LABELS_DE = {
     ReportStatus.BLOCKED.value: "Blockiert",
     ReportStatus.CANCELLED.value: "Abgebrochen",
@@ -161,13 +171,22 @@ def report_message(chat_id: int):
 def report_voice_turn(chat_id: int):
     """Transcribe one recorded audio answer and advance the report chat."""
     chat = _get_own_chat_or_404(chat_id)
+    if _voice_request_is_too_large():
+        return _voice_error_response("Audiodatei ist zu groß.", 413)
+
     audio_file = request.files.get("audio")
     if audio_file is None:
         return _voice_error_response("Keine Audiodatei empfangen.", 400)
+    if not _voice_mimetype_is_supported(audio_file.mimetype):
+        return _voice_error_response("Audioformat wird nicht unterstützt.", 415)
+
+    audio_bytes = audio_file.read()
+    if _voice_payload_is_too_large(audio_bytes):
+        return _voice_error_response("Audiodatei ist zu groß.", 413)
 
     try:
         transcript = transcribe_audio(
-            audio_file.read(),
+            audio_bytes,
             audio_file.filename or "recording.webm",
             audio_file.mimetype or "application/octet-stream",
         )
@@ -362,6 +381,26 @@ def _speech_for_message(message: ChatMessage):
 
 def _voice_error_response(message: str, status_code: int):
     return jsonify({"error": message}), status_code
+
+
+def _voice_request_is_too_large() -> bool:
+    content_length = request.content_length
+    if content_length is None:
+        return False
+
+    return content_length > _voice_upload_limit()
+
+
+def _voice_payload_is_too_large(audio_bytes: bytes) -> bool:
+    return len(audio_bytes) > _voice_upload_limit()
+
+
+def _voice_upload_limit() -> int:
+    return int(current_app.config["VOICE_MAX_UPLOAD_BYTES"])
+
+
+def _voice_mimetype_is_supported(mimetype: str | None) -> bool:
+    return (mimetype or "").lower() in SUPPORTED_VOICE_MIME_TYPES
 
 
 def _build_open_report_rows(chats: list[Chat]) -> list[dict[str, object]]:

@@ -41,12 +41,24 @@ def test_voice_script_marks_dynamic_assistant_replies_for_speech() -> None:
     assert "Ich höre zu. Sprich deine Antwort." in script_text
 
 
+def test_report_chat_css_reserves_space_for_sticky_composer() -> None:
+    css_text = (_project_root() / "benno" / "static" / "css" / "app.css").read_text(
+        encoding="utf-8"
+    )
+
+    assert "padding: 20px 20px 180px;" in css_text
+    assert "scroll-padding-bottom: 180px;" in css_text
+    assert "padding: 14px 14px 260px;" in css_text
+    assert "scroll-padding-bottom: 260px;" in css_text
+
+
 def test_create_app_uses_testing_configuration() -> None:
     app = create_app("testing")
 
     assert isinstance(app, Flask)
     assert app.config["TESTING"] is True
     assert app.config["SQLALCHEMY_DATABASE_URI"] == "sqlite:///:memory:"
+    assert app.config["VOICE_MAX_UPLOAD_BYTES"] == 10_485_760
 
 
 def test_index_redirects_anonymous_users_to_login() -> None:
@@ -109,6 +121,14 @@ def test_development_configuration_reads_langfuse_environment(monkeypatch) -> No
     assert app.config["LANGFUSE_HOST"] == "https://langfuse.test"
     assert app.config["LANGFUSE_CAPTURE_FULL_CONTEXT"] is True
     assert app.config["LANGFUSE_FLUSH_ON_TURN"] is True
+
+
+def test_development_configuration_reads_voice_upload_limit(monkeypatch) -> None:
+    monkeypatch.setenv("VOICE_MAX_UPLOAD_BYTES", "2048")
+
+    app = create_app("development")
+
+    assert app.config["VOICE_MAX_UPLOAD_BYTES"] == 2048
 
 
 def test_default_development_database_uses_project_root(monkeypatch) -> None:

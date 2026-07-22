@@ -39,7 +39,7 @@ def test_voice_turn_transcribes_and_advances_own_chat(app, monkeypatch) -> None:
         chat_id = int(new_response.location.rsplit("/", 1)[-1])
         response = client.post(
             f"/sales/reports/{chat_id}/voice-turn",
-            data={"audio": (BytesIO(b"audio-bytes"), "answer.webm")},
+            data={"audio": (BytesIO(b"audio-bytes"), "answer.webm", "audio/webm")},
             content_type="multipart/form-data",
         )
 
@@ -82,7 +82,7 @@ def test_voice_turn_keeps_chat_turn_when_tts_fails(app, monkeypatch) -> None:
         chat_id = int(new_response.location.rsplit("/", 1)[-1])
         response = client.post(
             f"/sales/reports/{chat_id}/voice-turn",
-            data={"audio": (BytesIO(b"audio-bytes"), "answer.webm")},
+            data={"audio": (BytesIO(b"audio-bytes"), "answer.webm", "audio/webm")},
             content_type="multipart/form-data",
         )
 
@@ -119,11 +119,54 @@ def test_voice_turn_requires_own_chat(app, monkeypatch) -> None:
         _login(client)
         response = client.post(
             f"/sales/reports/{other_chat.id}/voice-turn",
-            data={"audio": (BytesIO(b"audio-bytes"), "answer.webm")},
+            data={"audio": (BytesIO(b"audio-bytes"), "answer.webm", "audio/webm")},
             content_type="multipart/form-data",
         )
 
     assert response.status_code == 404
+
+
+def test_voice_turn_rejects_oversized_audio_upload(app, monkeypatch) -> None:
+    seed_database()
+    app.config["VOICE_MAX_UPLOAD_BYTES"] = 3
+    monkeypatch.setattr(
+        "benno.sales.transcribe_audio",
+        lambda *_args: "Should not be used.",
+    )
+
+    with app.test_client() as client:
+        _login(client)
+        new_response = client.get("/sales/reports/new")
+        chat_id = int(new_response.location.rsplit("/", 1)[-1])
+        response = client.post(
+            f"/sales/reports/{chat_id}/voice-turn",
+            data={"audio": (BytesIO(b"audio-bytes"), "answer.webm", "audio/webm")},
+            content_type="multipart/form-data",
+        )
+
+    assert response.status_code == 413
+    assert response.get_json() == {"error": "Audiodatei ist zu groß."}
+
+
+def test_voice_turn_rejects_unsupported_audio_mimetype(app, monkeypatch) -> None:
+    seed_database()
+    monkeypatch.setattr(
+        "benno.sales.transcribe_audio",
+        lambda *_args: "Should not be used.",
+    )
+
+    with app.test_client() as client:
+        _login(client)
+        new_response = client.get("/sales/reports/new")
+        chat_id = int(new_response.location.rsplit("/", 1)[-1])
+        response = client.post(
+            f"/sales/reports/{chat_id}/voice-turn",
+            data={"audio": (BytesIO(b"not-audio"), "answer.txt", "text/plain")},
+            content_type="multipart/form-data",
+        )
+
+    assert response.status_code == 415
+    assert response.get_json() == {"error": "Audioformat wird nicht unterstützt."}
 
 
 def test_voice_turn_returns_controlled_error_when_stt_fails(app, monkeypatch) -> None:
@@ -140,7 +183,7 @@ def test_voice_turn_returns_controlled_error_when_stt_fails(app, monkeypatch) ->
         chat_id = int(new_response.location.rsplit("/", 1)[-1])
         response = client.post(
             f"/sales/reports/{chat_id}/voice-turn",
-            data={"audio": (BytesIO(b"audio-bytes"), "answer.webm")},
+            data={"audio": (BytesIO(b"audio-bytes"), "answer.webm", "audio/webm")},
             content_type="multipart/form-data",
         )
 

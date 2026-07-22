@@ -87,6 +87,7 @@ def _configure_langfuse(app: Flask) -> None:
 
 def _configure_voice(app: Flask) -> None:
     _configure_boolean_from_env(app, "VOICE_ENABLED")
+    _configure_integer_from_env(app, "VOICE_MAX_UPLOAD_BYTES")
     for key in (
         "SPEACHES_BASE_URL",
         "SPEACHES_STT_MODEL",
@@ -106,6 +107,20 @@ def _configure_boolean_from_env(app: Flask, key: str) -> None:
         return
 
     app.config[key] = configured_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _configure_integer_from_env(app: Flask, key: str) -> None:
+    configured_value = os.environ.get(key)
+    if configured_value is None:
+        return
+
+    try:
+        parsed_value = int(configured_value)
+    except ValueError:
+        return
+
+    if parsed_value > 0:
+        app.config[key] = parsed_value
 
 
 def _configure_secret_key(app: Flask) -> None:
