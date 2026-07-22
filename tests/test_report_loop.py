@@ -22,7 +22,10 @@ from benno.services.report_loop import (
     start_report_chat,
 )
 from benno.services.report_review import normalize_report_display_text
-from benno.services.report_shortcuts import parse_visit_date
+from benno.services.report_shortcuts import (
+    extract_strength_weakness_answers,
+    parse_visit_date,
+)
 from benno.services.report_steps import step_by_key
 
 
@@ -243,6 +246,82 @@ def test_four_enventa_ratings_complete_rating_section(app) -> None:
     }
     assert ratings["priority_rating"]["value"] == 9
     assert chat.report_draft.draft_data_json["current_step"] == "review"
+
+
+def test_explicit_strength_and_weakness_are_extracted_by_rules() -> None:
+    answers = extract_strength_weakness_answers(
+        "Stärke ist hohes Projektvolumen, Schwäche ist unklare Freigabe."
+    )
+
+    assert answers == {
+        "strength_text": "hohes Projektvolumen",
+        "weakness_text": "unklare Freigabe",
+    }
+
+
+def test_strength_weakness_hint_works_during_rating_step(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_all_required_until_ratings(chat)
+
+    process_report_message_with_ai(
+        chat,
+        "Stärke ist hohes Projektvolumen, Schwäche ist unklare technische Freigabe.",
+        _FakeAiService(),
+    )
+
+    draft = chat.report_draft
+    answers = draft.draft_data_json["answers"]
+    assert answers["strength_text"] == "hohes Projektvolumen"
+    assert answers["weakness_text"] == "unklare technische Freigabe"
+    assert draft.ratings_json == {}
+    assert draft.draft_data_json["current_step"] == "ratings"
+
+
+def test_strength_weakness_hint_does_not_overwrite_existing_answers(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_all_required_until_ratings(chat)
+
+    process_report_message_with_ai(
+        chat,
+        "Stärke ist hohes Projektvolumen, Schwäche ist unklare technische Freigabe.",
+        _FakeAiService(),
+    )
+    process_report_message_with_ai(
+        chat,
+        "Stärke ist anderer Bedarf, Schwäche ist anderer Einwand.",
+        _FakeAiService(),
+    )
+
+    answers = chat.report_draft.draft_data_json["answers"]
+    assert answers["strength_text"] == "hohes Projektvolumen"
+    assert answers["weakness_text"] == "unklare technische Freigabe"
+
+
+def test_confirm_writes_rule_based_strength_and_weakness_to_mock_visit_report(
+    app,
+) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_all_required_until_ratings(chat)
+    process_report_message_with_ai(
+        chat,
+        "Stärke ist hohes Projektvolumen, Schwäche ist unklare technische Freigabe.",
+        _FakeAiService(),
+    )
+    process_report_message_with_ai(
+        chat,
+        "Zufriedenheit 8, technisch 7, kaufmaennisch 6, Prioritaet 9.",
+        _FakeAiService(),
+    )
+
+    final_report = confirm_report(chat)
+
+    assert final_report.mock_visit_report.strength_text == "hohes Projektvolumen"
+    assert final_report.mock_visit_report.weakness_text == (
+        "unklare technische Freigabe"
+    )
 
 
 def test_report_display_text_removes_markdown_artifacts() -> None:

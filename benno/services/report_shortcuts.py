@@ -101,6 +101,60 @@ def looks_like_rating_answer(message_text: str) -> bool:
     )
 
 
+def extract_strength_weakness_answers(message_text: str) -> dict[str, str]:
+    """Extract explicitly stated strength and weakness notes."""
+    markers = _explicit_strength_weakness_markers(message_text)
+    if not markers:
+        return {}
+
+    answers = {}
+    for index, marker in enumerate(markers):
+        next_start = (
+            markers[index + 1]["start"]
+            if index + 1 < len(markers)
+            else len(message_text)
+        )
+        value = _clean_strength_weakness_value(message_text[marker["end"] : next_start])
+        if value:
+            answers[marker["key"]] = value
+
+    return answers
+
+
+def _explicit_strength_weakness_markers(
+    message_text: str,
+) -> list[dict[str, int | str]]:
+    marker_specs = (
+        (
+            "strength_text",
+            r"\b(?:st[äa]rke|staerke|st[äa]rken|staerken|positiv|"
+            r"positive punkte|pluspunkt|pluspunkte)\b"
+            r"\s*(?:ist|sind|war|waren|:|-)?",
+        ),
+        (
+            "weakness_text",
+            r"\b(?:schw[äa]che|schwaeche|schw[äa]chen|schwaechen|"
+            r"risiko|risiken|einwand|einw[äa]nde|einwaende|negativ)\b"
+            r"\s*(?:ist|sind|war|waren|:|-)?",
+        ),
+    )
+    markers = []
+    for key, pattern in marker_specs:
+        for match in re.finditer(pattern, message_text, re.IGNORECASE):
+            markers.append({"key": key, "start": match.start(), "end": match.end()})
+
+    return sorted(markers, key=lambda marker: int(marker["start"]))
+
+
+def _clean_strength_weakness_value(value: str) -> str | None:
+    cleaned_value = re.sub(r"\s+", " ", value).strip(" \t\r\n,.;:-")
+    if not cleaned_value:
+        return None
+
+    cleaned_value = re.sub(r"^(?:und|aber|noch)\s+", "", cleaned_value, flags=re.I)
+    return cleaned_value[:500]
+
+
 def parse_iso_date(message_text: str) -> date | None:
     """Parse an ISO date from text."""
     match = re.search(r"\b\d{4}-\d{2}-\d{2}\b", message_text)
