@@ -169,7 +169,11 @@ def test_admin_user_cannot_access_sales_pages(app) -> None:
         _login(client, "admin@solar-sales.local", "Admin123")
         response = client.get("/sales")
 
+    response_text = response.get_data(as_text=True)
+
     assert response.status_code == 403
+    assert "Zugriff nicht erlaubt" in response_text
+    assert "Zurück zum Start" in response_text
 
 
 def _login(client, email: str, password: str):

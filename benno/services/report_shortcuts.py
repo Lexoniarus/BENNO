@@ -110,16 +110,38 @@ def parse_iso_date(message_text: str) -> date | None:
     return date.fromisoformat(match.group(0))
 
 
+def parse_german_date(message_text: str) -> date | None:
+    """Parse a German date from free text."""
+    match = re.search(r"\b(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})\b", message_text)
+    if match is None:
+        return None
+
+    day = int(match.group(1))
+    month = int(match.group(2))
+    year = int(match.group(3))
+    if year < 100:
+        year += 2000
+
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
+
+
 def parse_visit_date(message_text: str) -> date | None:
     """Parse a simple visit or follow-up date from text."""
     parsed_date = parse_iso_date(message_text)
     if parsed_date is not None:
         return parsed_date
 
+    parsed_date = parse_german_date(message_text)
+    if parsed_date is not None:
+        return parsed_date
+
     normalized_text = message_text.strip().lower()
-    if normalized_text in {"heute", "today"}:
+    if "heute" in normalized_text or "today" in normalized_text:
         return date.today()
-    if normalized_text in {"gestern", "yesterday"}:
+    if "gestern" in normalized_text or "yesterday" in normalized_text:
         return date.today() - timedelta(days=1)
     if "nächste woche" in normalized_text or "naechste woche" in normalized_text:
         return date.today() + timedelta(days=7)

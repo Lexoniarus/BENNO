@@ -72,10 +72,11 @@ function submitReportMessage(event) {
   }
 
   const textarea = reportForm.querySelector("textarea");
-  const button = reportForm.querySelector("button");
+  const button = reportForm.querySelector("button[type='submit']");
   addChatMessage("user", messageText.toString(), "chat-message--pending");
   addChatMessage("assistant", "BENNO analysiert", "chat-message--typing");
   reportForm.classList.add("is-submitting");
+  reportForm.setAttribute("aria-busy", "true");
 
   if (textarea) {
     textarea.readOnly = true;
@@ -87,7 +88,7 @@ function submitReportMessage(event) {
 
   window.setTimeout(() => {
     reportForm.submit();
-  }, 80);
+  }, 450);
 }
 
 scrollChatToBottom();

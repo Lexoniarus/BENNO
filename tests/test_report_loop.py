@@ -1,5 +1,7 @@
 """Tests for the Phase 6 eNVenta-oriented report loop."""
 
+from datetime import date
+
 from benno.enums import MessageSender, ReportStatus, UserIntent, VisitType
 from benno.models import MockReminder, MockVisitReport, User
 from benno.seed import seed_database
@@ -19,6 +21,7 @@ from benno.services.report_loop import (
     process_report_message_with_ai,
     start_report_chat,
 )
+from benno.services.report_shortcuts import parse_visit_date
 from benno.services.report_steps import step_by_key
 
 
@@ -346,6 +349,41 @@ def test_unclear_visit_date_does_not_default_to_today(app) -> None:
 
     assert chat.report_draft.visit_date is None
     assert chat.report_draft.draft_data_json["current_step"] == "visit_date"
+
+
+def test_german_visit_date_formats_are_accepted() -> None:
+    assert parse_visit_date("22.07.2026") == date(2026, 7, 22)
+    assert parse_visit_date("22.07.26") == date(2026, 7, 22)
+    assert parse_visit_date("22.7.2026") == date(2026, 7, 22)
+    assert parse_visit_date("Das Gespräch war heute, am 22.07.2026.") == date(
+        2026,
+        7,
+        22,
+    )
+    assert parse_visit_date("Das Gespräch war heute.") == date.today()
+    assert parse_visit_date("irgendwann letzte Woche") is None
+
+
+def test_strict_flow_accepts_german_visit_date_and_reaches_review(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    answers = [
+        "Nordlicht Maschinenbau GmbH",
+        "persoenlich",
+        "Mara Stein",
+        "22.07.2026",
+        "Forecast",
+        "Forecast und Lieferfaehigkeit besprochen.",
+        "Revidiertes Angebot wird geschickt.",
+        "Sales sendet die Unterlagen.",
+        "Zufriedenheit 8, technisch 7, kaufmaennisch 6, Prioritaet 9.",
+    ]
+
+    for answer in answers:
+        process_report_message_with_ai(chat, answer, _FakeAiService())
+
+    assert chat.report_draft.visit_date == date(2026, 7, 22)
+    assert chat.report_draft.draft_data_json["current_step"] == "review"
 
 
 def test_unrelated_conditional_answer_does_not_block_rating_step(app) -> None:

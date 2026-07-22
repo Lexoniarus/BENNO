@@ -158,6 +158,10 @@ textarea {
   width: min(1040px, 100%);
 }
 
+.error-panel {
+  max-width: 720px;
+}
+
 .page-section--wide {
   width: min(1360px, 100%);
 }
@@ -1020,6 +1024,7 @@ td a {
 
   .topbar {
     align-items: center;
+    flex-wrap: wrap;
     padding: 14px;
   }
 
@@ -1037,12 +1042,28 @@ td a {
     width: 100%;
     flex-basis: 100%;
     flex-direction: column;
-    gap: 12px;
-    padding-top: 10px;
+    align-items: stretch;
+    gap: 4px;
+    padding-top: 12px;
   }
 
   .topbar__nav.is-open {
     display: flex;
+  }
+
+  .topbar__nav a {
+    display: flex;
+    min-height: 38px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-radius: var(--radius);
+    background: rgba(255, 255, 255, 0.05);
+    white-space: nowrap;
+  }
+
+  .topbar__nav a::after {
+    display: none;
   }
 
   .section-heading,
@@ -1080,12 +1101,18 @@ td a {
   }
 
   .message-composer {
-    flex-direction: column;
+    gap: 10px;
   }
 
-  .button--icon,
+  .message-composer textarea {
+    min-width: 0;
+  }
+
   .button--send {
-    width: 100%;
+    width: 52px;
+    min-width: 52px;
+    min-height: 52px;
+    flex: 0 0 52px;
   }
 
   .report-table-wrap {
