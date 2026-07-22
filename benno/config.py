@@ -17,7 +17,14 @@ class BaseConfig:
     SECRET_KEY = "development-secret-key"
     SQLALCHEMY_DATABASE_URI = None
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    KOKORO_BASE_URL = "http://127.0.0.1:8881"
+    KOKORO_TTS_MODEL = "kokoro"
+    KOKORO_TTS_VOICE = "martin"
+    SPEACHES_BASE_URL = "http://127.0.0.1:8000"
+    SPEACHES_STT_LANGUAGE = "de"
+    SPEACHES_STT_MODEL = "Systran/faster-whisper-base"
     TESTING = False
+    VOICE_ENABLED = True
 
 
 class DevelopmentConfig(BaseConfig):

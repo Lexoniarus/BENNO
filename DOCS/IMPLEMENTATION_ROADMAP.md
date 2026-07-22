@@ -442,8 +442,11 @@ Current implementation direction:
   target.
 - Return playable audio to the browser without storing generated audio as a
   long-term business record.
-- Start with push-to-talk or an explicit recording control before attempting a
-  mostly hands-free mode.
+- Start voice mode through one explicit browser user action, then send
+  transcripts directly as report turns.
+- Read BENNO's assistant replies aloud automatically while voice mode is active.
+- Reopen the answer gate automatically after playback, with silence detection
+  plus manual stop/cancel controls.
 
 Important:
 
@@ -462,6 +465,7 @@ Done when:
 - The transcript appears as a normal chat message.
 - The same Phase 6/8 report loop processes that transcript.
 - BENNO can read the next assistant response aloud through local TTS.
+- After spoken playback, BENNO can automatically listen for the next answer.
 - The user can continue by text if microphone, STT, or TTS fails.
 
 ## Phase 10: Stabilization And Demo Scenarios

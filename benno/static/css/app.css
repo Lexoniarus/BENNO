@@ -27,6 +27,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html {
   min-width: 320px;
 }
@@ -932,6 +936,41 @@ td a {
   background: var(--workspace);
 }
 
+.voice-controls {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.voice-controls__label,
+.voice-status {
+  margin: 0;
+}
+
+.voice-controls__label {
+  color: var(--sflex-muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.voice-status {
+  color: var(--sflex-graphite);
+  font-weight: 700;
+}
+
+.voice-controls__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .message-composer {
   display: flex;
   gap: 12px;
@@ -1023,6 +1062,15 @@ td a {
   .chat-panel {
     min-height: 52vh;
     max-height: 58vh;
+  }
+
+  .voice-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .voice-controls__actions {
+    justify-content: flex-start;
   }
 
   .metric-grid--workspace {

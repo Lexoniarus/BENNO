@@ -37,6 +37,7 @@ def _configure_app(app: Flask, config_name: str | None) -> None:
     app.config.from_object(config_class)
     _configure_ai(app)
     _configure_langfuse(app)
+    _configure_voice(app)
     _configure_secret_key(app)
     _configure_database(app)
 
@@ -82,6 +83,21 @@ def _configure_langfuse(app: Flask) -> None:
 
     app.config["LANGFUSE_HOST"] = app.config["LANGFUSE_BASE_URL"]
     os.environ["LANGFUSE_HOST"] = app.config["LANGFUSE_BASE_URL"]
+
+
+def _configure_voice(app: Flask) -> None:
+    _configure_boolean_from_env(app, "VOICE_ENABLED")
+    for key in (
+        "SPEACHES_BASE_URL",
+        "SPEACHES_STT_MODEL",
+        "SPEACHES_STT_LANGUAGE",
+        "KOKORO_BASE_URL",
+        "KOKORO_TTS_MODEL",
+        "KOKORO_TTS_VOICE",
+    ):
+        configured_value = os.environ.get(key)
+        if configured_value:
+            app.config[key] = configured_value
 
 
 def _configure_boolean_from_env(app: Flask, key: str) -> None:

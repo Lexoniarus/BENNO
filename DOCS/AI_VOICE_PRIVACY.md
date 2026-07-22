@@ -177,9 +177,20 @@ controls rather than immediate full hands-free automation:
 
 - record button in the report chat
 - visible recording state
-- transcript preview or direct transcript insertion as a normal chat message
-- assistant audio playback after the text answer is produced
+- direct transcript insertion as a normal chat message
+- automatic assistant audio playback after the text answer is produced
+- automatic reopening of the answer gate after playback
+- silence detection plus manual stop/cancel controls
 - text input remains available at all times
+
+The first implementation uses direct send rather than an editable transcript
+preview. This matches the hands-free target more closely, while the visible chat
+still provides transparency and later correction options.
+
+Because browser microphone and autoplay behavior depend on a user gesture, voice
+mode starts only after the user explicitly activates it. After that activation,
+BENNO may continue the turn loop automatically until the user stops voice mode,
+the report reaches review, or an error requires text fallback.
 
 The browser should handle microphone access and recording. The backend should
 coordinate the actual transcription path so BENNO keeps one stable server-side

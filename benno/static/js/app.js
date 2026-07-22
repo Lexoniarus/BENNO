@@ -8,6 +8,29 @@ const copySource = document.querySelector("[data-copy-source]");
 const mainNav = document.querySelector("[data-main-nav]");
 const navToggle = document.querySelector("[data-nav-toggle]");
 const reportForm = document.querySelector("[data-report-form]");
+const voiceCancelButton = document.querySelector("[data-voice-cancel]");
+const voiceControls = document.querySelector("[data-voice-controls]");
+const voiceStartButton = document.querySelector("[data-voice-start]");
+const voiceStatus = document.querySelector("[data-voice-status]");
+const voiceStopButton = document.querySelector("[data-voice-stop]");
+
+const voiceState = {
+  active: false,
+  analyser: null,
+  audioContext: null,
+  chunks: [],
+  levelTimer: null,
+  maxTimer: null,
+  mediaRecorder: null,
+  silenceStartedAt: null,
+  startedAt: null,
+  stream: null,
+};
+
+const maxRecordingMs = 24000;
+const minimumRecordingMs = 1200;
+const silenceCloseMs = 1400;
+const silenceThreshold = 0.018;
 
 function scrollChatToBottom() {
   if (!chatPanel) {
@@ -36,6 +59,35 @@ function addChatMessage(sender, text, extraClass = "") {
   scrollChatToBottom();
 }
 
+function removeTypingMessages() {
+  document
+    .querySelectorAll(".chat-message--typing")
+    .forEach((message) => message.remove());
+}
+
+function latestAssistantMessage() {
+  const messages = document.querySelectorAll("[data-assistant-message]");
+  return messages[messages.length - 1] || null;
+}
+
+function setVoiceStatus(message) {
+  if (voiceStatus) {
+    voiceStatus.textContent = message;
+  }
+}
+
+function setVoiceControlsRecording(isRecording) {
+  if (voiceStartButton) {
+    voiceStartButton.hidden = isRecording || voiceState.active;
+  }
+  if (voiceStopButton) {
+    voiceStopButton.hidden = !isRecording;
+  }
+  if (voiceCancelButton) {
+    voiceCancelButton.hidden = !voiceState.active;
+  }
+}
+
 function toggleNavigation() {
   if (!mainNav || !navToggle) {
     return;
@@ -60,6 +112,242 @@ async function copySetupLink() {
   }
 
   copyButton.textContent = "Kopiert";
+}
+
+async function startVoiceMode() {
+  if (!voiceControls) {
+    return;
+  }
+
+  voiceState.active = true;
+  setVoiceControlsRecording(false);
+  setVoiceStatus("BENNO liest die letzte Frage vor.");
+
+  try {
+    await ensureMicrophoneStream();
+    await playLatestAssistantSpeech();
+    if (voiceState.active) {
+      await startVoiceRecording();
+    }
+  } catch (error) {
+    stopVoiceMode();
+    setVoiceStatus(error.message || "Sprachmodus konnte nicht gestartet werden.");
+  }
+}
+
+function stopVoiceMode() {
+  voiceState.active = false;
+  stopActiveRecording();
+  stopMicrophoneStream();
+  setVoiceControlsRecording(false);
+  if (voiceStartButton) {
+    voiceStartButton.hidden = false;
+  }
+}
+
+async function ensureMicrophoneStream() {
+  if (voiceState.stream) {
+    return voiceState.stream;
+  }
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    throw new Error("Dein Browser erlaubt hier keine Mikrofonaufnahme.");
+  }
+
+  voiceState.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  return voiceState.stream;
+}
+
+async function playLatestAssistantSpeech() {
+  const message = latestAssistantMessage();
+  if (!message || !message.dataset.speechUrl) {
+    return;
+  }
+
+  const response = await fetch(message.dataset.speechUrl, { method: "POST" });
+  if (!response.ok) {
+    setVoiceStatus("Sprachausgabe nicht verfuegbar, Aufnahme startet trotzdem.");
+    return;
+  }
+
+  const audioBlob = await response.blob();
+  await playAudioBlob(audioBlob);
+}
+
+async function playAudioBlob(audioBlob) {
+  const audioUrl = URL.createObjectURL(audioBlob);
+  const audio = new Audio(audioUrl);
+
+  try {
+    await audio.play();
+    await new Promise((resolve) => {
+      audio.addEventListener("ended", resolve, { once: true });
+      audio.addEventListener("error", resolve, { once: true });
+    });
+  } finally {
+    URL.revokeObjectURL(audioUrl);
+  }
+}
+
+async function playBase64Audio(audioBase64, mimetype) {
+  if (!audioBase64) {
+    return;
+  }
+
+  const byteCharacters = atob(audioBase64);
+  const byteNumbers = Array.from(byteCharacters, (character) =>
+    character.charCodeAt(0),
+  );
+  const audioBlob = new Blob([new Uint8Array(byteNumbers)], {
+    type: mimetype || "audio/wav",
+  });
+  await playAudioBlob(audioBlob);
+}
+
+async function startVoiceRecording() {
+  const stream = await ensureMicrophoneStream();
+  voiceState.chunks = [];
+  voiceState.mediaRecorder = new MediaRecorder(stream);
+  voiceState.startedAt = Date.now();
+  voiceState.silenceStartedAt = null;
+
+  voiceState.mediaRecorder.addEventListener("dataavailable", (event) => {
+    if (event.data.size > 0) {
+      voiceState.chunks.push(event.data);
+    }
+  });
+  voiceState.mediaRecorder.addEventListener("stop", submitVoiceRecording, {
+    once: true,
+  });
+
+  prepareAudioAnalyser(stream);
+  voiceState.mediaRecorder.start();
+  voiceState.levelTimer = window.setInterval(checkVoiceLevel, 160);
+  voiceState.maxTimer = window.setTimeout(stopActiveRecording, maxRecordingMs);
+  setVoiceControlsRecording(true);
+  setVoiceStatus("Ich hoere zu. Sprich deine Antwort.");
+}
+
+function prepareAudioAnalyser(stream) {
+  if (!voiceState.audioContext) {
+    voiceState.audioContext = new AudioContext();
+  }
+
+  const source = voiceState.audioContext.createMediaStreamSource(stream);
+  voiceState.analyser = voiceState.audioContext.createAnalyser();
+  voiceState.analyser.fftSize = 1024;
+  source.connect(voiceState.analyser);
+}
+
+function checkVoiceLevel() {
+  if (!voiceState.analyser || !voiceState.startedAt) {
+    return;
+  }
+
+  const sampleBuffer = new Uint8Array(voiceState.analyser.fftSize);
+  voiceState.analyser.getByteTimeDomainData(sampleBuffer);
+  const recordingAge = Date.now() - voiceState.startedAt;
+  if (recordingAge < minimumRecordingMs) {
+    return;
+  }
+
+  updateSilenceState(rmsVolume(sampleBuffer));
+}
+
+function updateSilenceState(volume) {
+  if (volume < silenceThreshold) {
+    voiceState.silenceStartedAt ||= Date.now();
+  } else {
+    voiceState.silenceStartedAt = null;
+  }
+
+  if (
+    voiceState.silenceStartedAt &&
+    Date.now() - voiceState.silenceStartedAt > silenceCloseMs
+  ) {
+    stopActiveRecording();
+  }
+}
+
+function rmsVolume(sampleBuffer) {
+  const sum = sampleBuffer.reduce((total, value) => {
+    const normalized = (value - 128) / 128;
+    return total + normalized * normalized;
+  }, 0);
+  return Math.sqrt(sum / sampleBuffer.length);
+}
+
+function stopActiveRecording() {
+  if (
+    voiceState.mediaRecorder &&
+    voiceState.mediaRecorder.state !== "inactive"
+  ) {
+    voiceState.mediaRecorder.stop();
+  }
+  clearVoiceTimers();
+  setVoiceControlsRecording(false);
+}
+
+function clearVoiceTimers() {
+  window.clearInterval(voiceState.levelTimer);
+  window.clearTimeout(voiceState.maxTimer);
+  voiceState.levelTimer = null;
+  voiceState.maxTimer = null;
+}
+
+function stopMicrophoneStream() {
+  if (voiceState.stream) {
+    voiceState.stream.getTracks().forEach((track) => track.stop());
+  }
+  voiceState.stream = null;
+}
+
+async function submitVoiceRecording() {
+  clearVoiceTimers();
+  if (!voiceState.active || voiceState.chunks.length === 0) {
+    return;
+  }
+
+  setVoiceStatus("BENNO transkribiert und analysiert.");
+  addChatMessage("assistant", "BENNO transkribiert", "chat-message--typing");
+
+  const audioBlob = new Blob(voiceState.chunks, {
+    type: voiceState.mediaRecorder?.mimeType || "audio/webm",
+  });
+  const formData = new FormData();
+  formData.append("audio", audioBlob, "recording.webm");
+
+  try {
+    const response = await fetch(voiceControls.dataset.voiceTurnUrl, {
+      method: "POST",
+      body: formData,
+    });
+    const payload = await response.json();
+    removeTypingMessages();
+    if (!response.ok) {
+      throw new Error(payload.error || "Sprachverarbeitung fehlgeschlagen.");
+    }
+
+    addChatMessage("user", payload.transcript);
+    addChatMessage("assistant", payload.assistant_reply);
+    setVoiceStatus("BENNO antwortet.");
+    await playBase64Audio(payload.audio, payload.audio_mime_type);
+    await continueVoiceMode(payload);
+  } catch (error) {
+    removeTypingMessages();
+    stopVoiceMode();
+    setVoiceStatus(error.message || "Sprachverarbeitung fehlgeschlagen.");
+  }
+}
+
+async function continueVoiceMode(payload) {
+  if (payload.ready_for_review || payload.chat_status !== "in_progress") {
+    window.location.reload();
+    return;
+  }
+  if (voiceState.active) {
+    await startVoiceRecording();
+  }
 }
 
 function submitReportMessage(event) {
@@ -99,6 +387,21 @@ if (navToggle) {
 
 if (reportForm) {
   reportForm.addEventListener("submit", submitReportMessage);
+}
+
+if (voiceStartButton) {
+  voiceStartButton.addEventListener("click", startVoiceMode);
+}
+
+if (voiceStopButton) {
+  voiceStopButton.addEventListener("click", stopActiveRecording);
+}
+
+if (voiceCancelButton) {
+  voiceCancelButton.addEventListener("click", () => {
+    stopVoiceMode();
+    setVoiceStatus("Sprachmodus beendet.");
+  });
 }
 
 if (copyButton) {

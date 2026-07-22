@@ -2,12 +2,23 @@
 
 from typing import Any
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import (
+    Blueprint,
+    Response,
+    abort,
+    current_app,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from flask_login import current_user
 
 from benno.auth import sales_required
-from benno.enums import ReportStatus
-from benno.models import Chat, FinalReport
+from benno.enums import MessageSender, ReportStatus
+from benno.models import Chat, ChatMessage, FinalReport
 from benno.services.ai_provider import get_ai_service, get_ai_status
 from benno.services.report_loop import (
     apply_report_correction,
@@ -19,6 +30,7 @@ from benno.services.report_loop import (
     start_report_chat,
 )
 from benno.services.report_state import display_value
+from benno.services.voice import VoiceServiceError, synthesize_speech, transcribe_audio
 
 sales_blueprint = Blueprint("sales", __name__, url_prefix="/sales")
 
@@ -120,6 +132,7 @@ def report_chat(chat_id: int):
         draft=chat.report_draft,
         ready_for_review=is_ready_for_review(chat),
         ai_status=get_ai_status(),
+        voice_enabled=current_app.config.get("VOICE_ENABLED", False),
         section_labels=REPORT_SECTION_LABELS_DE,
         status_labels=REPORT_STATUS_LABELS_DE,
     )
@@ -141,6 +154,61 @@ def report_message(chat_id: int):
         flash(str(error), "warning")
 
     return redirect(url_for("sales.report_chat", chat_id=chat.id))
+
+
+@sales_blueprint.post("/reports/<int:chat_id>/voice-turn")
+@sales_required
+def report_voice_turn(chat_id: int):
+    """Transcribe one recorded audio answer and advance the report chat."""
+    chat = _get_own_chat_or_404(chat_id)
+    audio_file = request.files.get("audio")
+    if audio_file is None:
+        return _voice_error_response("Keine Audiodatei empfangen.", 400)
+
+    try:
+        transcript = transcribe_audio(
+            audio_file.read(),
+            audio_file.filename or "recording.webm",
+            audio_file.mimetype or "application/octet-stream",
+        )
+        process_report_message(chat, transcript)
+    except VoiceServiceError as error:
+        return _voice_error_response(str(error), 503)
+    except ValueError as error:
+        return _voice_error_response(str(error), 422)
+
+    assistant_message = _latest_assistant_message(chat)
+    speech = _speech_for_message(assistant_message)
+
+    return jsonify(
+        {
+            "transcript": transcript,
+            "assistant_reply": assistant_message.message_text,
+            "assistant_message_id": assistant_message.id,
+            "chat_status": chat.status,
+            "ready_for_review": is_ready_for_review(chat),
+            "audio": speech.as_base64() if speech else None,
+            "audio_mime_type": speech.mimetype if speech else None,
+            "tts_error": None if speech else "Sprachausgabe nicht verfuegbar.",
+        }
+    )
+
+
+@sales_blueprint.post("/reports/<int:chat_id>/messages/<int:message_id>/speech")
+@sales_required
+def assistant_message_speech(chat_id: int, message_id: int):
+    """Generate speech audio for one assistant message in the current user's chat."""
+    chat = _get_own_chat_or_404(chat_id)
+    message = _get_chat_message_or_404(chat, message_id)
+    if message.sender != MessageSender.ASSISTANT.value:
+        abort(404)
+
+    try:
+        speech = synthesize_speech(message.message_text)
+    except VoiceServiceError as error:
+        return _voice_error_response(str(error), 503)
+
+    return Response(speech.audio_bytes, mimetype=speech.mimetype)
 
 
 @sales_blueprint.get("/reports/<int:chat_id>/review")
@@ -255,6 +323,40 @@ def _get_own_final_report_or_404(report_id: int) -> FinalReport:
         abort(404)
 
     return final_report
+
+
+def _get_chat_message_or_404(chat: Chat, message_id: int) -> ChatMessage:
+    message = ChatMessage.query.filter_by(id=message_id, chat_id=chat.id).one_or_none()
+    if message is None:
+        abort(404)
+
+    return message
+
+
+def _latest_assistant_message(chat: Chat) -> ChatMessage:
+    message = (
+        ChatMessage.query.filter_by(
+            chat_id=chat.id,
+            sender=MessageSender.ASSISTANT.value,
+        )
+        .order_by(ChatMessage.created_at.desc(), ChatMessage.id.desc())
+        .first()
+    )
+    if message is None:
+        raise ValueError("Keine BENNO-Antwort gefunden.")
+
+    return message
+
+
+def _speech_for_message(message: ChatMessage):
+    try:
+        return synthesize_speech(message.message_text)
+    except VoiceServiceError:
+        return None
+
+
+def _voice_error_response(message: str, status_code: int):
+    return jsonify({"error": message}), status_code
 
 
 def _build_open_report_rows(chats: list[Chat]) -> list[dict[str, object]]:

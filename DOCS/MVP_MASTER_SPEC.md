@@ -300,6 +300,12 @@ The current TTS integration target is the local Docker-based Kokoro/Martin
 service available in the development environment. Speaches TTS can be evaluated
 as a secondary comparison path.
 
+The first Phase 9 interaction mode sends transcripts directly into the existing
+report loop. While voice mode is active, BENNO reads assistant replies aloud
+automatically and then opens the next recording gate automatically. Recording is
+closed by silence detection, with manual stop and cancel controls as fallback.
+The visible text chat remains the correction and fallback surface.
+
 Initial test candidates from earlier research:
 
 - STT first candidate: browser microphone capture plus local Speaches Docker
