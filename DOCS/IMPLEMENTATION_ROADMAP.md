@@ -430,11 +430,16 @@ Current implementation direction:
 
 - Keep the text chat as the source-of-truth interaction surface.
 - Add browser microphone capture through standard web media APIs.
-- Send recorded audio to the backend for transcription unless a browser STT
-  experiment is explicitly enabled.
+- Send recorded audio to the backend for transcription through a local
+  Speaches Docker sidecar.
+- Use Speaches as the first STT integration target because it provides an
+  OpenAI-compatible audio API and has a useful streaming path for later
+  hands-free tests.
 - Treat the transcript exactly like a manually typed chat message.
 - Use the existing local Kokoro/Martin Docker TTS service for spoken BENNO
   responses.
+- Keep Speaches TTS as a secondary TTS comparison path, not the first playback
+  target.
 - Return playable audio to the browser without storing generated audio as a
   long-term business record.
 - Start with push-to-talk or an explicit recording control before attempting a
@@ -545,10 +550,11 @@ and optional Langfuse observability.
 Phase 8 is complete. The next practical step is Phase 9:
 
 1. add browser microphone capture to the report chat
-2. transcribe recorded speech into the existing text turn flow
+2. connect a local Speaches Docker sidecar for STT
 3. connect local Kokoro/Martin TTS for assistant playback
-4. keep text input and visible transcript as the fallback path
-5. test the same eNVenta-shaped report scenarios with voice-assisted input
+4. keep Speaches TTS available as a later comparison path
+5. keep text input and visible transcript as the fallback path
+6. test the same eNVenta-shaped report scenarios with voice-assisted input
 
 After Phase 9, BENNO should move into repeatable demo-scenario stabilization
 before adding Postgres, local LLM provider experiments, or real eNVenta

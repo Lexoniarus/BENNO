@@ -187,6 +187,15 @@ STT boundary. Browser-native speech recognition may be tested as an experiment,
 but it should not be the primary MVP path because its availability and behavior
 vary by browser.
 
+The first STT integration target is a local Speaches Docker sidecar. Speaches is
+useful for BENNO because it can expose OpenAI-compatible speech APIs while still
+running locally. This keeps BENNO's application code thin: BENNO forwards a
+temporary audio upload to the local service and receives transcript text back.
+
+Speaches may also be useful later for streaming and as a secondary TTS
+comparison path. The first TTS path remains the already available local
+Kokoro/Martin Docker service.
+
 ## Hands-Free Target
 
 The long-term product target is hands-free usage after the report has been started.
@@ -210,11 +219,15 @@ Initial STT direction:
 
 - browser microphone capture through standard web media APIs
 - backend STT endpoint that receives a temporary audio upload
+- local Speaches Docker sidecar as the first transcription service
+- OpenAI-compatible `/v1/audio/transcriptions` style boundary where practical
 - transcript is stored as a normal chat message
 
 Initial local STT candidate:
 
-- `primeline/whisper-large-v3-turbo-german`
+- Speaches with a German-capable Whisper/faster-whisper model
+- `primeline/whisper-large-v3-turbo-german`, if compatible with the selected
+  Speaches/faster-whisper setup
 
 STT fallback or performance paths:
 
@@ -228,6 +241,8 @@ Initial TTS direction:
   development environment
 - backend TTS endpoint sends assistant text to that service
 - browser plays the returned audio
+- Speaches TTS may be evaluated as an alternative, but it is not the first
+  implementation target
 
 Initial local TTS candidate:
 
@@ -239,6 +254,12 @@ TTS fallback:
 
 These are test candidates and current local integration targets, not final
 production commitments.
+
+References:
+
+- [Speaches Realtime API](https://speaches.ai/usage/realtime-api/)
+- [MediaRecorder](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder)
+- [getUserMedia](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia)
 
 ## Privacy Direction
 

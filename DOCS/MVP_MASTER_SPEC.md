@@ -291,15 +291,25 @@ behavior vary between browsers. Instead, recorded audio should be sent to a
 backend STT boundary, and the resulting transcript should enter the existing
 text report loop.
 
+The current STT integration target is a local Speaches Docker sidecar. Speaches
+keeps STT outside the BENNO application process while still allowing local,
+OpenAI-compatible speech API calls. Its streaming support is relevant for later
+hands-free experiments, but Phase 9 may start with file/blob transcription.
+
 The current TTS integration target is the local Docker-based Kokoro/Martin
-service available in the development environment.
+service available in the development environment. Speaches TTS can be evaluated
+as a secondary comparison path.
 
 Initial test candidates from earlier research:
 
-- STT first candidate: browser microphone capture plus backend STT with `primeline/whisper-large-v3-turbo-german`
+- STT first candidate: browser microphone capture plus local Speaches Docker
+  with a German-capable Whisper/faster-whisper model
+- STT model candidate: `primeline/whisper-large-v3-turbo-german`, if compatible
+  with the selected Speaches/faster-whisper setup
 - STT fallback: `primeline/whisper-tiny-german`
 - STT performance path: GGML / whisper.cpp / faster-whisper
 - TTS first candidate: local Kokoro/Martin Docker service using `Godelaune/Kokoro-82M-ONNX-German-Martin`
+- TTS comparison path: Speaches TTS
 - TTS fallback: Thorsten / Piper voices
 
 These model choices are candidates, not final implementation commitments.
@@ -670,9 +680,11 @@ The following decisions define the current MVP direction:
 | CRM | Placeholder CRM/ERP counterpart, not application core |
 | Database | SQLite is the current local mock backend; Postgres can be introduced later behind the same CRM/eNVenta gateway |
 | Observability | Langfuse is available as an optional development tracing layer and must not affect business logic |
-| Frontend/Admin UX | The next planned step is a focused frontend and admin UX overhaul before demo stabilization |
-| Voice | Target layer after text workflow, not part of Vertical Slice 1 |
-| STT/TTS timing | Add and test STT/TTS after a stable text-based report can be created and saved with Gemini |
+| Frontend/Admin UX | Phase 8 is complete and merged |
+| Voice | Phase 9 adds voice as a layer over the existing text workflow |
+| STT/TTS timing | Next implementation step after the Phase 6/8 stable text baseline |
+| STT service | Local Speaches Docker sidecar |
+| TTS service | Local Kokoro/Martin Docker service first; Speaches TTS can be compared later |
 | Audio persistence | No long-term raw audio archive |
 | Language | Session language controls first slice behavior |
 
@@ -700,20 +712,15 @@ The current implementation baseline includes:
 - internal CRM/eNVenta gateway boundary
 - optional Langfuse observability
 
-The next practical step is a frontend and admin UX overhaul:
+The next practical step is the Phase 9 voice foundation:
 
-- improve Sales dashboards, report lists, chat, review, and final report detail
-- make the main workflow usable on desktop, tablet, and phone
-- keep German user-facing workflow text consistent for the current MVP
-- edit users without exposing report content
-- set roles and preferred language
-- edit global provider and language defaults
-- set optional per-user AI provider overrides
-- keep status counts simple and non-surveillance-oriented
+- add browser microphone capture to the report chat
+- connect a local Speaches Docker sidecar for STT
+- submit transcripts into the existing text report loop
+- connect local Kokoro/Martin Docker TTS for assistant playback
+- keep text input and visible transcript as the fallback path
 
-After that, BENNO should move into repeatable demo-scenario stabilization and
-then provider fallback experiments such as LM Studio or another
-OpenAI-compatible local API.
-
-Voice, Postgres, and real eNVenta integration should stay behind the stabilized
-text workflow and the existing CRM/eNVenta gateway boundary.
+After that, BENNO should move into repeatable demo-scenario stabilization.
+Postgres, local LLM provider experiments, and real eNVenta integration should
+stay behind the stabilized voice-assisted workflow and the existing
+CRM/eNVenta gateway boundary.
