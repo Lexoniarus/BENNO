@@ -50,6 +50,7 @@ from benno.services.report_shortcuts import (
     looks_like_reference,
     mentions_inside_sales_follow_up,
     mentions_lead,
+    parse_labeled_rating_values,
     parse_rating_values,
     parse_visit_date,
     parse_visit_type,
@@ -1210,10 +1211,16 @@ def _apply_order_reference_answer(
 
 def _apply_rating_answers(draft: ReportDraft, message_text: str) -> None:
     ratings = dict(draft.ratings_json)
-    parsed_values = parse_rating_values(message_text)
     is_not_assessable = is_not_assessable_rating_answer(message_text)
+    labeled_values = {}
+    parsed_values = []
+    if not is_not_assessable:
+        labeled_values = parse_labeled_rating_values(message_text)
+        parsed_values = parse_rating_values(message_text)
     for index, (rating_key, _label_en, _label_de) in enumerate(RATING_FIELDS):
-        value = parsed_values[index] if index < len(parsed_values) else None
+        value = labeled_values.get(rating_key)
+        if value is None and not labeled_values:
+            value = parsed_values[index] if index < len(parsed_values) else None
         if value is None and not is_not_assessable:
             continue
         if value is None and rating_key in ratings:

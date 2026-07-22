@@ -440,13 +440,16 @@ Current implementation direction:
   responses.
 - Keep Speaches TTS as a secondary TTS comparison path, not the first playback
   target.
-- Return playable audio to the browser without storing generated audio as a
-  long-term business record.
-- Start voice mode through one explicit browser user action, then send
-  transcripts directly as report turns.
+- Return playable audio to the browser while keeping generated TTS snippets as
+  local ignored performance artifacts, not business records.
+- Treat voice mode as the default for in-progress report chats, while keeping
+  one manual start button as browser-permission fallback.
 - Read BENNO's assistant replies aloud automatically while voice mode is active.
 - Reopen the answer gate automatically after playback, with silence detection
   plus manual stop/cancel controls.
+- Cache and prewarm common TTS snippets such as standard phrases and frequent
+  dynamic names so BENNO does not regenerate every assistant answer from
+  scratch.
 
 Important:
 
@@ -454,6 +457,8 @@ Important:
   writeback must not be rewritten for voice.
 - STT only creates text input.
 - TTS only reads assistant output.
+- Kokoro/Martin is not treated as true streaming TTS in this phase; snippet
+  caching is the first latency-reduction path.
 - Visual text remains available for correction, transparency, and fallback.
 - Browser `SpeechRecognition` may be tested as an experiment, but it is not the
   primary MVP path because browser support and behavior are less predictable

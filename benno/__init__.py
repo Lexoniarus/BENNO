@@ -88,6 +88,9 @@ def _configure_langfuse(app: Flask) -> None:
 def _configure_voice(app: Flask) -> None:
     _configure_boolean_from_env(app, "VOICE_ENABLED")
     _configure_integer_from_env(app, "VOICE_MAX_UPLOAD_BYTES")
+    _configure_boolean_from_env(app, "VOICE_TTS_CACHE_ENABLED")
+    _configure_boolean_from_env(app, "VOICE_TTS_PREWARM_ENABLED")
+    _configure_integer_from_env(app, "VOICE_TTS_MAX_SNIPPET_CHARS")
     for key in (
         "SPEACHES_BASE_URL",
         "SPEACHES_STT_MODEL",
@@ -95,6 +98,7 @@ def _configure_voice(app: Flask) -> None:
         "KOKORO_BASE_URL",
         "KOKORO_TTS_MODEL",
         "KOKORO_TTS_VOICE",
+        "VOICE_TTS_CACHE_DIR",
     ):
         configured_value = os.environ.get(key)
         if configured_value:

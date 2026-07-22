@@ -26,6 +26,10 @@ class BaseConfig:
     TESTING = False
     VOICE_ENABLED = True
     VOICE_MAX_UPLOAD_BYTES = 10_485_760
+    VOICE_TTS_CACHE_DIR = "instance/voice_cache"
+    VOICE_TTS_CACHE_ENABLED = True
+    VOICE_TTS_MAX_SNIPPET_CHARS = 180
+    VOICE_TTS_PREWARM_ENABLED = True
 
 
 class DevelopmentConfig(BaseConfig):

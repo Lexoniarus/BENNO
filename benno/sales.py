@@ -30,7 +30,8 @@ from benno.services.report_loop import (
     start_report_chat,
 )
 from benno.services.report_state import display_value
-from benno.services.voice import VoiceServiceError, synthesize_speech, transcribe_audio
+from benno.services.voice import VoiceServiceError, transcribe_audio
+from benno.services.voice_tts_cache import synthesize_assistant_speech
 
 sales_blueprint = Blueprint("sales", __name__, url_prefix="/sales")
 
@@ -127,7 +128,7 @@ def new_report():
     """Start a new deterministic report chat."""
     chat = start_report_chat(current_user)
 
-    return redirect(url_for("sales.report_chat", chat_id=chat.id))
+    return redirect(url_for("sales.report_chat", chat_id=chat.id, voice="auto"))
 
 
 @sales_blueprint.get("/reports/<int:chat_id>")
@@ -142,6 +143,7 @@ def report_chat(chat_id: int):
         draft=chat.report_draft,
         ready_for_review=is_ready_for_review(chat),
         ai_status=get_ai_status(),
+        voice_auto_start=_voice_should_auto_start(chat),
         voice_enabled=current_app.config.get("VOICE_ENABLED", False),
         section_labels=REPORT_SECTION_LABELS_DE,
         status_labels=REPORT_STATUS_LABELS_DE,
@@ -227,10 +229,9 @@ def assistant_message_speech(chat_id: int, message_id: int):
     if message.sender != MessageSender.ASSISTANT.value:
         abort(404)
 
-    try:
-        speech = synthesize_speech(message.message_text)
-    except VoiceServiceError as error:
-        return _voice_error_response(str(error), 503)
+    speech = _speech_for_message(message)
+    if speech is None:
+        return _voice_error_response("Sprachausgabe nicht verfügbar.", 503)
 
     return Response(speech.audio_bytes, mimetype=speech.mimetype)
 
@@ -374,7 +375,10 @@ def _latest_assistant_message(chat: Chat) -> ChatMessage:
 
 def _speech_for_message(message: ChatMessage):
     try:
-        return synthesize_speech(message.message_text)
+        return synthesize_assistant_speech(
+            message.message_text,
+            _speech_context(message.chat),
+        )
     except VoiceServiceError:
         return None
 
@@ -401,6 +405,34 @@ def _voice_upload_limit() -> int:
 
 def _voice_mimetype_is_supported(mimetype: str | None) -> bool:
     return (mimetype or "").lower() in SUPPORTED_VOICE_MIME_TYPES
+
+
+def _voice_should_auto_start(chat: Chat) -> bool:
+    if not current_app.config.get("VOICE_ENABLED", False):
+        return False
+    if chat.status != ReportStatus.IN_PROGRESS.value:
+        return False
+
+    return request.args.get("voice") == "auto"
+
+
+def _speech_context(chat: Chat) -> dict[str, object]:
+    draft = chat.report_draft
+    answers = dict(draft.draft_data_json.get("answers", {})) if draft else {}
+    context: dict[str, object] = {
+        "username": chat.sales_user.username,
+        "visit_context": answers.get("visit_context"),
+        "participants": answers.get("participants"),
+        "target_topic": answers.get("target_topic"),
+    }
+    account = getattr(draft, "account", None) if draft else None
+    contact = getattr(draft, "contact", None) if draft else None
+    if account:
+        context["account_name"] = account.display_name or account.search_name
+    if contact:
+        context["contact_name"] = contact.full_name
+
+    return context
 
 
 def _build_open_report_rows(chats: list[Chat]) -> list[dict[str, object]]:

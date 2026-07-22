@@ -47,19 +47,83 @@ def parse_visit_type(message_text: str) -> str | None:
 def parse_rating_value(message_text: str) -> int | None:
     """Parse the first 1-10 rating value from text."""
     match = re.search(r"\b(10|[1-9])\b", message_text)
-    if match is None:
-        return None
+    if match is not None:
+        return int(match.group(1))
 
-    return int(match.group(1))
+    normalized_text = message_text.lower()
+    spoken_values = {
+        "eins": 1,
+        "zwei": 2,
+        "drei": 3,
+        "vier": 4,
+        "fuenf": 5,
+        "fünf": 5,
+        "sechs": 6,
+        "sieben": 7,
+        "acht": 8,
+        "neun": 9,
+        "zehn": 10,
+        "zähn": 10,
+        "zaehn": 10,
+    }
+    for word, value in spoken_values.items():
+        if re.search(rf"\b{re.escape(word)}\b", normalized_text):
+            return value
+
+    return None
 
 
 def parse_rating_values(message_text: str) -> list[int]:
     """Parse all 1-10 rating values from text."""
-    return [
+    numeric_values = [
         int(match)
         for match in re.findall(r"\b(10|[1-9])\b", message_text)
         if 1 <= int(match) <= 10
     ]
+    if numeric_values:
+        return numeric_values
+
+    value = parse_rating_value(message_text)
+    return [value] if value is not None else []
+
+
+def parse_labeled_rating_values(message_text: str) -> dict[str, int]:
+    """Parse rating values that are explicitly tied to eNVenta rating labels."""
+    label_patterns = {
+        "customer_satisfaction_rating": (
+            r"zufriedenheit",
+            r"zufrieden",
+        ),
+        "technical_attractiveness_rating": (
+            r"technische?\s+attraktivit[aä]t",
+            r"technisch(?:e|er|en)?",
+        ),
+        "commercial_attractiveness_rating": (
+            r"kaufm[aä]nnische?\s+attraktivit[aä]t",
+            r"kaufmaennische?\s+attraktivit[aä]t",
+            r"kaufm[aä]nnisch(?:e|er|en)?",
+            r"kaufmaennisch(?:e|er|en)?",
+            r"kommerziell(?:e|er|en)?",
+        ),
+        "priority_rating": (
+            r"priorit[aä]t",
+            r"prioritaet",
+        ),
+    }
+    parsed_values = {}
+    normalized_text = message_text.lower()
+    for rating_key, patterns in label_patterns.items():
+        for pattern in patterns:
+            match = re.search(pattern, normalized_text)
+            if match is None:
+                continue
+            search_window = message_text[match.end() : match.end() + 90]
+            value = parse_rating_value(search_window)
+            if value is not None:
+                parsed_values[rating_key] = value
+                break
+
+    return parsed_values
 
 
 def is_not_assessable_rating_answer(message_text: str) -> bool:

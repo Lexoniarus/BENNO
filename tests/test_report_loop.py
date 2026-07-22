@@ -468,6 +468,41 @@ def test_partial_rating_answer_keeps_rating_step_open(app) -> None:
     assert draft.draft_data_json["current_step"] == "ratings"
 
 
+def test_labeled_priority_rating_updates_priority_field(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_all_required_until_ratings(chat)
+
+    process_report_message_with_ai(chat, "Priorität ist 5", _FakeAiService())
+
+    draft = chat.report_draft
+    assert draft.ratings_json["priority_rating"]["value"] == 5
+    assert "customer_satisfaction_rating" not in draft.ratings_json
+    assert draft.draft_data_json["current_step"] == "ratings"
+
+
+def test_labeled_rating_bundle_does_not_shift_values_by_position(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_all_required_until_ratings(chat)
+
+    process_report_message_with_ai(
+        chat,
+        (
+            "Zufriedenheit stabile zehn, technische Attraktivität 10, "
+            "kaufmännische Attraktivität 5, Priorität 4."
+        ),
+        _FakeAiService(),
+    )
+
+    ratings = chat.report_draft.ratings_json
+    assert ratings["customer_satisfaction_rating"]["value"] == 10
+    assert ratings["technical_attractiveness_rating"]["value"] == 10
+    assert ratings["commercial_attractiveness_rating"]["value"] == 5
+    assert ratings["priority_rating"]["value"] == 4
+    assert chat.report_draft.draft_data_json["current_step"] == "review"
+
+
 def test_not_assessable_rating_answer_can_complete_rating_step(app) -> None:
     seed_database()
     chat = _start_sales_chat()

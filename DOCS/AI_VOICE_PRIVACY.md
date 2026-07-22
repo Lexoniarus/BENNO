@@ -172,10 +172,13 @@ Text-to-speech only adds spoken output. It does not replace the visible text int
 
 The core report workflow remains text-based internally.
 
-For the next implementation phase, BENNO should start with explicit voice
-controls rather than immediate full hands-free automation:
+For Phase 9, BENNO should treat voice mode as the default for active report
+chats:
 
-- record button in the report chat
+- automatic speech playback of the latest BENNO question when a new report chat
+  opens
+- automatic opening of the answer gate after playback
+- visible voice controls as fallback and user control surface
 - visible recording state
 - direct transcript insertion as a normal chat message
 - automatic assistant audio playback after the text answer is produced
@@ -188,9 +191,11 @@ preview. This matches the hands-free target more closely, while the visible chat
 still provides transparency and later correction options.
 
 Because browser microphone and autoplay behavior depend on a user gesture, voice
-mode starts only after the user explicitly activates it. After that activation,
-BENNO may continue the turn loop automatically until the user stops voice mode,
-the report reaches review, or an error requires text fallback.
+mode may still require one manual fallback click when the browser blocks
+autostart. BENNO should attempt voice autostart for in-progress report chats,
+but the visible `Sprachmodus starten` control remains available. After voice
+activation, BENNO may continue the turn loop automatically until the user stops
+voice mode, the report reaches review, or an error requires text fallback.
 
 The browser should handle microphone access and recording. The backend should
 coordinate the actual transcription path so BENNO keeps one stable server-side
@@ -250,8 +255,13 @@ Initial TTS direction:
 
 - use the local Docker-based Kokoro/Martin service already available in the
   development environment
-- backend TTS endpoint sends assistant text to that service
+- backend TTS endpoint sends assistant text through a local snippet cache before
+  falling back to full Kokoro generation
 - browser plays the returned audio
+- common standard phrases and frequent dynamic terms such as company/contact
+  names may be cached locally as WAV snippets
+- cached snippets may be concatenated server-side when WAV parameters are
+  compatible
 - Speaches TTS may be evaluated as an alternative, but it is not the first
   implementation target
 
@@ -265,6 +275,11 @@ TTS fallback:
 
 These are test candidates and current local integration targets, not final
 production commitments.
+
+Kokoro/Martin currently behaves as a full-response TTS source for BENNO. It is
+not treated as true streaming TTS in this MVP phase. Perceived latency should be
+reduced through prewarmed and lazy-cached snippets first; real streaming remains
+a later optimization path.
 
 References:
 
@@ -294,9 +309,12 @@ Target behavior:
 - backend processes audio for transcription through a controlled STT boundary
 - transcript becomes the relevant chat input
 - raw audio is discarded after transcription, completion, or cancellation
-- generated TTS audio is returned for playback and not stored as a long-term archive
+- generated TTS output may be cached locally as reusable snippets for
+  performance, but it is not a business record and must remain outside Git
 
-During development, temporary audio may exist for processing, but the product direction is no raw-audio archive.
+During development, temporary audio may exist for processing, and reusable TTS
+snippets may exist under a local ignored cache directory. The product direction
+remains no raw-audio archive and no long-term business audio archive.
 
 ## Persisted Data
 
@@ -315,6 +333,7 @@ Not persisted as long-term records:
 
 - raw audio archive
 - generated TTS audio archive
+- local TTS snippet cache as business data
 - real customer data in the mock MVP
 - real employee data in the mock MVP
 

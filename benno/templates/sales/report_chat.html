@@ -42,6 +42,8 @@
               <div
                 class="voice-controls"
                 data-voice-controls
+                data-voice-auto-start="{{ 'true' if voice_auto_start else 'false' }}"
+                data-voice-chat-id="{{ chat.id }}"
                 data-voice-turn-url="{{ url_for('sales.report_voice_turn', chat_id=chat.id) }}"
               >
                 <div>

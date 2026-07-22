@@ -28,9 +28,36 @@ const voiceState = {
 };
 
 const maxRecordingMs = 24000;
+const maxPlaybackWaitMs = 45000;
 const minimumRecordingMs = 1200;
 const silenceCloseMs = 1400;
 const silenceThreshold = 0.018;
+
+function voiceStopStorageKey() {
+  if (!voiceControls?.dataset.voiceChatId) {
+    return null;
+  }
+
+  return `benno.voice.autostart.stopped.${voiceControls.dataset.voiceChatId}`;
+}
+
+function voiceAutostartIsStopped() {
+  const storageKey = voiceStopStorageKey();
+  return Boolean(storageKey && sessionStorage.getItem(storageKey));
+}
+
+function setVoiceAutostartStopped(isStopped) {
+  const storageKey = voiceStopStorageKey();
+  if (!storageKey) {
+    return;
+  }
+
+  if (isStopped) {
+    sessionStorage.setItem(storageKey, "true");
+  } else {
+    sessionStorage.removeItem(storageKey);
+  }
+}
 
 function scrollChatToBottom() {
   if (!chatPanel) {
@@ -123,24 +150,37 @@ async function copySetupLink() {
   copyButton.textContent = "Kopiert";
 }
 
-async function startVoiceMode() {
+async function startVoiceMode(options = {}) {
   if (!voiceControls) {
     return;
   }
 
+  if (options.auto && voiceAutostartIsStopped()) {
+    return;
+  }
+  if (!options.auto) {
+    setVoiceAutostartStopped(false);
+  }
+
   voiceState.active = true;
   setVoiceControlsRecording(false);
-  setVoiceStatus("BENNO liest die letzte Frage vor.");
+  setVoiceStatus("BENNO bereitet die Sprachausgabe vor.");
 
   try {
-    await ensureMicrophoneStream();
     await playLatestAssistantSpeech();
     if (voiceState.active) {
       await startVoiceRecording();
     }
   } catch (error) {
     stopVoiceMode();
-    setVoiceStatus(error.message || "Sprachmodus konnte nicht gestartet werden.");
+    if (options.auto) {
+      setVoiceAutostartStopped(true);
+      setVoiceStatus(
+        "Automatischer Sprachstart wurde blockiert. Bitte starte den Sprachmodus einmal manuell.",
+      );
+    } else {
+      setVoiceStatus(error.message || "Sprachmodus konnte nicht gestartet werden.");
+    }
   }
 }
 
@@ -173,12 +213,14 @@ async function playLatestAssistantSpeech() {
     return;
   }
 
+  setVoiceStatus("BENNO bereitet die Sprachausgabe vor.");
   const response = await fetch(message.dataset.speechUrl, { method: "POST" });
   if (!response.ok) {
     throw new Error("Sprachausgabe ist nicht verfügbar.");
   }
 
   const audioBlob = await response.blob();
+  setVoiceStatus("BENNO spricht.");
   await playAudioBlob(audioBlob);
 }
 
@@ -189,8 +231,14 @@ async function playAudioBlob(audioBlob) {
   try {
     await audio.play();
     await new Promise((resolve) => {
-      audio.addEventListener("ended", resolve, { once: true });
-      audio.addEventListener("error", resolve, { once: true });
+      const finish = () => {
+        window.clearTimeout(playbackTimer);
+        resolve();
+      };
+      const playbackTimer = window.setTimeout(finish, maxPlaybackWaitMs);
+
+      audio.addEventListener("error", finish, { once: true });
+      audio.addEventListener("ended", finish, { once: true });
     });
   } finally {
     URL.revokeObjectURL(audioUrl);
@@ -418,6 +466,7 @@ if (voiceStopButton) {
 
 if (voiceCancelButton) {
   voiceCancelButton.addEventListener("click", () => {
+    setVoiceAutostartStopped(true);
     stopVoiceMode();
     setVoiceStatus("Sprachmodus beendet.");
   });
@@ -425,4 +474,8 @@ if (voiceCancelButton) {
 
 if (copyButton) {
   copyButton.addEventListener("click", copySetupLink);
+}
+
+if (voiceControls?.dataset.voiceAutoStart === "true") {
+  window.setTimeout(() => startVoiceMode({ auto: true }), 0);
 }

@@ -38,7 +38,20 @@ def test_voice_script_marks_dynamic_assistant_replies_for_speech() -> None:
     assert "payload.assistant_speech_url" in script_text
     assert "payload.tts_error || !payload.audio" in script_text
     assert "stopVoiceMode();" in script_text
+    assert "maxPlaybackWaitMs" in script_text
     assert "Ich höre zu. Sprich deine Antwort." in script_text
+
+
+def test_voice_script_supports_report_chat_autostart() -> None:
+    script_text = (_project_root() / "benno" / "static" / "js" / "app.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert "dataset.voiceAutoStart" in script_text
+    assert "startVoiceMode({ auto: true })" in script_text
+    assert 'sessionStorage.setItem(storageKey, "true")' in script_text
+    assert "sessionStorage.removeItem(storageKey)" in script_text
+    assert "Automatischer Sprachstart wurde blockiert." in script_text
 
 
 def test_report_chat_css_reserves_space_for_sticky_composer() -> None:
@@ -59,6 +72,10 @@ def test_create_app_uses_testing_configuration() -> None:
     assert app.config["TESTING"] is True
     assert app.config["SQLALCHEMY_DATABASE_URI"] == "sqlite:///:memory:"
     assert app.config["VOICE_MAX_UPLOAD_BYTES"] == 10_485_760
+    assert app.config["VOICE_TTS_CACHE_DIR"] == "instance/voice_cache"
+    assert app.config["VOICE_TTS_CACHE_ENABLED"] is True
+    assert app.config["VOICE_TTS_MAX_SNIPPET_CHARS"] == 180
+    assert app.config["VOICE_TTS_PREWARM_ENABLED"] is True
 
 
 def test_index_redirects_anonymous_users_to_login() -> None:
@@ -129,6 +146,22 @@ def test_development_configuration_reads_voice_upload_limit(monkeypatch) -> None
     app = create_app("development")
 
     assert app.config["VOICE_MAX_UPLOAD_BYTES"] == 2048
+
+
+def test_development_configuration_reads_voice_tts_cache_environment(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("VOICE_TTS_CACHE_ENABLED", "false")
+    monkeypatch.setenv("VOICE_TTS_PREWARM_ENABLED", "false")
+    monkeypatch.setenv("VOICE_TTS_CACHE_DIR", "instance/test-voice-cache")
+    monkeypatch.setenv("VOICE_TTS_MAX_SNIPPET_CHARS", "96")
+
+    app = create_app("development")
+
+    assert app.config["VOICE_TTS_CACHE_ENABLED"] is False
+    assert app.config["VOICE_TTS_PREWARM_ENABLED"] is False
+    assert app.config["VOICE_TTS_CACHE_DIR"] == "instance/test-voice-cache"
+    assert app.config["VOICE_TTS_MAX_SNIPPET_CHARS"] == 96
 
 
 def test_default_development_database_uses_project_root(monkeypatch) -> None:
