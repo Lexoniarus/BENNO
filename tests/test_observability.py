@@ -56,7 +56,7 @@ def test_gemini_usage_metadata_maps_to_langfuse_usage_details() -> None:
 
 def test_report_decision_updates_current_span(app, monkeypatch) -> None:
     seed_database()
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     chat = start_report_chat(sales_user)
     captured_update = {}
 
@@ -107,7 +107,7 @@ def test_flush_errors_do_not_escape(app, monkeypatch) -> None:
 
 def test_trace_report_turn_uses_noop_when_client_lookup_fails(app, monkeypatch) -> None:
     seed_database()
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     chat = start_report_chat(sales_user)
     entered_trace_body = False
 
@@ -132,7 +132,7 @@ def test_trace_report_turn_uses_noop_when_client_lookup_fails(app, monkeypatch) 
 
 def test_report_loop_continues_when_trace_update_fails(app, monkeypatch) -> None:
     seed_database()
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     chat = start_report_chat(sales_user)
 
     class BrokenLangfuseClient:
@@ -151,7 +151,7 @@ def test_report_loop_continues_when_trace_update_fails(app, monkeypatch) -> None
 
 def test_report_loop_wraps_turn_with_observability_trace(app, monkeypatch) -> None:
     seed_database()
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     chat = start_report_chat(sales_user)
     captured_trace = {}
 

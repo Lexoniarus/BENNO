@@ -8,6 +8,12 @@ from benno.models import ReportDraft
 AI_CACHE_KEY = "ai_cache"
 CRM_REFERENCES_KEY = "crm_references"
 INSIDE_SALES_FOLLOW_UP_KEY = "inside_sales_follow_up_requested"
+DISPLAY_VALUE_LABELS = {
+    "in_person": "Vor Ort",
+    "virtual": "Virtuell",
+    "phone": "Telefonisch",
+    "not_applicable": "Nicht relevant",
+}
 
 
 def draft_data(draft: ReportDraft) -> dict[str, Any]:
@@ -81,4 +87,7 @@ def display_value(value: Any, empty: str = "Not provided") -> str:
         return empty
 
     text = str(value).strip()
-    return text or empty
+    if not text:
+        return empty
+
+    return DISPLAY_VALUE_LABELS.get(text, text)

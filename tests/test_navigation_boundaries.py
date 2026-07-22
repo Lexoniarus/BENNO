@@ -28,7 +28,7 @@ from benno.seed import seed_database
 
 def test_sales_open_reports_only_include_own_chats(app) -> None:
     seed_database()
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     other_user = _create_sales_user("other-sales@example.invalid")
     own_chat = Chat(sales_user=sales_user, status=ReportStatus.IN_PROGRESS.value)
     other_chat = Chat(sales_user=other_user, status=ReportStatus.IN_PROGRESS.value)
@@ -36,7 +36,7 @@ def test_sales_open_reports_only_include_own_chats(app) -> None:
     db.session.commit()
 
     with app.test_client() as client:
-        _login(client, "sales@benno.local", "sales-demo-password")
+        _login(client, "laura.schneider@solar-sales.example", "Sales123")
         response = client.get("/sales/reports/open")
 
     assert response.status_code == 200
@@ -46,7 +46,7 @@ def test_sales_open_reports_only_include_own_chats(app) -> None:
 
 def test_sales_completed_reports_only_include_own_reports(app) -> None:
     seed_database()
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     other_user = _create_sales_user("other-sales@example.invalid")
     own_chat = Chat(sales_user=sales_user, status=ReportStatus.CONFIRMED.value)
     other_chat = Chat(sales_user=other_user, status=ReportStatus.CONFIRMED.value)
@@ -67,7 +67,7 @@ def test_sales_completed_reports_only_include_own_reports(app) -> None:
     db.session.commit()
 
     with app.test_client() as client:
-        _login(client, "sales@benno.local", "sales-demo-password")
+        _login(client, "laura.schneider@solar-sales.example", "Sales123")
         response = client.get("/sales/reports/completed")
 
     assert response.status_code == 200
@@ -78,9 +78,57 @@ def test_sales_completed_reports_only_include_own_reports(app) -> None:
     assert f'data-report-id="{other_report.id}"'.encode() not in response.data
 
 
+def test_sales_final_report_detail_shows_enventa_writeback_fields(app) -> None:
+    seed_database()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
+    chat = Chat(sales_user=sales_user, status=ReportStatus.CONFIRMED.value)
+    report = _create_final_report(chat, sales_user, "Final report text")
+    visit_report = MockVisitReport(
+        visit_report_number="VR-DETAIL-001",
+        final_report=report,
+        visit_type=VisitType.IN_PERSON.value,
+        account_search_name="Nordlicht",
+        contact_name="Mara Stein",
+        visit_date=date(2026, 6, 30),
+        target_topic="Forecast",
+        info_text="Lieferfaehigkeit besprochen.",
+        agreement_text="Unterlagen werden gesendet.",
+        strength_text="Hohes Projektvolumen",
+        weakness_text="Technische Freigabe offen",
+        customer_satisfaction_rating=8,
+        technical_attractiveness_rating=7,
+        commercial_attractiveness_rating=6,
+        priority_rating=9,
+        next_appointment_date=date(2026, 7, 7),
+        offer_reference="OFF-123",
+        order_reference="keiner",
+    )
+    db.session.add_all([chat, report, visit_report])
+    db.session.commit()
+
+    with app.test_client() as client:
+        _login(client, "laura.schneider@solar-sales.example", "Sales123")
+        response = client.get(f"/sales/reports/final/{report.id}")
+
+    response_text = response.data.decode()
+    assert response.status_code == 200
+    assert "Besuchsart" in response_text
+    assert "Vor Ort" in response_text
+    assert "Teilnehmer" in response_text
+    assert "Mara Stein" in response_text
+    assert "Besuchsdatum" in response_text
+    assert "2026-06-30" in response_text
+    assert "Angebotsbezug" in response_text
+    assert "OFF-123" in response_text
+    assert "Auftragsbezug" in response_text
+    assert "Nicht relevant" in response_text
+    assert "Bewertungen" in response_text
+    assert "Priorität: 9/10" in response_text
+
+
 def test_admin_pages_do_not_render_chat_or_report_content(app) -> None:
     seed_database()
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     chat = Chat(sales_user=sales_user, status=ReportStatus.IN_PROGRESS.value)
     message = ChatMessage(
         chat=chat,
@@ -93,7 +141,7 @@ def test_admin_pages_do_not_render_chat_or_report_content(app) -> None:
     db.session.commit()
 
     with app.test_client() as client:
-        _login(client, "admin@benno.local", "admin-demo-password")
+        _login(client, "admin@solar-sales.local", "Admin123")
         responses = [
             client.get("/admin"),
             client.get("/admin/users"),
@@ -108,7 +156,7 @@ def test_admin_pages_do_not_render_chat_or_report_content(app) -> None:
 
 def test_admin_dashboard_counts_phase_6_mock_reminders(app) -> None:
     seed_database()
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     chat = Chat(sales_user=sales_user, status=ReportStatus.CONFIRMED.value)
     report = _create_final_report(chat, sales_user, "Reminder report text")
     visit_report = MockVisitReport(
@@ -130,11 +178,11 @@ def test_admin_dashboard_counts_phase_6_mock_reminders(app) -> None:
     db.session.commit()
 
     with app.test_client() as client:
-        _login(client, "admin@benno.local", "admin-demo-password")
+        _login(client, "admin@solar-sales.local", "Admin123")
         response = client.get("/admin")
 
     assert response.status_code == 200
-    assert b"Open Reminders" in response.data
+    assert b"Offene Wiedervorlagen" in response.data
     assert b"1" in response.data
 
 

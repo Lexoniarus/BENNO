@@ -24,3 +24,9 @@ def index():
 def health() -> tuple[dict[str, str], int]:
     """Return a small health response for smoke tests."""
     return {"status": "ok", "service": "benno"}, 200
+
+
+@main_blueprint.get("/favicon.ico")
+def favicon():
+    """Redirect browsers to BENNO's local SVG favicon asset."""
+    return redirect(url_for("static", filename="img/benno-logo.svg"))

@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}BENNO{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/benno-logo.svg') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
     <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
   </head>
@@ -17,18 +18,34 @@
             alt="BENNO"
           >
         </a>
-        <nav class="topbar__nav" aria-label="Hauptnavigation">
+        <button
+          class="topbar__toggle"
+          type="button"
+          data-nav-toggle
+          aria-expanded="false"
+          aria-controls="main-navigation"
+        >
+          Menü
+        </button>
+        <nav id="main-navigation" class="topbar__nav" data-main-nav aria-label="Hauptnavigation">
           {% if current_user.is_sales_rep %}
-            <a href="{{ url_for('sales.dashboard') }}">Vertrieb</a>
-            <a href="{{ url_for('sales.open_reports') }}">Offene Berichte</a>
-            <a href="{{ url_for('sales.completed_reports') }}">Fertige Berichte</a>
-            <a href="{{ url_for('sales.options') }}">Optionen</a>
+            <a class="{{ 'is-active' if request.endpoint == 'sales.dashboard' else '' }}" href="{{ url_for('sales.dashboard') }}">Vertrieb</a>
+            <a class="{{ 'is-active' if request.endpoint == 'sales.open_reports' else '' }}" href="{{ url_for('sales.open_reports') }}">Offene Berichte</a>
+            <a class="{{ 'is-active' if request.endpoint == 'sales.completed_reports' else '' }}" href="{{ url_for('sales.completed_reports') }}">Fertige Berichte</a>
+            <a class="{{ 'is-active' if request.endpoint == 'sales.options' else '' }}" href="{{ url_for('sales.options') }}">Optionen</a>
           {% elif current_user.is_admin %}
-            <a href="{{ url_for('admin.dashboard') }}">Admin</a>
-            <a href="{{ url_for('admin.users') }}">Benutzer</a>
-            <a href="{{ url_for('admin.settings') }}">Einstellungen</a>
+            <a class="{{ 'is-active' if request.endpoint == 'admin.dashboard' else '' }}" href="{{ url_for('admin.dashboard') }}">Übersicht</a>
+            <a class="{{ 'is-active' if request.endpoint in ['admin.users', 'admin.new_user', 'admin.edit_user'] else '' }}" href="{{ url_for('admin.users') }}">Benutzer</a>
+            <a class="{{ 'is-active' if request.endpoint == 'admin.settings' else '' }}" href="{{ url_for('admin.settings') }}">Einstellungen</a>
           {% endif %}
-          <a href="{{ url_for('auth.logout') }}">Abmelden</a>
+          <a class="topbar__logout" href="{{ url_for('auth.logout') }}">
+            <span>Abmelden</span>
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M10 17l5-5-5-5"></path>
+              <path d="M15 12H3"></path>
+              <path d="M21 3v18h-7"></path>
+            </svg>
+          </a>
         </nav>
       </header>
     {% endif %}

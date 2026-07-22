@@ -1,19 +1,81 @@
 {% extends "base.html" %}
 
-{% block title %}Admin Dashboard - BENNO{% endblock %}
+{% block title %}Admin Übersicht - BENNO{% endblock %}
 {% block shell_class %}app-shell--page{% endblock %}
 
 {% block content %}
-  <section class="page-section" aria-labelledby="admin-title">
-    <p class="hero__eyebrow">Admin workspace</p>
-    <h1 id="admin-title">Status Overview</h1>
-    <div class="action-grid">
-      {% for label, value in status.items() %}
-        <div class="action-card">
-          <span>{{ label.replace("_", " ").title() }}</span>
-          <strong>{{ value }}</strong>
-        </div>
+  <section class="page-section page-section--wide workspace-shell" aria-labelledby="admin-title">
+    <div class="section-heading workspace-header">
+      <div>
+        <h1 id="admin-title">Übersicht & Einstellungen</h1>
+        <p class="workspace-subtitle">Status, Benutzer und globale BENNO-Konfiguration.</p>
+      </div>
+    </div>
+
+    <nav class="workspace-tabs" aria-label="Adminbereiche">
+      <a class="is-active" href="{{ url_for('admin.dashboard') }}" aria-current="page">Übersicht</a>
+      <a href="{{ url_for('admin.users') }}">Benutzer</a>
+      <a href="{{ url_for('admin.settings') }}">Provider</a>
+      <a href="{{ url_for('admin.settings') }}">Einstellungen</a>
+      <a href="{{ url_for('admin.settings') }}">System</a>
+    </nav>
+
+    <div class="metric-grid metric-grid--workspace">
+      {% for card in status_cards %}
+        <article class="metric-card">
+          <span>{{ card.label }}</span>
+          <strong>{{ card.value }}</strong>
+          <small>Anzeigen</small>
+        </article>
       {% endfor %}
+    </div>
+
+    <div class="admin-layout">
+      <section class="surface-panel workspace-card" aria-labelledby="admin-users-title">
+        <div class="panel-heading">
+          <h2 id="admin-users-title">Benutzerstatus</h2>
+          <a class="button button--link" href="{{ url_for('admin.new_user') }}">Benutzer hinzufügen</a>
+        </div>
+        <div class="table-wrap report-table-wrap workspace-card workspace-card--flush">
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th>Benutzer</th>
+                <th>Rolle</th>
+                <th>Sprache</th>
+                <th>Offen</th>
+                <th>Fertig</th>
+                <th>Problemfälle</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in user_rows %}
+                {% set user = row.user %}
+                <tr>
+                  <td data-label="Benutzer">{{ user.username }}</td>
+                  <td data-label="Rolle">{{ user.role }}</td>
+                  <td data-label="Sprache">{{ user.preferred_language }}</td>
+                  <td data-label="Offen">{{ row.open_chats }}</td>
+                  <td data-label="Fertig">{{ row.completed_reports }}</td>
+                  <td data-label="Problemfälle">{{ row.problem_chats }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <aside class="surface-panel surface-panel--compact workspace-card" aria-labelledby="admin-boundary-title">
+        <h2 id="admin-boundary-title">Admin-Grenze</h2>
+        <p>
+          Diese Übersicht zeigt technische und organisatorische Statusdaten.
+          Chattexte, Transkripte und vollständige Berichtstexte bleiben im
+          Adminbereich verborgen.
+        </p>
+        <div class="action-row">
+          <a class="button button--link" href="{{ url_for('admin.settings') }}">Einstellungen</a>
+        </div>
+      </aside>
     </div>
   </section>
 {% endblock %}

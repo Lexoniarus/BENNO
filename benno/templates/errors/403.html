@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Zugriff nicht erlaubt - BENNO{% endblock %}
+{% block shell_class %}app-shell--page{% endblock %}
+
+{% block content %}
+  <section class="page-section error-panel" aria-labelledby="error-title">
+    <p class="section-kicker">BENNO Zugriff</p>
+    <h1 id="error-title">Zugriff nicht erlaubt</h1>
+    <p>
+      Dein aktueller Benutzer darf diesen Bereich nicht öffnen.
+      Wechsle zurück in deinen BENNO-Arbeitsbereich.
+    </p>
+    <a class="button button--link" href="{{ url_for('main.index') }}">
+      Zurück zum Start
+    </a>
+  </section>
+{% endblock %}

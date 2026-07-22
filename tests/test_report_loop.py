@@ -1,5 +1,7 @@
 """Tests for the Phase 6 eNVenta-oriented report loop."""
 
+from datetime import date
+
 from benno.enums import MessageSender, ReportStatus, UserIntent, VisitType
 from benno.models import MockReminder, MockVisitReport, User
 from benno.seed import seed_database
@@ -19,12 +21,17 @@ from benno.services.report_loop import (
     process_report_message_with_ai,
     start_report_chat,
 )
+from benno.services.report_review import normalize_report_display_text
+from benno.services.report_shortcuts import (
+    extract_strength_weakness_answers,
+    parse_visit_date,
+)
 from benno.services.report_steps import step_by_key
 
 
 def test_service_creates_phase_6_chat_draft_and_initial_question(app) -> None:
     seed_database()
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
 
     chat = start_report_chat(sales_user)
 
@@ -32,13 +39,13 @@ def test_service_creates_phase_6_chat_draft_and_initial_question(app) -> None:
     assert chat.status == ReportStatus.IN_PROGRESS.value
     assert len(chat.messages) == 1
     assert chat.messages[0].sender == MessageSender.ASSISTANT.value
-    assert "BENNO Sales Rep" in chat.messages[0].message_text
+    assert "Laura Schneider" in chat.messages[0].message_text
     assert "Kunden, Lead oder Kontakt" in chat.messages[0].message_text
 
 
 def test_fresh_ai_context_lists_phase_6_report_requirements(app) -> None:
     seed_database()
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     chat = start_report_chat(sales_user)
 
     context = ai_message_context(chat.report_draft, step_by_key("visit_context"))
@@ -63,7 +70,7 @@ def test_fresh_ai_context_lists_phase_6_report_requirements(app) -> None:
 
 def test_ai_analysis_can_fill_multiple_phase_6_sections_from_one_message(app) -> None:
     seed_database()
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     chat = start_report_chat(sales_user)
     ai_service = _FakeAiService(
         analysis=AiMessageAnalysis(
@@ -154,7 +161,7 @@ def test_rating_clues_are_extracted_from_later_bundle_without_ai_rating_update(
     app,
 ) -> None:
     seed_database()
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     chat = start_report_chat(sales_user)
     ai_service = _FakeAiService(
         analysis=AiMessageAnalysis(
@@ -239,6 +246,160 @@ def test_four_enventa_ratings_complete_rating_section(app) -> None:
     }
     assert ratings["priority_rating"]["value"] == 9
     assert chat.report_draft.draft_data_json["current_step"] == "review"
+    assert "/sales/reports/" not in chat.messages[-1].message_text
+    assert "Bericht pr\u00fcfen" in chat.messages[-1].message_text
+
+
+def test_explicit_strength_and_weakness_are_extracted_by_rules() -> None:
+    answers = extract_strength_weakness_answers(
+        "Stärke ist hohes Projektvolumen, Schwäche ist unklare Freigabe."
+    )
+
+    assert answers == {
+        "strength_text": "hohes Projektvolumen",
+        "weakness_text": "unklare Freigabe",
+    }
+
+
+def test_strength_weakness_hint_works_during_rating_step(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_all_required_until_ratings(chat)
+
+    process_report_message_with_ai(
+        chat,
+        "Stärke ist hohes Projektvolumen, Schwäche ist unklare technische Freigabe.",
+        _FakeAiService(),
+    )
+
+    draft = chat.report_draft
+    answers = draft.draft_data_json["answers"]
+    assert answers["strength_text"] == "hohes Projektvolumen"
+    assert answers["weakness_text"] == "unklare technische Freigabe"
+    assert draft.ratings_json == {}
+    assert draft.draft_data_json["current_step"] == "ratings"
+
+
+def test_strength_weakness_hint_does_not_overwrite_existing_answers(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_all_required_until_ratings(chat)
+
+    process_report_message_with_ai(
+        chat,
+        "Stärke ist hohes Projektvolumen, Schwäche ist unklare technische Freigabe.",
+        _FakeAiService(),
+    )
+    process_report_message_with_ai(
+        chat,
+        "Stärke ist anderer Bedarf, Schwäche ist anderer Einwand.",
+        _FakeAiService(),
+    )
+
+    answers = chat.report_draft.draft_data_json["answers"]
+    assert answers["strength_text"] == "hohes Projektvolumen"
+    assert answers["weakness_text"] == "unklare technische Freigabe"
+
+
+def test_confirm_writes_rule_based_strength_and_weakness_to_mock_visit_report(
+    app,
+) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_all_required_until_ratings(chat)
+    process_report_message_with_ai(
+        chat,
+        "Stärke ist hohes Projektvolumen, Schwäche ist unklare technische Freigabe.",
+        _FakeAiService(),
+    )
+    process_report_message_with_ai(
+        chat,
+        "Zufriedenheit 8, technisch 7, kaufmaennisch 6, Prioritaet 9.",
+        _FakeAiService(),
+    )
+
+    final_report = confirm_report(chat)
+
+    assert final_report.mock_visit_report.strength_text == "hohes Projektvolumen"
+    assert final_report.mock_visit_report.weakness_text == (
+        "unklare technische Freigabe"
+    )
+
+
+def test_report_display_text_removes_markdown_artifacts() -> None:
+    markdown_text = (
+        "### Besuchsbericht: Nordlicht\n\n"
+        "***\n\n"
+        "**Datum:** 22.07.2026\n"
+        "* **Naechste Schritte:** Innendienst ruft nach.\n"
+    )
+
+    normalized_text = normalize_report_display_text(markdown_text)
+
+    assert "###" not in normalized_text
+    assert "**" not in normalized_text
+    assert "***" not in normalized_text
+    assert normalized_text == (
+        "Besuchsbericht: Nordlicht\n\n"
+        "Datum: 22.07.2026\n"
+        "- Naechste Schritte: Innendienst ruft nach."
+    )
+
+
+def test_report_display_text_uses_mock_enventa_wording() -> None:
+    normalized_text = normalize_report_display_text(
+        "### CRM-Besuchsbericht\n\nCRM Besuchsbericht fuer Nordlicht"
+    )
+
+    assert "CRM-Besuchsbericht" not in normalized_text
+    assert "CRM Besuchsbericht" not in normalized_text
+    assert normalized_text == (
+        "Mock-eNVenta-Besuchsbericht\n\n" "Mock-eNVenta-Besuchsbericht fuer Nordlicht"
+    )
+
+
+def test_review_uses_normalized_ai_text_and_german_visit_type_label(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+    process_report_message_with_ai(chat, "8 7 6 9", _FakeAiService())
+
+    review = build_report_review(
+        chat.report_draft,
+        _FakeAiService(
+            review_text="### Pruefung\n**Alles** passt.",
+            final_report_text="### Bericht\n**Besuchsart:** Vor-Ort-Termin",
+        ),
+    )
+
+    section_values = dict(review["sections"])
+    assert section_values["Besuchsart"] == "Vor Ort"
+    assert review["review_text"] == "Pruefung\nAlles passt."
+    assert review["final_report_text"] == "Bericht\nBesuchsart: Vor-Ort-Termin"
+
+
+def test_review_uses_follow_up_date_for_next_appointment(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    draft = chat.report_draft
+    draft.follow_up_date = date(2026, 7, 29)
+    draft.draft_data_json = {
+        "answers": {
+            "visit_context": "Nordlicht Maschinenbau GmbH",
+            "visit_type": "in_person",
+            "participants": "Mara Stein",
+            "visit_date": "2026-07-22",
+            "target_topic": "Forecast",
+            "info_text": "Forecast besprochen.",
+            "agreement_text": "Unterlagen werden geschickt.",
+            "next_action": "Innendienst ruft naechste Woche nach.",
+        }
+    }
+
+    review = build_report_review(draft)
+
+    section_values = dict(review["sections"])
+    assert section_values["Termin ab"] == "2026-07-29"
 
 
 def test_strict_question_answer_flow_reaches_review_without_optional_references(
@@ -267,6 +428,31 @@ def test_strict_question_answer_flow_reaches_review_without_optional_references(
     assert final_report.mock_visit_report is not None
     assert final_report.mock_visit_report.target_topic == "Forecast"
     assert chat.status == ReportStatus.CONFIRMED.value
+
+
+def test_confirm_report_keeps_unmatched_visit_context_as_account_label(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    answers = [
+        "SonnenTest GmbH",
+        "telefonisch",
+        "Frau Becker",
+        "2026-07-07",
+        "Kooperation",
+        "Pilotprojekt und Datenblaetter besprochen.",
+        "Unterlagen werden geschickt.",
+        "Innendienst soll telefonisch nachfassen.",
+        "Zufriedenheit 8, technisch 7, kaufmaennisch 6, Prioritaet 9.",
+    ]
+
+    for answer in answers:
+        process_report_message_with_ai(chat, answer, _FakeAiService())
+
+    final_report = confirm_report(chat)
+
+    assert final_report.mock_visit_report is not None
+    assert final_report.mock_visit_report.account_id is None
+    assert final_report.mock_visit_report.account_search_name == "SonnenTest GmbH"
 
 
 def test_partial_rating_answer_keeps_rating_step_open(app) -> None:
@@ -321,6 +507,41 @@ def test_unclear_visit_date_does_not_default_to_today(app) -> None:
 
     assert chat.report_draft.visit_date is None
     assert chat.report_draft.draft_data_json["current_step"] == "visit_date"
+
+
+def test_german_visit_date_formats_are_accepted() -> None:
+    assert parse_visit_date("22.07.2026") == date(2026, 7, 22)
+    assert parse_visit_date("22.07.26") == date(2026, 7, 22)
+    assert parse_visit_date("22.7.2026") == date(2026, 7, 22)
+    assert parse_visit_date("Das Gespräch war heute, am 22.07.2026.") == date(
+        2026,
+        7,
+        22,
+    )
+    assert parse_visit_date("Das Gespräch war heute.") == date.today()
+    assert parse_visit_date("irgendwann letzte Woche") is None
+
+
+def test_strict_flow_accepts_german_visit_date_and_reaches_review(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    answers = [
+        "Nordlicht Maschinenbau GmbH",
+        "persoenlich",
+        "Mara Stein",
+        "22.07.2026",
+        "Forecast",
+        "Forecast und Lieferfaehigkeit besprochen.",
+        "Revidiertes Angebot wird geschickt.",
+        "Sales sendet die Unterlagen.",
+        "Zufriedenheit 8, technisch 7, kaufmaennisch 6, Prioritaet 9.",
+    ]
+
+    for answer in answers:
+        process_report_message_with_ai(chat, answer, _FakeAiService())
+
+    assert chat.report_draft.visit_date == date(2026, 7, 22)
+    assert chat.report_draft.draft_data_json["current_step"] == "review"
 
 
 def test_unrelated_conditional_answer_does_not_block_rating_step(app) -> None:
@@ -392,6 +613,36 @@ def test_inside_sales_nachfassen_creates_mock_reminder(app) -> None:
     assert visit_report is not None
     assert len(visit_report.reminders) == 1
     assert "nachfassen" in visit_report.reminders[0].message.lower()
+
+
+def test_inside_sales_calls_next_week_creates_mock_reminder(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    answers = [
+        "Nordlicht Maschinenbau GmbH",
+        "persoenlich",
+        "Mara Stein",
+        "22.07.2026",
+        "Forecast",
+        "Lieferfaehigkeit und Angebot A-2026-104 besprochen.",
+        (
+            "Ich sende die Unterlagen, der Innendienst ruft naechste Woche "
+            "nach und Mara Stein prueft den Folgeauftrag."
+        ),
+        "Zufriedenheit 8, technisch 7, kaufmaennisch 6, Prioritaet 9.",
+    ]
+
+    for answer in answers:
+        process_report_message_with_ai(chat, answer, _FakeAiService())
+
+    final_report = confirm_report(chat)
+
+    visit_report = final_report.mock_visit_report
+    assert visit_report is not None
+    assert len(visit_report.reminders) == 1
+    assert "innendienst ruft naechste woche nach" in (
+        visit_report.reminders[0].message.lower()
+    )
 
 
 def test_lead_without_offer_or_order_skips_document_reference_questions(app) -> None:
@@ -492,7 +743,7 @@ def test_report_loop_can_use_injected_crm_gateway(app) -> None:
 
 
 def _start_sales_chat():
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     return start_report_chat(sales_user)
 
 

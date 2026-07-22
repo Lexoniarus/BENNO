@@ -101,6 +101,60 @@ def looks_like_rating_answer(message_text: str) -> bool:
     )
 
 
+def extract_strength_weakness_answers(message_text: str) -> dict[str, str]:
+    """Extract explicitly stated strength and weakness notes."""
+    markers = _explicit_strength_weakness_markers(message_text)
+    if not markers:
+        return {}
+
+    answers = {}
+    for index, marker in enumerate(markers):
+        next_start = (
+            markers[index + 1]["start"]
+            if index + 1 < len(markers)
+            else len(message_text)
+        )
+        value = _clean_strength_weakness_value(message_text[marker["end"] : next_start])
+        if value:
+            answers[marker["key"]] = value
+
+    return answers
+
+
+def _explicit_strength_weakness_markers(
+    message_text: str,
+) -> list[dict[str, int | str]]:
+    marker_specs = (
+        (
+            "strength_text",
+            r"\b(?:st[äa]rke|staerke|st[äa]rken|staerken|positiv|"
+            r"positive punkte|pluspunkt|pluspunkte)\b"
+            r"\s*(?:ist|sind|war|waren|:|-)?",
+        ),
+        (
+            "weakness_text",
+            r"\b(?:schw[äa]che|schwaeche|schw[äa]chen|schwaechen|"
+            r"risiko|risiken|einwand|einw[äa]nde|einwaende|negativ)\b"
+            r"\s*(?:ist|sind|war|waren|:|-)?",
+        ),
+    )
+    markers = []
+    for key, pattern in marker_specs:
+        for match in re.finditer(pattern, message_text, re.IGNORECASE):
+            markers.append({"key": key, "start": match.start(), "end": match.end()})
+
+    return sorted(markers, key=lambda marker: int(marker["start"]))
+
+
+def _clean_strength_weakness_value(value: str) -> str | None:
+    cleaned_value = re.sub(r"\s+", " ", value).strip(" \t\r\n,.;:-")
+    if not cleaned_value:
+        return None
+
+    cleaned_value = re.sub(r"^(?:und|aber|noch)\s+", "", cleaned_value, flags=re.I)
+    return cleaned_value[:500]
+
+
 def parse_iso_date(message_text: str) -> date | None:
     """Parse an ISO date from text."""
     match = re.search(r"\b\d{4}-\d{2}-\d{2}\b", message_text)
@@ -110,16 +164,38 @@ def parse_iso_date(message_text: str) -> date | None:
     return date.fromisoformat(match.group(0))
 
 
+def parse_german_date(message_text: str) -> date | None:
+    """Parse a German date from free text."""
+    match = re.search(r"\b(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})\b", message_text)
+    if match is None:
+        return None
+
+    day = int(match.group(1))
+    month = int(match.group(2))
+    year = int(match.group(3))
+    if year < 100:
+        year += 2000
+
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
+
+
 def parse_visit_date(message_text: str) -> date | None:
     """Parse a simple visit or follow-up date from text."""
     parsed_date = parse_iso_date(message_text)
     if parsed_date is not None:
         return parsed_date
 
+    parsed_date = parse_german_date(message_text)
+    if parsed_date is not None:
+        return parsed_date
+
     normalized_text = message_text.strip().lower()
-    if normalized_text in {"heute", "today"}:
+    if "heute" in normalized_text or "today" in normalized_text:
         return date.today()
-    if normalized_text in {"gestern", "yesterday"}:
+    if "gestern" in normalized_text or "yesterday" in normalized_text:
         return date.today() - timedelta(days=1)
     if "nächste woche" in normalized_text or "naechste woche" in normalized_text:
         return date.today() + timedelta(days=7)
@@ -173,10 +249,23 @@ def mentions_lead(message_text: str) -> bool:
 def mentions_inside_sales_follow_up(message_text: str) -> bool:
     """Return whether text requests an inside-sales follow-up."""
     normalized_text = message_text.lower()
-    return "innendienst" in normalized_text and any(
+    owner_signal = any(
         keyword in normalized_text
-        for keyword in ("anrufen", "melden", "nachfassen", "follow")
+        for keyword in ("innendienst", "sachbearbeiter", "inside sales")
     )
+    action_signal = any(
+        keyword in normalized_text
+        for keyword in (
+            "anrufen",
+            "ruft",
+            "melden",
+            "nachfassen",
+            "nachhaken",
+            "kontaktieren",
+            "follow",
+        )
+    )
+    return owner_signal and action_signal
 
 
 def looks_like_follow_up_action(message_text: str) -> bool:

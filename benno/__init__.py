@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from flask import Flask
+from flask import Flask, render_template
 
 from benno.cli import register_cli_commands
 from benno.config import CONFIG_BY_NAME, DevelopmentConfig
@@ -25,6 +25,7 @@ def create_app(config_name: str | None = None) -> Flask:
     _load_models()
     _initialize_extensions(app)
     _register_blueprints(app)
+    _register_error_handlers(app)
     _register_cli(app)
 
     return app
@@ -140,6 +141,12 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(auth_blueprint)
     app.register_blueprint(admin_blueprint)
     app.register_blueprint(sales_blueprint)
+
+
+def _register_error_handlers(app: Flask) -> None:
+    @app.errorhandler(403)
+    def forbidden(_error):
+        return render_template("errors/403.html"), 403
 
 
 def _register_user_loader() -> None:

@@ -1,5 +1,7 @@
 """Sales user routes for BENNO."""
 
+from typing import Any
+
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 
@@ -16,6 +18,7 @@ from benno.services.report_loop import (
     process_report_message,
     start_report_chat,
 )
+from benno.services.report_state import display_value
 
 sales_blueprint = Blueprint("sales", __name__, url_prefix="/sales")
 
@@ -210,7 +213,7 @@ def final_report_detail(report_id: int):
     return render_template(
         "sales/final_report.html",
         report=final_report,
-        status_labels=REPORT_STATUS_LABELS_DE,
+        report_sections=_build_final_report_sections(final_report),
     )
 
 
@@ -313,6 +316,110 @@ def _completed_report_number(report: FinalReport) -> str:
         return f"#{report.id}"
 
     return report.mock_visit_report.visit_report_number
+
+
+def _build_final_report_sections(report: FinalReport) -> list[tuple[str, str]]:
+    mock_visit_report = report.mock_visit_report
+    if mock_visit_report is None:
+        return _fallback_final_report_sections(report)
+
+    return [
+        ("Kunde/Lead", display_value(mock_visit_report.account_search_name)),
+        ("Besuchsart", display_value(mock_visit_report.visit_type)),
+        ("Teilnehmer", display_value(mock_visit_report.contact_name)),
+        ("Besuchsdatum", display_value(mock_visit_report.visit_date)),
+        ("Ziel/Thema", display_value(mock_visit_report.target_topic)),
+        ("Info", display_value(mock_visit_report.info_text)),
+        ("Vereinbarung", display_value(mock_visit_report.agreement_text)),
+        ("Nächster Schritt", display_value(report.next_action)),
+        (
+            "Termin ab",
+            _display_optional_reference(mock_visit_report.next_appointment_date),
+        ),
+        (
+            "Angebotsbezug",
+            _display_optional_reference(mock_visit_report.offer_reference),
+        ),
+        (
+            "Auftragsbezug",
+            _display_optional_reference(mock_visit_report.order_reference),
+        ),
+        (
+            "Stärke",
+            display_value(mock_visit_report.strength_text, empty="Nicht angegeben"),
+        ),
+        (
+            "Schwäche",
+            display_value(mock_visit_report.weakness_text, empty="Nicht angegeben"),
+        ),
+        ("Bewertungen", _format_mock_visit_report_ratings(mock_visit_report)),
+        ("Status", REPORT_STATUS_LABELS_DE.get(report.status, report.status)),
+        ("Wiedervorlagen", str(len(mock_visit_report.reminders))),
+    ]
+
+
+def _fallback_final_report_sections(report: FinalReport) -> list[tuple[str, str]]:
+    return [
+        ("Kunde/Lead", display_value(getattr(report.account, "search_name", None))),
+        ("Besuchsart", display_value(report.visit_type)),
+        ("Besuchsdatum", display_value(report.visit_date)),
+        ("Info", display_value(report.summary)),
+        ("Vereinbarung", display_value(report.outcome, empty="Nicht angegeben")),
+        (
+            "Nächster Schritt",
+            display_value(report.next_action, empty="Nicht angegeben"),
+        ),
+        ("Bewertungen", _format_final_report_ratings(report)),
+        ("Status", REPORT_STATUS_LABELS_DE.get(report.status, report.status)),
+        ("Wiedervorlagen", "0"),
+    ]
+
+
+def _display_optional_reference(value: Any) -> str:
+    if value is None:
+        return "Nicht relevant"
+
+    text = str(value).strip()
+    if not text or text.lower() in {"keine", "keiner", "kein", "none"}:
+        return "Nicht relevant"
+
+    return display_value(text)
+
+
+def _format_mock_visit_report_ratings(mock_visit_report: Any) -> str:
+    ratings = [
+        ("Zufriedenheit", mock_visit_report.customer_satisfaction_rating),
+        ("Technische Attraktivität", mock_visit_report.technical_attractiveness_rating),
+        (
+            "Kaufmännische Attraktivität",
+            mock_visit_report.commercial_attractiveness_rating,
+        ),
+        ("Priorität", mock_visit_report.priority_rating),
+    ]
+    formatted_ratings = [
+        f"{label}: {value}/10" for label, value in ratings if value is not None
+    ]
+    return "; ".join(formatted_ratings) if formatted_ratings else "Nicht angegeben"
+
+
+def _format_final_report_ratings(report: FinalReport) -> str:
+    labels = {
+        "customer_satisfaction_rating": "Zufriedenheit",
+        "technical_attractiveness_rating": "Technische Attraktivität",
+        "commercial_attractiveness_rating": "Kaufmännische Attraktivität",
+        "priority_rating": "Priorität",
+    }
+    formatted_ratings = []
+    for rating_key, label in labels.items():
+        rating = dict(report.ratings_json or {}).get(rating_key)
+        if not isinstance(rating, dict):
+            continue
+
+        value = rating.get("value")
+        if value is not None:
+            formatted_ratings.append(f"{label}: {value}/10")
+
+    return "; ".join(formatted_ratings) if formatted_ratings else "Nicht angegeben"
 
 
 def _open_report_progress_label(draft) -> str:

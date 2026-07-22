@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}{{ link_label }} - BENNO{% endblock %}
+{% block shell_class %}app-shell--page{% endblock %}
+
+{% block content %}
+  <section class="page-section page-section--wide workspace-shell" aria-labelledby="setup-link-title">
+    <div class="section-heading workspace-header">
+      <div>
+        <h1 id="setup-link-title">{{ link_label }}</h1>
+        <p class="workspace-subtitle">Lokaler MVP-Link für die Passwortanlage oder Zurücksetzung.</p>
+      </div>
+    </div>
+
+    <nav class="workspace-tabs" aria-label="Adminbereiche">
+      <a href="{{ url_for('admin.dashboard') }}">Übersicht</a>
+      <a class="is-active" href="{{ url_for('admin.users') }}" aria-current="page">Benutzer</a>
+      <a href="{{ url_for('admin.settings') }}">Provider</a>
+      <a href="{{ url_for('admin.settings') }}">Einstellungen</a>
+      <a href="{{ url_for('admin.settings') }}">System</a>
+    </nav>
+
+    <article class="surface-panel workspace-card">
+      <h2>{{ user.username }}</h2>
+      <p>
+        Der Link wird nur hier angezeigt. Er ist lokal für das MVP gedacht und
+        wird nicht per E-Mail versendet.
+      </p>
+      <label class="form-stack setup-link-copy" for="setup-url">
+        Link
+        <input id="setup-url" value="{{ setup_url }}" readonly data-copy-source>
+      </label>
+      <div class="action-row">
+        <button class="button" type="button" data-copy-button>Link kopieren</button>
+        <a class="button button--link button--secondary" href="{{ url_for('admin.users') }}">
+          Zur Benutzerliste
+        </a>
+      </div>
+    </article>
+  </section>
+{% endblock %}

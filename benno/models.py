@@ -10,6 +10,7 @@ from benno.enums import (
     ReportStatus,
     SessionLanguage,
     UserRole,
+    UserSetupTokenPurpose,
     ValidationStatus,
     VisitReportStatus,
 )
@@ -55,6 +56,11 @@ class User(db.Model, TimestampMixin):
     chats = db.relationship("Chat", back_populates="sales_user")
     report_drafts = db.relationship("ReportDraft", back_populates="sales_user")
     final_reports = db.relationship("FinalReport", back_populates="sales_user")
+    setup_tokens = db.relationship(
+        "UserSetupToken",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
     @property
     def is_admin(self) -> bool:
@@ -79,6 +85,26 @@ class User(db.Model, TimestampMixin):
     def is_sales_rep(self) -> bool:
         """Return whether the user has the sales representative role."""
         return self.role == UserRole.SALES_REP.value
+
+
+class UserSetupToken(db.Model):
+    """A local one-time setup or password reset token."""
+
+    __tablename__ = "user_setup_tokens"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    token_hash = db.Column(db.String(64), nullable=False, unique=True, index=True)
+    purpose = db.Column(
+        db.String(20),
+        nullable=False,
+        default=UserSetupTokenPurpose.SETUP.value,
+    )
+    expires_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    used_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=utc_now, nullable=False)
+
+    user = db.relationship("User", back_populates="setup_tokens")
 
 
 class GlobalSetting(db.Model, TimestampMixin):

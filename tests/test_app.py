@@ -12,6 +12,22 @@ def _project_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def test_report_form_script_adds_pending_typing_state() -> None:
+    script_text = (_project_root() / "benno" / "static" / "js" / "app.js").read_text(
+        encoding="utf-8"
+    )
+    user_pending_call = (
+        'addChatMessage("user", messageText.toString(), "chat-message--pending")'
+    )
+    assistant_typing_call = (
+        'addChatMessage("assistant", "BENNO analysiert", "chat-message--typing")'
+    )
+
+    assert user_pending_call in script_text
+    assert assistant_typing_call in script_text
+    assert 'reportForm.setAttribute("aria-busy", "true")' in script_text
+
+
 def test_create_app_uses_testing_configuration() -> None:
     app = create_app("testing")
 
@@ -38,6 +54,16 @@ def test_health_endpoint_returns_ok_status() -> None:
 
     assert response.status_code == 200
     assert response.get_json() == {"service": "benno", "status": "ok"}
+
+
+def test_favicon_route_redirects_to_local_logo() -> None:
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.get("/favicon.ico")
+
+    assert response.status_code == 302
+    assert response.location == "/static/img/benno-logo.svg"
 
 
 def test_development_configuration_reads_environment_at_app_creation(

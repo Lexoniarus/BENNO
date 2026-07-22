@@ -1,54 +1,67 @@
 {% extends "base.html" %}
 
-{% block title %}Bericht pr&uuml;fen - BENNO{% endblock %}
+{% block title %}Bericht prüfen - BENNO{% endblock %}
 {% block shell_class %}app-shell--page{% endblock %}
 
 {% block content %}
-  <section class="page-section" aria-labelledby="report-review-title">
-    <p class="hero__eyebrow">Vertriebsbereich</p>
-    <h1 id="report-review-title">Bericht pr&uuml;fen</h1>
-
-    {% if review.review_text %}
-      <article class="review-block review-block--wide">
-        <span>Pr&uuml;fzusammenfassung</span>
-        <p>{{ review.review_text }}</p>
-      </article>
-    {% endif %}
-
-    <div class="review-grid">
-      {% for label, value in review.sections %}
-        <article class="review-block">
-          <span>{{ label }}</span>
-          <p>{{ value }}</p>
-        </article>
-      {% endfor %}
+  <section class="page-section page-section--wide workspace-shell" aria-labelledby="report-review-title">
+    <div class="section-heading workspace-header">
+      <div>
+        <h1 id="report-review-title">Bericht prüfen</h1>
+        <p class="workspace-subtitle">Kontrolliere den Mock-eNVenta-Schreibblock vor dem Speichern.</p>
+      </div>
+      <a class="button button--link button--secondary" href="{{ url_for('sales.report_chat', chat_id=chat.id) }}">
+        Zurück zum Chat
+      </a>
     </div>
 
-    <article class="review-block review-block--wide">
-      <span>Finaler Berichtstext</span>
-      <pre>{{ review.final_report_text }}</pre>
-    </article>
+    <div class="review-layout">
+      <div>
+        {% if review.review_text %}
+          <article class="surface-panel surface-panel--intro workspace-card">
+            <h2>Prüfzusammenfassung</h2>
+            <p class="report-text">{{ review.review_text }}</p>
+          </article>
+        {% endif %}
 
-    <form class="form-stack review-correction" method="post" action="{{ url_for('sales.report_correction', chat_id=chat.id) }}">
-      <label for="field_key">Korrekturfeld</label>
-      <select id="field_key" name="field_key" required>
-        {% for field_key, label in review.correction_fields %}
-          <option value="{{ field_key }}">{{ label }}</option>
-        {% endfor %}
-      </select>
+        <div class="review-grid">
+          {% for label, value in review.sections %}
+            <article class="review-block">
+              <span>{{ label }}</span>
+              <p>{{ value }}</p>
+            </article>
+          {% endfor %}
+        </div>
 
-      <label for="correction_text">Korrektur</label>
-      <textarea id="correction_text" name="correction_text" rows="3" required></textarea>
-      <button class="button" type="submit">Korrektur &uuml;bernehmen</button>
-    </form>
+        <article class="review-block review-block--wide">
+          <span>Finaler Berichtstext</span>
+          <p class="report-text">{{ review.final_report_text }}</p>
+        </article>
+      </div>
 
-    <div class="action-row">
-      <form method="post" action="{{ url_for('sales.confirm_report_route', chat_id=chat.id) }}">
-        <button class="button" type="submit">Best&auml;tigen und speichern</button>
-      </form>
-      <a class="button button--link" href="{{ url_for('sales.report_chat', chat_id=chat.id) }}">
-        Zur&uuml;ck zum Chat
-      </a>
+      <aside class="writeback-panel writeback-panel--sticky">
+        <h2>Mock-eNVenta speichern</h2>
+        <p class="panel-copy">
+          BENNO speichert erst nach deiner Bestätigung lokal in den
+          Mock-eNVenta-Bereich.
+        </p>
+        <form class="form-stack review-correction" method="post" action="{{ url_for('sales.report_correction', chat_id=chat.id) }}">
+          <label for="field_key">Korrekturfeld</label>
+          <select id="field_key" name="field_key" required>
+            {% for field_key, label in review.correction_fields %}
+              <option value="{{ field_key }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          <label for="correction_text">Korrektur</label>
+          <textarea id="correction_text" name="correction_text" rows="3" required></textarea>
+          <button class="button button--secondary" type="submit">Korrektur übernehmen</button>
+        </form>
+
+        <form class="confirm-form" method="post" action="{{ url_for('sales.confirm_report_route', chat_id=chat.id) }}">
+          <button class="button" type="submit">Mock-eNVenta speichern</button>
+        </form>
+      </aside>
     </div>
   </section>
 {% endblock %}

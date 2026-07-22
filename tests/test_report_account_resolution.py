@@ -60,7 +60,7 @@ def test_lead_signal_does_not_override_matched_account(app) -> None:
 
 def _start_sales_chat():
     seed_database()
-    sales_user = User.query.filter_by(email="sales@benno.local").one()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     return start_report_chat(sales_user)
 
 

@@ -1,5 +1,6 @@
 """Review and final-text helpers for visit reports."""
 
+import re
 from typing import Any
 
 from benno.extensions import db
@@ -36,7 +37,7 @@ def _build_review_sections(draft: ReportDraft) -> list[tuple[str, str]]:
     answers = draft_data(draft).get("answers", {})
     return [
         *_core_review_sections(draft, answers),
-        *_reference_review_sections(answers),
+        *_reference_review_sections(draft, answers),
         *_closing_review_sections(draft, answers),
     ]
 
@@ -57,11 +58,14 @@ def _core_review_sections(
     ]
 
 
-def _reference_review_sections(answers: dict[str, Any]) -> list[tuple[str, str]]:
+def _reference_review_sections(
+    draft: ReportDraft,
+    answers: dict[str, Any],
+) -> list[tuple[str, str]]:
     return [
         _review_section(
             "Termin ab",
-            answers.get("next_appointment_date"),
+            draft.follow_up_date or answers.get("next_appointment_date"),
             empty="Nicht relevant",
         ),
         _review_section(
@@ -143,7 +147,7 @@ def cached_or_generated_ai_text(
     ai_cache = _ai_cache(draft)
     cached_text = ai_cache.get(cache_key)
     if cached_text:
-        return cached_text
+        return normalize_report_display_text(cached_text)
 
     if ai_service is None:
         return fallback_text
@@ -159,6 +163,7 @@ def cached_or_generated_ai_text(
     if not cleaned_text:
         return fallback_text
 
+    cleaned_text = normalize_report_display_text(cleaned_text)
     persist_generated_ai_text(draft, cache_key, cleaned_text)
     return cleaned_text
 
@@ -184,6 +189,63 @@ def build_final_report_text(draft: ReportDraft) -> str:
         f"Bewertungen: {format_ratings(draft.ratings_json)}",
     ]
     return "\n".join(report_lines)
+
+
+def normalize_report_display_text(text: str) -> str:
+    """Convert lightweight Markdown-like AI output to safe readable plaintext."""
+    normalized_lines = []
+    for line in text.splitlines():
+        cleaned_line = _normalize_report_line(line)
+        if cleaned_line is None:
+            continue
+
+        normalized_lines.append(cleaned_line)
+
+    normalized_text = "\n".join(_collapse_blank_lines(normalized_lines)).strip()
+    return _normalize_report_context_wording(normalized_text)
+
+
+def _normalize_report_line(line: str) -> str | None:
+    stripped_line = line.strip()
+    if not stripped_line:
+        return ""
+    if re.fullmatch(r"[-*_]{3,}", stripped_line):
+        return None
+
+    stripped_line = re.sub(r"^#{1,6}\s*", "", stripped_line)
+    stripped_line = re.sub(r"^\*\s+", "- ", stripped_line)
+    stripped_line = re.sub(r"\*\*(.*?)\*\*", r"\1", stripped_line)
+    stripped_line = re.sub(r"__(.*?)__", r"\1", stripped_line)
+    stripped_line = re.sub(
+        r"(?<!\*)\*(?!\*)([^*]+?)(?<!\*)\*(?!\*)",
+        r"\1",
+        stripped_line,
+    )
+
+    return stripped_line.strip()
+
+
+def _collapse_blank_lines(lines: list[str]) -> list[str]:
+    collapsed_lines = []
+    previous_blank = False
+    for line in lines:
+        is_blank = line == ""
+        if is_blank and previous_blank:
+            continue
+
+        collapsed_lines.append(line)
+        previous_blank = is_blank
+
+    return collapsed_lines
+
+
+def _normalize_report_context_wording(text: str) -> str:
+    return re.sub(
+        r"\bCRM[\s-]+Besuchsbericht\b",
+        "Mock-eNVenta-Besuchsbericht",
+        text,
+        flags=re.IGNORECASE,
+    )
 
 
 def format_ratings(ratings: dict[str, Any]) -> str:

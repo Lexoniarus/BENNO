@@ -41,6 +41,7 @@ from benno.services.report_review import (
 )
 from benno.services.report_shortcuts import (
     classify_reason,
+    extract_strength_weakness_answers,
     is_no_reference_message,
     is_none_answer,
     is_not_assessable_rating_answer,
@@ -720,6 +721,7 @@ def _rule_based_hint_handlers() -> tuple[Any, ...]:
         _apply_document_reference_hint,
         _apply_next_appointment_hint,
         _apply_next_action_hint,
+        _apply_strength_weakness_hint,
         _apply_rating_hint,
     )
 
@@ -931,6 +933,37 @@ def _apply_next_action_hint(
         applied_steps.append(next_action_step)
 
 
+def _apply_strength_weakness_hint(
+    draft: ReportDraft,
+    current_step: ReportStep,
+    message_text: str,
+    completed_before_message: set[str],
+    applied_steps: list[ReportStep],
+    crm_gateway: CrmGateway,
+) -> None:
+    extracted_answers = extract_strength_weakness_answers(message_text)
+    if not extracted_answers:
+        return
+
+    existing_answers = dict(draft_data(draft).get("answers", {}))
+    for step_key in ("strength_text", "weakness_text"):
+        if step_key not in extracted_answers:
+            continue
+        if step_key in completed_before_message or existing_answers.get(step_key):
+            continue
+        if any(applied_step.key == step_key for applied_step in applied_steps):
+            continue
+
+        step = step_by_key(step_key)
+        if _apply_requirement_answer(
+            draft,
+            step,
+            extracted_answers[step_key],
+            crm_gateway,
+        ):
+            applied_steps.append(step)
+
+
 def _apply_rating_hint(
     draft: ReportDraft,
     current_step: ReportStep,
@@ -1066,7 +1099,8 @@ def _next_question(
 def _review_ready_message(chat: Chat) -> str:
     return (
         "Alle Pflichtbereiche sind vollständig. "
-        f"Bitte prüfe den Bericht unter /sales/reports/{chat.id}/review."
+        'Bitte prüfe den Bericht über den Button "Bericht prüfen" '
+        "im Schreibzurück-Bereich."
     )
 
 
