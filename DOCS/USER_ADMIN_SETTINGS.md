@@ -140,6 +140,23 @@ For the first implementation:
 - no email delivery is required
 - no two-factor authentication is required
 
+## Seeded Mock Users
+
+The current local demo company is Solar Sales. After running `seed-db` or
+`reset-db --yes`, these seeded users are available for testing:
+
+| Role | Email | Password |
+|---|---|---|
+| Admin | `admin@solar-sales.local` | `Admin123` |
+| Sales Rep | `laura.schneider@solar-sales.example` | `Sales123` |
+| Sales Rep | `markus.weber@solar-sales.example` | `Sales123` |
+| Sales Rep | `sophie.klein@solar-sales.example` | `Sales123` |
+| Sales Rep | `tobias.fischer@solar-sales.example` | `Sales123` |
+
+The older BENNO demo accounts are retired and should not be used for current
+manual tests. If the application rejects the current credentials, the running
+app is likely using an outdated local database and should be reseeded or reset.
+
 ## Registration And Password Reset Direction
 
 Later target flow:

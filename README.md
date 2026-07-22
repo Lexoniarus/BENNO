@@ -39,13 +39,20 @@ Open `http://127.0.0.1:5000` in a browser.
 
 ## Demo Logins
 
-After running `seed-db`, these mock users are available:
+After running `seed-db` or `reset-db --yes`, these Solar Sales mock users are
+available:
 
-- `admin@solar-sales.local` / `Admin123`
-- `laura.schneider@solar-sales.example` / `Sales123`
-- `markus.weber@solar-sales.example` / `Sales123`
-- `sophie.klein@solar-sales.example` / `Sales123`
-- `tobias.fischer@solar-sales.example` / `Sales123`
+| Role | Email | Password |
+|---|---|---|
+| Admin | `admin@solar-sales.local` | `Admin123` |
+| Sales Rep | `laura.schneider@solar-sales.example` | `Sales123` |
+| Sales Rep | `markus.weber@solar-sales.example` | `Sales123` |
+| Sales Rep | `sophie.klein@solar-sales.example` | `Sales123` |
+| Sales Rep | `tobias.fischer@solar-sales.example` | `Sales123` |
+
+Older demo accounts such as `admin@benno.local` or `sales@benno.local` are no
+longer current. If login fails after pulling newer code, reset or reseed the
+local development database.
 
 ## Quality Checks
 
