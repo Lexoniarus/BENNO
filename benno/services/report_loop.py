@@ -1099,7 +1099,8 @@ def _next_question(
 def _review_ready_message(chat: Chat) -> str:
     return (
         "Alle Pflichtbereiche sind vollständig. "
-        f"Bitte prüfe den Bericht unter /sales/reports/{chat.id}/review."
+        'Bitte prüfe den Bericht über den Button "Bericht prüfen" '
+        "im Schreibzurück-Bereich."
     )
 
 

@@ -246,6 +246,8 @@ def test_four_enventa_ratings_complete_rating_section(app) -> None:
     }
     assert ratings["priority_rating"]["value"] == 9
     assert chat.report_draft.draft_data_json["current_step"] == "review"
+    assert "/sales/reports/" not in chat.messages[-1].message_text
+    assert "Bericht pr\u00fcfen" in chat.messages[-1].message_text
 
 
 def test_explicit_strength_and_weakness_are_extracted_by_rules() -> None:

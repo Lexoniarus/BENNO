@@ -590,6 +590,7 @@ h3 {
 .final-report-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.7fr);
+  align-items: start;
   gap: 20px;
 }
 
@@ -772,6 +773,11 @@ td a {
 .writeback-panel--sticky {
   position: sticky;
   top: 82px;
+}
+
+.final-report-text-panel {
+  align-content: start;
+  align-self: start;
 }
 
 .progress-strip {
