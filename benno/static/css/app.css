@@ -162,6 +162,14 @@ textarea {
   max-width: 720px;
 }
 
+.error-panel .section-kicker {
+  color: var(--sflex-yellow);
+}
+
+.error-panel p {
+  color: rgba(255, 255, 255, 0.86);
+}
+
 .page-section--wide {
   width: min(1360px, 100%);
 }
@@ -984,7 +992,8 @@ td a {
   margin-top: 18px;
 }
 
-.review-block pre {
+.review-block pre,
+.report-text {
   overflow-x: auto;
   margin: 0;
   color: var(--sflex-graphite);

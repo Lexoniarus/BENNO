@@ -20,7 +20,7 @@
         {% if review.review_text %}
           <article class="surface-panel surface-panel--intro workspace-card">
             <h2>Prüfzusammenfassung</h2>
-            <p>{{ review.review_text }}</p>
+            <p class="report-text">{{ review.review_text }}</p>
           </article>
         {% endif %}
 
@@ -35,7 +35,7 @@
 
         <article class="review-block review-block--wide">
           <span>Finaler Berichtstext</span>
-          <pre>{{ review.final_report_text }}</pre>
+          <p class="report-text">{{ review.final_report_text }}</p>
         </article>
       </div>
 

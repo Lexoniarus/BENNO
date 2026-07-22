@@ -195,10 +195,23 @@ def mentions_lead(message_text: str) -> bool:
 def mentions_inside_sales_follow_up(message_text: str) -> bool:
     """Return whether text requests an inside-sales follow-up."""
     normalized_text = message_text.lower()
-    return "innendienst" in normalized_text and any(
+    owner_signal = any(
         keyword in normalized_text
-        for keyword in ("anrufen", "melden", "nachfassen", "follow")
+        for keyword in ("innendienst", "sachbearbeiter", "inside sales")
     )
+    action_signal = any(
+        keyword in normalized_text
+        for keyword in (
+            "anrufen",
+            "ruft",
+            "melden",
+            "nachfassen",
+            "nachhaken",
+            "kontaktieren",
+            "follow",
+        )
+    )
+    return owner_signal and action_signal
 
 
 def looks_like_follow_up_action(message_text: str) -> bool:

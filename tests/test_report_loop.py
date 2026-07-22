@@ -21,6 +21,7 @@ from benno.services.report_loop import (
     process_report_message_with_ai,
     start_report_chat,
 )
+from benno.services.report_review import normalize_report_display_text
 from benno.services.report_shortcuts import parse_visit_date
 from benno.services.report_steps import step_by_key
 
@@ -244,6 +245,46 @@ def test_four_enventa_ratings_complete_rating_section(app) -> None:
     assert chat.report_draft.draft_data_json["current_step"] == "review"
 
 
+def test_report_display_text_removes_markdown_artifacts() -> None:
+    markdown_text = (
+        "### Besuchsbericht: Nordlicht\n\n"
+        "***\n\n"
+        "**Datum:** 22.07.2026\n"
+        "* **Naechste Schritte:** Innendienst ruft nach.\n"
+    )
+
+    normalized_text = normalize_report_display_text(markdown_text)
+
+    assert "###" not in normalized_text
+    assert "**" not in normalized_text
+    assert "***" not in normalized_text
+    assert normalized_text == (
+        "Besuchsbericht: Nordlicht\n\n"
+        "Datum: 22.07.2026\n"
+        "- Naechste Schritte: Innendienst ruft nach."
+    )
+
+
+def test_review_uses_normalized_ai_text_and_german_visit_type_label(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+    process_report_message_with_ai(chat, "8 7 6 9", _FakeAiService())
+
+    review = build_report_review(
+        chat.report_draft,
+        _FakeAiService(
+            review_text="### Pruefung\n**Alles** passt.",
+            final_report_text="### Bericht\n**Besuchsart:** Vor-Ort-Termin",
+        ),
+    )
+
+    section_values = dict(review["sections"])
+    assert section_values["Besuchsart"] == "Vor Ort"
+    assert review["review_text"] == "Pruefung\nAlles passt."
+    assert review["final_report_text"] == "Bericht\nBesuchsart: Vor-Ort-Termin"
+
+
 def test_strict_question_answer_flow_reaches_review_without_optional_references(
     app,
 ) -> None:
@@ -455,6 +496,36 @@ def test_inside_sales_nachfassen_creates_mock_reminder(app) -> None:
     assert visit_report is not None
     assert len(visit_report.reminders) == 1
     assert "nachfassen" in visit_report.reminders[0].message.lower()
+
+
+def test_inside_sales_calls_next_week_creates_mock_reminder(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    answers = [
+        "Nordlicht Maschinenbau GmbH",
+        "persoenlich",
+        "Mara Stein",
+        "22.07.2026",
+        "Forecast",
+        "Lieferfaehigkeit und Angebot A-2026-104 besprochen.",
+        (
+            "Ich sende die Unterlagen, der Innendienst ruft naechste Woche "
+            "nach und Mara Stein prueft den Folgeauftrag."
+        ),
+        "Zufriedenheit 8, technisch 7, kaufmaennisch 6, Prioritaet 9.",
+    ]
+
+    for answer in answers:
+        process_report_message_with_ai(chat, answer, _FakeAiService())
+
+    final_report = confirm_report(chat)
+
+    visit_report = final_report.mock_visit_report
+    assert visit_report is not None
+    assert len(visit_report.reminders) == 1
+    assert "innendienst ruft naechste woche nach" in (
+        visit_report.reminders[0].message.lower()
+    )
 
 
 def test_lead_without_offer_or_order_skips_document_reference_questions(app) -> None:
