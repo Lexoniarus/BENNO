@@ -6,6 +6,28 @@ from datetime import date, timedelta
 from benno.enums import ReasonCode, VisitType
 from benno.services.report_steps import RATING_FIELDS, is_none_answer
 
+RATING_LABEL_PATTERNS = {
+    "customer_satisfaction_rating": (
+        r"zufriedenheit",
+        r"zufrieden",
+    ),
+    "technical_attractiveness_rating": (
+        r"technische?\s+attraktivit[aä]t",
+        r"technisch(?:e|er|en)?",
+    ),
+    "commercial_attractiveness_rating": (
+        r"kaufm[aä]nnische?\s+attraktivit[aä]t",
+        r"kaufmaennische?\s+attraktivit[aä]t",
+        r"kaufm[aä]nnisch(?:e|er|en)?",
+        r"kaufmaennisch(?:e|er|en)?",
+        r"kommerziell(?:e|er|en)?",
+    ),
+    "priority_rating": (
+        r"priorit[aä]t",
+        r"prioritaet",
+    ),
+}
+
 
 def classify_reason(message_text: str) -> str:
     """Classify a visit reason from simple keyword hints."""
@@ -89,41 +111,27 @@ def parse_rating_values(message_text: str) -> list[int]:
 
 def parse_labeled_rating_values(message_text: str) -> dict[str, int]:
     """Parse rating values that are explicitly tied to eNVenta rating labels."""
-    label_patterns = {
-        "customer_satisfaction_rating": (
-            r"zufriedenheit",
-            r"zufrieden",
-        ),
-        "technical_attractiveness_rating": (
-            r"technische?\s+attraktivit[aä]t",
-            r"technisch(?:e|er|en)?",
-        ),
-        "commercial_attractiveness_rating": (
-            r"kaufm[aä]nnische?\s+attraktivit[aä]t",
-            r"kaufmaennische?\s+attraktivit[aä]t",
-            r"kaufm[aä]nnisch(?:e|er|en)?",
-            r"kaufmaennisch(?:e|er|en)?",
-            r"kommerziell(?:e|er|en)?",
-        ),
-        "priority_rating": (
-            r"priorit[aä]t",
-            r"prioritaet",
-        ),
-    }
     parsed_values = {}
-    normalized_text = message_text.lower()
-    for rating_key, patterns in label_patterns.items():
-        for pattern in patterns:
-            match = re.search(pattern, normalized_text)
-            if match is None:
-                continue
-            search_window = message_text[match.end() : match.end() + 90]
-            value = parse_rating_value(search_window)
-            if value is not None:
-                parsed_values[rating_key] = value
-                break
+    for rating_key, segment in _labeled_rating_segments(message_text).items():
+        value = parse_rating_value(segment)
+        if value is not None:
+            parsed_values[rating_key] = value
 
     return parsed_values
+
+
+def parse_labeled_rating_clarifications(message_text: str) -> dict[str, str]:
+    """Extract qualitative rating hints that still need numeric confirmation."""
+    clarifications = {}
+    for rating_key, segment in _labeled_rating_segments(message_text).items():
+        if parse_rating_value(segment) is not None:
+            continue
+
+        clarification = _clean_rating_clarification(segment)
+        if clarification is not None:
+            clarifications[rating_key] = clarification
+
+    return clarifications
 
 
 def is_not_assessable_rating_answer(message_text: str) -> bool:
@@ -148,6 +156,10 @@ def looks_like_rating_answer(message_text: str) -> bool:
     normalized_text = message_text.lower()
     if is_not_assessable_rating_answer(message_text):
         return True
+    if parse_labeled_rating_clarifications(message_text):
+        return True
+    if parse_labeled_rating_values(message_text):
+        return True
 
     rating_values = parse_rating_values(message_text)
     if len(rating_values) < len(RATING_FIELDS):
@@ -161,6 +173,89 @@ def looks_like_rating_answer(message_text: str) -> bool:
             "priorit",
             "rating",
             "bewertung",
+        )
+    )
+
+
+def _labeled_rating_segments(message_text: str) -> dict[str, str]:
+    markers = _rating_label_markers(message_text)
+    segments = {}
+    for index, marker in enumerate(markers):
+        next_start = (
+            markers[index + 1]["start"]
+            if index + 1 < len(markers)
+            else len(message_text)
+        )
+        segment = message_text[int(marker["end"]) : int(next_start)]
+        segments[str(marker["key"])] = segment
+
+    return segments
+
+
+def _rating_label_markers(message_text: str) -> list[dict[str, int | str]]:
+    markers = []
+    for rating_key, patterns in RATING_LABEL_PATTERNS.items():
+        rating_marker = None
+        for pattern in patterns:
+            match = re.search(pattern, message_text, re.IGNORECASE)
+            if match is not None:
+                rating_marker = {
+                    "key": rating_key,
+                    "start": match.start(),
+                    "end": match.end(),
+                }
+                break
+        if rating_marker is not None:
+            markers.append(rating_marker)
+
+    return sorted(markers, key=lambda marker: int(marker["start"]))
+
+
+def _clean_rating_clarification(segment: str) -> str | None:
+    cleaned_value = re.sub(r"\s+", " ", segment).strip(" \t\r\n,.;:-")
+    cleaned_value = re.sub(
+        r"^(?:ist|war|sind|waren|ja|also)\s+",
+        "",
+        cleaned_value,
+        flags=re.IGNORECASE,
+    )
+    cleaned_value = re.sub(
+        r"\s+und\s+(?:die|der|das)?$",
+        "",
+        cleaned_value,
+        flags=re.IGNORECASE,
+    )
+    if len(cleaned_value) < 3:
+        return None
+    if not _contains_qualitative_rating_signal(cleaned_value):
+        return None
+
+    return cleaned_value[:180]
+
+
+def _contains_qualitative_rating_signal(text: str) -> bool:
+    normalized_text = text.lower()
+    return any(
+        keyword in normalized_text
+        for keyword in (
+            "attraktiv",
+            "durchaus",
+            "gut",
+            "heiß",
+            "heiss",
+            "hoch",
+            "interessiert",
+            "kohle",
+            "positiv",
+            "potential",
+            "potenzial",
+            "recht",
+            "schwach",
+            "stark",
+            "unerfahren",
+            "unklar",
+            "unsicher",
+            "zufrieden",
         )
     )
 

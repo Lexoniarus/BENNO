@@ -28,9 +28,13 @@ from benno.services.report_review import normalize_report_display_text
 from benno.services.report_shortcuts import (
     extract_strength_weakness_answers,
     mentions_lead,
+    parse_labeled_rating_clarifications,
     parse_visit_date,
 )
-from benno.services.report_state import REMINDER_SUPPRESSED_KEY
+from benno.services.report_state import (
+    RATING_CLARIFICATIONS_KEY,
+    REMINDER_SUPPRESSED_KEY,
+)
 from benno.services.report_steps import step_by_key
 
 
@@ -157,15 +161,158 @@ def test_visit_type_is_inferred_from_free_visit_context_message(app) -> None:
     assert draft.visit_type == VisitType.IN_PERSON.value
     assert draft.draft_data_json["answers"]["visit_type"] == VisitType.IN_PERSON.value
     assert "visit_type" in draft.draft_data_json["completed_steps"]
-    assert draft.draft_data_json["current_step"] == "participants"
-    assert chat.messages[-1].message_text != (
-        "War der Besuch persönlich, virtuell oder telefonisch?"
+    assert "visit_context" not in draft.draft_data_json["completed_steps"]
+    assert draft.draft_data_json["current_step"] == "visit_context"
+    assert chat.messages[-1].message_text == (
+        "Wie heißt die Firma oder Adresse des neuen Interessenten?"
     )
 
 
 def test_german_interessent_terms_count_as_lead_signal() -> None:
     assert mentions_lead("Das ist ein neuer Interessent.")
     assert mentions_lead("Das ist ein potenzieller Kunde.")
+
+
+def test_akl_classification_without_name_keeps_visit_context_open(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+
+    process_report_message_with_ai(
+        chat,
+        "Es geht um eine Adresse, also einen neuen Interessenten.",
+        _FakeAiService(
+            analysis=AiMessageAnalysis(
+                intent=UserIntent.ANSWER,
+                intent_confidence=0.95,
+                target_sections=["visit_context"],
+                section_updates={"visit_context": "neuer Interessent"},
+            )
+        ),
+    )
+
+    draft = chat.report_draft
+    assert draft.customer_context_type == "new_lead"
+    assert draft.draft_data_json["account_type_override"] == "A"
+    assert "visit_context" not in draft.draft_data_json.get("answers", {})
+    assert "visit_context" not in draft.draft_data_json.get("completed_steps", [])
+    assert draft.draft_data_json["current_step"] == "visit_context"
+    assert chat.messages[-1].message_text == (
+        "Wie heißt die Firma oder Adresse des neuen Interessenten?"
+    )
+
+
+def test_new_interested_account_name_completes_akl_name_but_keeps_type(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+
+    process_report_message_with_ai(
+        chat,
+        "Es ist eine Adresse.",
+        _FakeAiService(
+            analysis=AiMessageAnalysis(
+                intent=UserIntent.ANSWER,
+                intent_confidence=0.95,
+                section_updates={"visit_context": "Adresse"},
+            )
+        ),
+    )
+    process_report_message_with_ai(
+        chat,
+        "Der neue Interessent heißt SunSolar.",
+        _FakeAiService(),
+    )
+
+    draft = chat.report_draft
+    assert draft.draft_data_json["answers"]["visit_context"] == "SunSolar"
+    assert draft.draft_data_json["account_type_override"] == "A"
+    assert draft.customer_context_type == "new_lead"
+    assert draft.draft_data_json["current_step"] == "visit_type"
+
+
+def test_participant_name_correction_does_not_overwrite_akl_name(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+
+    process_report_message_with_ai(
+        chat, "Der neue Interessent heißt SunSolar.", _FakeAiService()
+    )
+    process_report_message_with_ai(chat, "vor Ort", _FakeAiService())
+    process_report_message_with_ai(chat, "Er heißt Bernd Rombach.", _FakeAiService())
+
+    answers = chat.report_draft.draft_data_json["answers"]
+    assert answers["visit_context"] == "SunSolar"
+    assert answers["participants"] == "Er heißt Bernd Rombach."
+
+
+def test_qualitative_rating_clues_are_stored_without_invented_numbers(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_all_required_until_ratings(chat)
+
+    process_report_message_with_ai(
+        chat,
+        (
+            "Ich hatte den Eindruck, dass die ganz zufrieden waren. "
+            "Also würde ich eher positiv werten. Technische Attraktivität, "
+            "ja, die sind recht unerfahren. Kaufmännische Attraktivität, "
+            "die scheinen Kohle zu haben und Potenzial. Priorität vielleicht sieben."
+        ),
+        _FakeAiService(),
+    )
+
+    draft = chat.report_draft
+    clarifications = draft.draft_data_json[RATING_CLARIFICATIONS_KEY]
+    assert draft.ratings_json["priority_rating"]["value"] == 7
+    assert "customer_satisfaction_rating" not in draft.ratings_json
+    assert "technical_attractiveness_rating" not in draft.ratings_json
+    assert "commercial_attractiveness_rating" not in draft.ratings_json
+    assert "positiv" in clarifications["customer_satisfaction_rating"]
+    assert "unerfahren" in clarifications["technical_attractiveness_rating"]
+    assert "Kohle" in clarifications["commercial_attractiveness_rating"]
+    assert draft.draft_data_json["current_step"] == "ratings"
+    assert "Ich habe verstanden:" in chat.messages[-1].message_text
+    assert "Zahlen von 1 bis 10" in chat.messages[-1].message_text
+
+
+def test_ai_rating_section_updates_accept_individual_rating_keys(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_all_required_until_ratings(chat)
+
+    process_report_message_with_ai(
+        chat,
+        "Die Zufriedenheit ist eher positiv und die Priorität ist sieben.",
+        _FakeAiService(
+            analysis=AiMessageAnalysis(
+                intent=UserIntent.ANSWER,
+                intent_confidence=0.95,
+                target_sections=["customer_satisfaction_rating", "priority_rating"],
+                section_updates={
+                    "customer_satisfaction_rating": "eher positiv",
+                    "priority_rating": "7",
+                },
+            )
+        ),
+    )
+
+    draft = chat.report_draft
+    clarifications = draft.draft_data_json[RATING_CLARIFICATIONS_KEY]
+    assert clarifications["customer_satisfaction_rating"] == "eher positiv"
+    assert draft.ratings_json["priority_rating"]["value"] == 7
+    assert draft.draft_data_json["current_step"] == "ratings"
+
+
+def test_labeled_rating_clarification_parser_splits_qualitative_segments() -> None:
+    clarifications = parse_labeled_rating_clarifications(
+        "Zufriedenheit eher positiv. Technische Attraktivität recht "
+        "unerfahren. Kaufmännische Attraktivität mit Potenzial. "
+        "Priorität sieben."
+    )
+
+    assert "positiv" in clarifications["customer_satisfaction_rating"]
+    assert "unerfahren" in clarifications["technical_attractiveness_rating"]
+    assert "Potenzial" in clarifications["commercial_attractiveness_rating"]
+    assert "priority_rating" not in clarifications
 
 
 def test_rating_clues_are_extracted_from_later_bundle_without_ai_rating_update(

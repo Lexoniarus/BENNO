@@ -27,6 +27,8 @@ from benno.services.mock_crm import CrmGateway, get_crm_gateway
 from benno.services.observability import trace_report_decision, trace_report_turn
 from benno.services.report_account_resolution import (
     apply_lead_context_signal,
+    extract_visit_context_name,
+    mentions_address_or_lead_context,
     resolve_visit_context,
 )
 from benno.services.report_ai_context import (
@@ -52,6 +54,7 @@ from benno.services.report_shortcuts import (
     looks_like_reference,
     mentions_inside_sales_follow_up,
     mentions_lead,
+    parse_labeled_rating_clarifications,
     parse_labeled_rating_values,
     parse_rating_value,
     parse_rating_values,
@@ -61,6 +64,7 @@ from benno.services.report_shortcuts import (
 from benno.services.report_state import (
     ACCOUNT_TYPE_OVERRIDE_KEY,
     INSIDE_SALES_FOLLOW_UP_KEY,
+    RATING_CLARIFICATIONS_KEY,
     REMINDER_SUPPRESSED_KEY,
     clear_crm_reference,
     crm_reference_value,
@@ -693,8 +697,12 @@ def _apply_requirement_specific_update(
     crm_gateway: CrmGateway,
 ) -> bool:
     if requirement.key in _GATEWAY_REQUIREMENT_KEYS:
-        _apply_gateway_requirement_answer(draft, requirement, answer_text, crm_gateway)
-        return True
+        return _apply_gateway_requirement_answer(
+            draft,
+            requirement,
+            answer_text,
+            crm_gateway,
+        )
     if requirement.key == "visit_type":
         if not _apply_visit_type_answer(draft, answer_text):
             return False
@@ -739,15 +747,17 @@ def _apply_gateway_requirement_answer(
     requirement: ReportStep,
     answer_text: str,
     crm_gateway: CrmGateway,
-) -> None:
+) -> bool:
     if requirement.key == "visit_context":
-        _apply_visit_context_answer(draft, answer_text, crm_gateway)
+        return _apply_visit_context_answer(draft, answer_text, crm_gateway)
     elif requirement.key == "participants":
         _apply_participants_answer(draft, answer_text, crm_gateway)
     elif requirement.key == "offer_reference":
         _apply_offer_reference_answer(draft, answer_text, crm_gateway)
     elif requirement.key == "order_reference":
         _apply_order_reference_answer(draft, answer_text, crm_gateway)
+
+    return True
 
 
 def _apply_local_requirement_answer(
@@ -917,10 +927,14 @@ def _apply_ai_requirement_updates(
         analysis,
         completed_before_message,
     ):
+        ai_answer = _ai_update_answer_for_requirement(requirement, analysis)
+        if ai_answer is None:
+            continue
+
         if _apply_requirement_answer(
             draft,
             requirement,
-            analysis.section_updates[requirement.key],
+            ai_answer,
             crm_gateway,
         ):
             applied_steps.append(requirement)
@@ -940,13 +954,37 @@ def _answer_for_requirement(
     if analysis is None:
         return message_text
 
-    suggested_value = analysis.section_updates.get(requirement.key)
+    suggested_value = _ai_update_answer_for_requirement(requirement, analysis)
     if not suggested_value:
         if analysis.intent == UserIntent.CORRECTION:
             return None
         return message_text
 
     return suggested_value
+
+
+def _ai_update_answer_for_requirement(
+    requirement: ReportStep,
+    analysis: AiMessageAnalysis,
+) -> str | None:
+    if requirement.key == "ratings":
+        return analysis.section_updates.get("ratings") or _rating_answer_from_analysis(
+            analysis
+        )
+
+    return analysis.section_updates.get(requirement.key)
+
+
+def _rating_answer_from_analysis(analysis: AiMessageAnalysis) -> str | None:
+    rating_parts = [
+        f"{label_de} {analysis.section_updates[rating_key]}"
+        for rating_key, _label_en, label_de in RATING_FIELDS
+        if analysis.section_updates.get(rating_key)
+    ]
+    if not rating_parts:
+        return None
+
+    return ", ".join(rating_parts)
 
 
 def _apply_rule_based_updates(
@@ -1256,7 +1294,7 @@ def _additional_ai_requirements(
         step
         for step in REPORT_STEPS
         if step.key != current_step.key
-        and step.key in analysis.section_updates
+        and _analysis_updates_requirement(step, analysis)
         and _can_apply_ai_update(
             step,
             current_index,
@@ -1264,6 +1302,16 @@ def _additional_ai_requirements(
             completed_before_message,
         )
     ]
+
+
+def _analysis_updates_requirement(
+    requirement: ReportStep,
+    analysis: AiMessageAnalysis,
+) -> bool:
+    if requirement.key == "ratings":
+        return bool(_ai_update_answer_for_requirement(requirement, analysis))
+
+    return requirement.key in analysis.section_updates
 
 
 def _can_apply_ai_update(
@@ -1343,6 +1391,8 @@ def _next_question(
         message = _review_ready_message(chat)
     elif next_step.section == ReportSection.RATINGS:
         message = rating_question(draft)
+    elif next_step.key == "visit_context" and _needs_akl_name_question(draft):
+        message = "Wie heißt die Firma oder Adresse des neuen Interessenten?"
     else:
         message = _suggested_question(next_step, analysis) or step_question(
             next_step,
@@ -1365,8 +1415,26 @@ def _apply_visit_context_answer(
     draft: ReportDraft,
     message_text: str,
     crm_gateway: CrmGateway,
-) -> None:
-    resolve_visit_context(draft, message_text, crm_gateway)
+) -> bool:
+    visit_context_name = extract_visit_context_name(message_text)
+    if visit_context_name is None:
+        if mentions_address_or_lead_context(message_text):
+            resolve_visit_context(draft, message_text, crm_gateway)
+        return False
+
+    has_address_or_lead_context = mentions_address_or_lead_context(message_text)
+    resolve_visit_context(draft, visit_context_name, crm_gateway)
+    if has_address_or_lead_context and draft.account_id is None:
+        apply_lead_context_signal(draft, message_text)
+    _replace_requirement_answer(draft, "visit_context", visit_context_name)
+    return True
+
+
+def _needs_akl_name_question(draft: ReportDraft) -> bool:
+    return (
+        draft.customer_context_type == CustomerContextType.NEW_LEAD.value
+        and not draft_data(draft).get("answers", {}).get("visit_context")
+    )
 
 
 def _apply_visit_type_answer(draft: ReportDraft, message_text: str) -> bool:
@@ -1476,19 +1544,28 @@ def _apply_rating_answers(draft: ReportDraft, message_text: str) -> None:
     ratings = dict(draft.ratings_json)
     is_not_assessable = is_not_assessable_rating_answer(message_text)
     labeled_values = {}
+    qualitative_clarifications = {}
     parsed_values = []
     if not is_not_assessable:
         labeled_values = parse_labeled_rating_values(message_text)
+        qualitative_clarifications = parse_labeled_rating_clarifications(message_text)
         parsed_values = parse_rating_values(message_text)
     for index, (rating_key, _label_en, _label_de) in enumerate(RATING_FIELDS):
         value = labeled_values.get(rating_key)
         if value is None and not labeled_values:
             value = parsed_values[index] if index < len(parsed_values) else None
         if value is None and not is_not_assessable:
+            if rating_key in qualitative_clarifications and rating_key not in ratings:
+                _store_rating_clarification(
+                    draft,
+                    rating_key,
+                    qualitative_clarifications[rating_key],
+                )
             continue
         if value is None and rating_key in ratings:
             continue
 
+        _clear_rating_clarification(draft, rating_key)
         ratings[rating_key] = {
             "value": value,
             "reason": message_text,
@@ -1496,6 +1573,33 @@ def _apply_rating_answers(draft: ReportDraft, message_text: str) -> None:
         }
 
     draft.ratings_json = ratings
+
+
+def _store_rating_clarification(
+    draft: ReportDraft,
+    rating_key: str,
+    clarification: str,
+) -> None:
+    data = draft_data(draft)
+    clarifications = dict(data.get(RATING_CLARIFICATIONS_KEY, {}))
+    clarifications[rating_key] = clarification
+    draft.draft_data_json = {
+        **data,
+        RATING_CLARIFICATIONS_KEY: clarifications,
+    }
+
+
+def _clear_rating_clarification(draft: ReportDraft, rating_key: str) -> None:
+    data = draft_data(draft)
+    clarifications = dict(data.get(RATING_CLARIFICATIONS_KEY, {}))
+    if rating_key not in clarifications:
+        return
+
+    clarifications.pop(rating_key, None)
+    draft.draft_data_json = {
+        **data,
+        RATING_CLARIFICATIONS_KEY: clarifications,
+    }
 
 
 def _apply_reminder_answer(draft: ReportDraft, message_text: str) -> None:

@@ -9,6 +9,7 @@ AI_CACHE_KEY = "ai_cache"
 ACCOUNT_TYPE_OVERRIDE_KEY = "account_type_override"
 CRM_REFERENCES_KEY = "crm_references"
 INSIDE_SALES_FOLLOW_UP_KEY = "inside_sales_follow_up_requested"
+RATING_CLARIFICATIONS_KEY = "rating_clarifications"
 REMINDER_SUPPRESSED_KEY = "reminder_suppressed"
 DISPLAY_VALUE_LABELS = {
     "A": "Adresse",

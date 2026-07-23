@@ -5,7 +5,7 @@ from typing import Any
 
 from benno.enums import ReportSection, ReportStatus, SectionStatus
 from benno.models import ReportDraft
-from benno.services.report_state import draft_data
+from benno.services.report_state import RATING_CLARIFICATIONS_KEY, draft_data
 
 REVIEW_STEP = "review"
 OPTIONAL_STEP_KEYS = {"strength_text", "weakness_text", "reminders"}
@@ -205,7 +205,9 @@ REPORT_STEPS = (
 
 def allowed_update_keys() -> list[str]:
     """Return section keys that AI providers may propose."""
-    return [step.key for step in REPORT_STEPS]
+    return [step.key for step in REPORT_STEPS] + [
+        rating_key for rating_key, _label_en, _label_de in RATING_FIELDS
+    ]
 
 
 def report_requirements(draft: ReportDraft) -> list[dict[str, Any]]:
@@ -315,6 +317,14 @@ def step_question(step: ReportStep, session_language: str | None) -> str:
 def rating_question(draft: ReportDraft) -> str:
     """Return the compact German rating question."""
     missing_labels = missing_rating_labels(draft)
+    clarification_summary = rating_clarification_summary(draft)
+    if clarification_summary:
+        return (
+            f"Ich habe verstanden: {clarification_summary}. "
+            "Welche Zahlen von 1 bis 10 soll ich für die noch fehlenden "
+            "Bewertungen eintragen? Wenn etwas nicht bewertbar ist, sag das "
+            "kurz dazu."
+        )
     if len(missing_labels) == len(RATING_FIELDS):
         return (
             "Wie bewertest du Zufriedenheit, technische Attraktivität, "
@@ -342,6 +352,21 @@ def missing_rating_labels(draft: ReportDraft) -> list[str]:
         for rating_key, _label_en, label_de in RATING_FIELDS
         if rating_key in missing_keys
     ]
+
+
+def rating_clarification_summary(draft: ReportDraft) -> str | None:
+    """Return a compact German summary of qualitative rating hints."""
+    clarifications = dict(draft_data(draft).get(RATING_CLARIFICATIONS_KEY, {}))
+    missing_keys = set(missing_rating_keys(draft))
+    parts = [
+        f"{label_de}: {clarifications[rating_key]}"
+        for rating_key, _label_en, label_de in RATING_FIELDS
+        if rating_key in missing_keys and clarifications.get(rating_key)
+    ]
+    if not parts:
+        return None
+
+    return "; ".join(parts)
 
 
 def initial_section_statuses() -> dict[str, str]:

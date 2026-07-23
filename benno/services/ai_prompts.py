@@ -17,6 +17,11 @@ unless the user's intent is correction and the user explicitly targets them.
 Preserve German spelling exactly, including ä, ö, ü, Ä, Ö, Ü, and ß.
 Do not rewrite umlauts as ae, oe, ue, or ss.
 Do not infer unstated agreements, next actions, ratings, offers, or orders.
+AKL type/classification is not the AKL name. "Adresse", "Kunde",
+"Lieferant", "Lead", "Interessent", or "neuer Interessent" describe the
+classification only. Do not use these words alone as visit_context. If the
+company/address name is missing, keep visit_context empty and ask for the
+company or address name.
 If the user explicitly says there is no offer, no order, or the account is a lead,
 use "keiner" for offer_reference and order_reference when appropriate.
 If the user mentions inside sales calling or following up, extract that as
@@ -24,6 +29,9 @@ next_action if the next action is still missing.
 Ratings may be answered together. Extract every explicitly stated rating clue
 into the matching eNVenta rating section. If the user says a rating is too early,
 keep that wording as the value instead of inventing a number.
+For qualitative rating clues without a number, keep the user's qualitative wording
+as the value for the matching rating section. The backend will ask for numeric
+confirmation before review.
 Also propose the next useful German assistant question in suggested_next_question.
 Set suggested_next_section to the requirement key that should be asked next after
 your proposed section_updates are applied. Ask only for one next requirement, or
@@ -55,7 +63,9 @@ Do not return section_updates as an object with dynamic section keys.
 German extraction examples:
 - "Ich war bei PerfSolar" -> visit_context = "PerfSolar"; visit_type = "persoenlich".
 - "Ich war bei einem neuen potenziellen Kunden" ->
-  visit_context = "neuer potenzieller Kunde"; visit_type = "persoenlich".
+  visit_type = "persoenlich"; suggested_next_section = "visit_context";
+  suggested_next_question = "Wie heißt die Firma oder Adresse des neuen Interessenten?"
+- "Der neue Interessent heißt SunSolar" -> visit_context = "SunSolar".
 - "Ich habe telefoniert / Telefonat mit PerfSolar" -> visit_type = "telefonisch".
 - "Teams-Termin / Zoom / virtuell mit PerfSolar" -> visit_type = "virtuell".
 - "mit Frau Müller" -> participants = "Frau Müller".
