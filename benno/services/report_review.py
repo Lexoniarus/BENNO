@@ -250,13 +250,13 @@ def display_akl_type(draft: ReportDraft) -> str:
 
 def account_type_value(draft: ReportDraft) -> str | None:
     """Return the best current AKL type code for review/writeback display."""
-    account = crm_reference(draft, "account")
-    if account is not None and account.get("account_type"):
-        return str(account["account_type"])
-
     override = draft_data(draft).get(ACCOUNT_TYPE_OVERRIDE_KEY)
     if override:
         return str(override)
+
+    account = crm_reference(draft, "account")
+    if account is not None and account.get("account_type"):
+        return str(account["account_type"])
 
     if draft.customer_context_type in {
         CustomerContextType.NEW_LEAD.value,

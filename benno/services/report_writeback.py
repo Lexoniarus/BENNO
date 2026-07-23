@@ -49,9 +49,9 @@ def account_payload_fields(draft: ReportDraft) -> dict[str, Any]:
         "account_id": draft.account_id or (account.get("id") if account else None),
         "account_number": account.get("account_number") if account else None,
         "account_type": (
-            account.get("account_type")
-            if account
-            else account_type_override or AccountType.ADDRESS.value
+            account_type_override
+            or (account.get("account_type") if account else None)
+            or AccountType.ADDRESS.value
         ),
         "account_search_name": (
             account.get("search_name") if account else fallback_search_name

@@ -305,7 +305,24 @@ def _apply_report_correction_value(
         return
 
     correction_step = _correction_step(field_key)
-    _apply_requirement_answer(draft, correction_step, correction_text, crm_gateway)
+    if not _apply_requirement_answer(
+        draft,
+        correction_step,
+        correction_text,
+        crm_gateway,
+    ):
+        raise ValueError(_invalid_correction_message(correction_step))
+
+
+def _invalid_correction_message(correction_step: ReportStep) -> str:
+    if correction_step.key == "visit_type":
+        return (
+            "Ungültige Besuchsart. Erlaubt sind Vor Ort, Virtuell " "oder Telefonisch."
+        )
+    if correction_step.key in {"visit_date", "next_appointment_date"}:
+        return "Ungültiges Datum. Bitte gib ein gültiges Datum ein."
+
+    return f"Ungültiger Wert für {correction_step.question_de}"
 
 
 def _apply_empty_report_correction(

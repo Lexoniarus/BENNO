@@ -795,7 +795,27 @@ def test_structured_review_corrections_update_akl_and_rating_fields(app) -> None
     assert "ai_cache" not in draft.draft_data_json
 
 
-def test_report_correction_batch_is_atomic(app) -> None:
+def test_account_type_override_wins_for_matched_account_review_and_writeback(
+    app,
+) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+    draft = chat.report_draft
+
+    assert draft.account.account_type == "K"
+
+    apply_report_correction(chat, "account_type", "A")
+    review = build_report_review(draft, _FakeAiService())
+    final_report = confirm_report(chat, _FakeAiService())
+
+    assert draft.draft_data_json["account_type_override"] == "A"
+    assert "Adresse" in dict(review["sections"])["AKL-Typ"]
+    assert final_report.mock_visit_report.account_type == "A"
+    assert final_report.mock_visit_report.account_number == "AKL-K-1001"
+
+
+def test_report_correction_batch_is_atomic_for_invalid_rating(app) -> None:
     seed_database()
     chat = _start_sales_chat()
     _process_complete_report_with_reminder(chat)
@@ -820,6 +840,62 @@ def test_report_correction_batch_is_atomic(app) -> None:
     db.session.refresh(draft)
     assert draft.draft_data_json["answers"] == original_answers
     assert draft.ratings_json["priority_rating"] == original_priority
+    assert _correction_message_count(chat) == original_correction_count
+
+
+def test_report_correction_batch_rejects_invalid_visit_date(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+    draft = chat.report_draft
+    original_answers = dict(draft.draft_data_json["answers"])
+    original_visit_date = draft.visit_date
+    original_correction_count = _correction_message_count(chat)
+
+    try:
+        apply_report_corrections(
+            chat,
+            [
+                ("visit_context", "Solar Sales Test GmbH"),
+                ("visit_date", "kein datum"),
+            ],
+        )
+    except ValueError as error:
+        assert "gültiges Datum" in str(error)
+    else:
+        raise AssertionError("Invalid visit date correction should fail.")
+
+    db.session.refresh(draft)
+    assert draft.visit_date == original_visit_date
+    assert draft.draft_data_json["answers"] == original_answers
+    assert _correction_message_count(chat) == original_correction_count
+
+
+def test_report_correction_batch_rejects_invalid_visit_type(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+    draft = chat.report_draft
+    original_answers = dict(draft.draft_data_json["answers"])
+    original_visit_type = draft.visit_type
+    original_correction_count = _correction_message_count(chat)
+
+    try:
+        apply_report_corrections(
+            chat,
+            [
+                ("visit_context", "Solar Sales Test GmbH"),
+                ("visit_type", "Rauchzeichen"),
+            ],
+        )
+    except ValueError as error:
+        assert "Vor Ort" in str(error)
+    else:
+        raise AssertionError("Invalid visit type correction should fail.")
+
+    db.session.refresh(draft)
+    assert draft.visit_type == original_visit_type
+    assert draft.draft_data_json["answers"] == original_answers
     assert _correction_message_count(chat) == original_correction_count
 
 
