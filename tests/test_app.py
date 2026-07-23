@@ -130,14 +130,14 @@ def test_health_endpoint_returns_ok_status() -> None:
     assert response.get_json() == {"service": "benno", "status": "ok"}
 
 
-def test_favicon_route_redirects_to_local_logo() -> None:
+def test_favicon_route_redirects_to_local_favicon() -> None:
     app = create_app("testing")
 
     with app.test_client() as client:
         response = client.get("/favicon.ico")
 
     assert response.status_code == 302
-    assert response.location == "/static/img/benno-logo.svg"
+    assert response.location == "/static/img/benno-favicon.svg"
 
 
 def test_development_configuration_reads_environment_at_app_creation(
