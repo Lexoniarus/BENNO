@@ -248,11 +248,11 @@ def apply_report_corrections(
     _ensure_report_is_mutable(chat)
     gateway = crm_gateway or get_crm_gateway()
     if not draft_is_ready_for_review(draft):
-        raise ValueError("Corrections are only available during final review.")
+        raise ValueError("Korrekturen sind erst in der Berichtprüfung möglich.")
 
     normalized_corrections = _normalized_report_corrections(corrections)
     if not normalized_corrections:
-        raise ValueError("No correction changes were provided.")
+        raise ValueError("Es wurden keine Änderungen übergeben.")
 
     try:
         with db.session.begin_nested():
@@ -282,9 +282,9 @@ def _normalized_report_corrections(
         clean_field_key = field_key.strip()
         clean_correction_text = correction_text.strip()
         if not clean_field_key:
-            raise ValueError("Unknown correction field.")
+            raise ValueError("Dieses Korrekturfeld ist nicht bekannt.")
         if not clean_correction_text and clean_field_key not in EMPTY_CORRECTION_KEYS:
-            raise ValueError("Correction text must not be empty.")
+            raise ValueError("Dieses Pflichtfeld darf nicht leer sein.")
 
         normalized_corrections.append((clean_field_key, clean_correction_text))
 
@@ -330,7 +330,7 @@ def _apply_empty_report_correction(
     field_key: str,
 ) -> None:
     if field_key not in EMPTY_CORRECTION_KEYS:
-        raise ValueError("Correction text must not be empty.")
+        raise ValueError("Dieses Pflichtfeld darf nicht leer sein.")
 
     clear_ai_cache(draft)
     if field_key == "next_appointment_date":
@@ -448,7 +448,9 @@ def _apply_account_type_correction(
     account_type = correction_text.strip().upper()
     allowed_types = {account_type.value for account_type in AccountType}
     if account_type not in allowed_types:
-        raise ValueError("Unknown AKL account type.")
+        raise ValueError(
+            "Ungültiger AKL-Typ. Erlaubt sind Adresse, Kunde oder Lieferant."
+        )
 
     clear_ai_cache(draft)
     set_draft_metadata(draft, ACCOUNT_TYPE_OVERRIDE_KEY, account_type)
@@ -489,7 +491,7 @@ def _apply_single_rating_correction(
 ) -> None:
     value = parse_rating_value(correction_text)
     if value is None:
-        raise ValueError("Rating correction must contain a value from 1 to 10.")
+        raise ValueError("Bewertungen müssen einen Wert von 1 bis 10 enthalten.")
 
     clear_ai_cache(draft)
     ratings = dict(draft.ratings_json)
@@ -637,7 +639,7 @@ def _correction_step(field_key: str) -> ReportStep:
         None,
     )
     if correction_step is None:
-        raise ValueError("Unknown correction field.")
+        raise ValueError("Dieses Korrekturfeld ist nicht bekannt.")
 
     return correction_step
 

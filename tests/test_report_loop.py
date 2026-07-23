@@ -833,7 +833,7 @@ def test_report_correction_batch_is_atomic_for_invalid_rating(app) -> None:
             ],
         )
     except ValueError as error:
-        assert "Rating correction" in str(error)
+        assert "Wert von 1 bis 10" in str(error)
     else:
         raise AssertionError("Invalid batch correction should fail.")
 
@@ -899,6 +899,60 @@ def test_report_correction_batch_rejects_invalid_visit_type(app) -> None:
     assert _correction_message_count(chat) == original_correction_count
 
 
+def test_report_correction_batch_rejects_invalid_account_type(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+    draft = chat.report_draft
+    original_data = dict(draft.draft_data_json)
+    original_correction_count = _correction_message_count(chat)
+
+    try:
+        apply_report_corrections(
+            chat,
+            [
+                ("visit_context", "Solar Sales Test GmbH"),
+                ("account_type", "X"),
+            ],
+        )
+    except ValueError as error:
+        message = str(error)
+        assert "Adresse" in message
+        assert "Kunde" in message
+        assert "Lieferant" in message
+    else:
+        raise AssertionError("Invalid account type correction should fail.")
+
+    db.session.refresh(draft)
+    assert draft.draft_data_json == original_data
+    assert _correction_message_count(chat) == original_correction_count
+
+
+def test_report_correction_batch_rejects_unknown_field(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+    draft = chat.report_draft
+    original_data = dict(draft.draft_data_json)
+    original_correction_count = _correction_message_count(chat)
+
+    try:
+        apply_report_corrections(
+            chat,
+            [
+                ("unknown_field", "Wert"),
+            ],
+        )
+    except ValueError as error:
+        assert "nicht bekannt" in str(error)
+    else:
+        raise AssertionError("Unbekanntes Korrekturfeld sollte fehlschlagen.")
+
+    db.session.refresh(draft)
+    assert draft.draft_data_json == original_data
+    assert _correction_message_count(chat) == original_correction_count
+
+
 def test_empty_optional_review_corrections_clear_writeback_values(app) -> None:
     seed_database()
     chat = _start_sales_chat()
@@ -943,7 +997,7 @@ def test_empty_required_review_correction_is_rejected(app) -> None:
     try:
         apply_report_corrections(chat, [("visit_context", "")])
     except ValueError as error:
-        assert "must not be empty" in str(error)
+        assert "Pflichtfeld darf nicht leer sein" in str(error)
     else:
         raise AssertionError("Empty required correction should fail.")
 
