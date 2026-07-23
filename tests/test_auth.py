@@ -15,6 +15,8 @@ def test_login_page_loads(app) -> None:
     assert response.status_code == 200
     assert b"BENNO" in response.data
     assert b"img/benno-favicon.svg" in response.data
+    assert b"img/benno-favicon-32.png" in response.data
+    assert b"img/benno-apple-touch-icon.png" in response.data
     assert b"img/benno-logo.svg" in response.data
 
 
@@ -28,10 +30,18 @@ def test_logo_asset_is_available(app) -> None:
 
 def test_favicon_asset_is_available(app) -> None:
     with app.test_client() as client:
-        response = client.get("/static/img/benno-favicon.svg")
+        response = client.get("/static/img/benno-favicon-32.png")
 
     assert response.status_code == 200
-    assert response.mimetype == "image/svg+xml"
+    assert response.mimetype == "image/png"
+
+
+def test_apple_touch_icon_asset_is_available(app) -> None:
+    with app.test_client() as client:
+        response = client.get("/static/img/benno-apple-touch-icon.png")
+
+    assert response.status_code == 200
+    assert response.mimetype == "image/png"
 
 
 def test_valid_admin_login_redirects_to_admin_dashboard(app) -> None:

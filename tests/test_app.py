@@ -137,7 +137,7 @@ def test_favicon_route_redirects_to_local_favicon() -> None:
         response = client.get("/favicon.ico")
 
     assert response.status_code == 302
-    assert response.location == "/static/img/benno-favicon.svg"
+    assert response.location == "/static/img/benno-favicon-32.png"
 
 
 def test_development_configuration_reads_environment_at_app_creation(
