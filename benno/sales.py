@@ -63,7 +63,7 @@ REPORT_STATUS_LABELS_DE = {
 }
 REPORT_SECTION_LABELS_DE = {
     "contacts": "Teilnehmer",
-    "customer_context": "Kunde oder Lead",
+    "customer_context": "AKL-Bezug",
     "final_report": "Finaler Bericht",
     "info_text": "Info",
     "next_action": "N\u00e4chster Schritt",

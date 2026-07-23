@@ -54,6 +54,16 @@ def test_voice_script_supports_report_chat_autostart() -> None:
     assert "Automatischer Sprachstart wurde blockiert." in script_text
 
 
+def test_voice_script_rejects_audio_playback_errors() -> None:
+    script_text = (_project_root() / "benno" / "static" / "js" / "app.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'audio.addEventListener("error", failPlayback' in script_text
+    assert 'audio.addEventListener("ended", finishPlayback' in script_text
+    assert 'reject(new Error("Sprachausgabe ist nicht verfügbar."))' in script_text
+
+
 def test_report_chat_css_reserves_space_for_sticky_composer() -> None:
     css_text = (_project_root() / "benno" / "static" / "css" / "app.css").read_text(
         encoding="utf-8"
@@ -78,6 +88,13 @@ def test_active_sales_templates_use_akl_wording() -> None:
 
         assert "Kunde/Lead" not in template_text
         assert "AKL" in template_text
+
+
+def test_sales_section_labels_use_akl_wording() -> None:
+    sales_text = (_project_root() / "benno" / "sales.py").read_text(encoding="utf-8")
+
+    assert '"customer_context": "AKL-Bezug"' in sales_text
+    assert '"customer_context": "Kunde oder Lead"' not in sales_text
 
 
 def test_create_app_uses_testing_configuration() -> None:

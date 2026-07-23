@@ -230,15 +230,19 @@ async function playAudioBlob(audioBlob) {
 
   try {
     await audio.play();
-    await new Promise((resolve) => {
-      const finish = () => {
+    await new Promise((resolve, reject) => {
+      const finishPlayback = () => {
         window.clearTimeout(playbackTimer);
         resolve();
       };
-      const playbackTimer = window.setTimeout(finish, maxPlaybackWaitMs);
+      const failPlayback = () => {
+        window.clearTimeout(playbackTimer);
+        reject(new Error("Sprachausgabe ist nicht verfügbar."));
+      };
+      const playbackTimer = window.setTimeout(finishPlayback, maxPlaybackWaitMs);
 
-      audio.addEventListener("error", finish, { once: true });
-      audio.addEventListener("ended", finish, { once: true });
+      audio.addEventListener("error", failPlayback, { once: true });
+      audio.addEventListener("ended", finishPlayback, { once: true });
     });
   } finally {
     URL.revokeObjectURL(audioUrl);
