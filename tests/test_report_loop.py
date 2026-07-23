@@ -268,6 +268,28 @@ def test_company_name_starting_with_neue_is_not_treated_as_new_lead(app) -> None
     assert draft.draft_data_json["current_step"] == "visit_type"
 
 
+def test_address_override_survives_later_akl_name_correction(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+
+    process_report_message_with_ai(
+        chat,
+        "Neuer Interessent in NRW.",
+        _FakeAiService(),
+    )
+    process_report_message_with_ai(
+        chat,
+        "Die Firma heißt PerfSolar.",
+        _FakeAiService(),
+    )
+
+    draft = chat.report_draft
+    assert draft.draft_data_json["answers"]["visit_context"] == "PerfSolar"
+    assert draft.draft_data_json["account_type_override"] == "A"
+    assert draft.customer_context_type == "new_lead"
+    assert draft.draft_data_json["current_step"] == "visit_type"
+
+
 def test_participant_name_correction_does_not_overwrite_akl_name(app) -> None:
     seed_database()
     chat = _start_sales_chat()
@@ -454,6 +476,27 @@ def test_explicit_strength_and_weakness_are_extracted_by_rules() -> None:
 
     assert answers == {
         "strength_text": "hohes Projektvolumen",
+        "weakness_text": "unklare Freigabe",
+    }
+
+
+def test_positive_rating_text_does_not_create_strength() -> None:
+    answers = extract_strength_weakness_answers(
+        "Bewertungen: Zufriedenheit wirkte ziemlich positiv, technisch "
+        "sind sie noch unsicher, kaufmännisch klingt es interessant mit "
+        "Budget, Priorität würde ich sieben sagen."
+    )
+
+    assert answers == {}
+
+
+def test_explicit_positive_and_negative_phrasing_can_create_notes() -> None:
+    answers = extract_strength_weakness_answers(
+        "Positiv war gutes Messepotenzial. Negativ war unklare Freigabe."
+    )
+
+    assert answers == {
+        "strength_text": "gutes Messepotenzial",
         "weakness_text": "unklare Freigabe",
     }
 

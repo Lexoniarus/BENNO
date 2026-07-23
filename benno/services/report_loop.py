@@ -1426,9 +1426,21 @@ def _apply_visit_context_answer(
         return False
 
     has_address_or_lead_context = mentions_address_or_lead_context(message_text)
+    had_address_override = (
+        draft_data(draft).get(ACCOUNT_TYPE_OVERRIDE_KEY) == AccountType.ADDRESS.value
+    )
     resolve_visit_context(draft, visit_context_name, crm_gateway)
-    if has_address_or_lead_context and draft.account_id is None:
+    if draft.account_id is None and (
+        has_address_or_lead_context or had_address_override
+    ):
         apply_lead_context_signal(draft, message_text)
+        if had_address_override:
+            draft.customer_context_type = CustomerContextType.NEW_LEAD.value
+            set_draft_metadata(
+                draft,
+                ACCOUNT_TYPE_OVERRIDE_KEY,
+                AccountType.ADDRESS.value,
+            )
     _replace_requirement_answer(draft, "visit_context", visit_context_name)
     return True
 

@@ -37,6 +37,17 @@ flask --app benno:create_app run
 
 Open `http://127.0.0.1:5000` in a browser.
 
+To open BENNO from another device in the same local network, start Flask with a
+LAN-visible host:
+
+```powershell
+flask --app benno:create_app run --host 0.0.0.0 --port 5000
+```
+
+On the current development PC, the iPad URL is usually
+`http://192.168.0.42:5000`. If the page does not load, check that Windows
+Firewall allows incoming connections on port `5000`.
+
 ## Demo Logins
 
 After running `seed-db` or `reset-db --yes`, these Solar Sales mock users are

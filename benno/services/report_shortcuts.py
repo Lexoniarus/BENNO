@@ -286,15 +286,17 @@ def _explicit_strength_weakness_markers(
     marker_specs = (
         (
             "strength_text",
-            r"\b(?:st[äa]rke|staerke|st[äa]rken|staerken|positiv|"
+            r"\b(?:st[äa]rke|staerke|st[äa]rken|staerken|"
             r"positive punkte|pluspunkt|pluspunkte)\b"
-            r"\s*(?:ist|sind|war|waren|:|-)?",
+            r"\s*(?:ist|sind|war|waren|:|-)?"
+            r"|\bpositiv\s+(?:ist|sind|war|waren|:|-)\s*",
         ),
         (
             "weakness_text",
             r"\b(?:schw[äa]che|schwaeche|schw[äa]chen|schwaechen|"
-            r"risiko|risiken|einwand|einw[äa]nde|einwaende|negativ)\b"
-            r"\s*(?:ist|sind|war|waren|:|-)?",
+            r"risiko|risiken|einwand|einw[äa]nde|einwaende)\b"
+            r"\s*(?:ist|sind|war|waren|:|-)?"
+            r"|\bnegativ\s+(?:ist|sind|war|waren|:|-)\s*",
         ),
     )
     markers = []
