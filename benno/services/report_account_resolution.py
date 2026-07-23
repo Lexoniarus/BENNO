@@ -44,6 +44,7 @@ CLASSIFICATION_WORDS = frozenset(
 CONTEXT_FILLER_WORDS = frozenset(
     {
         "also",
+        "aus",
         "das",
         "der",
         "die",
@@ -54,9 +55,19 @@ CONTEXT_FILLER_WORDS = frozenset(
         "einer",
         "es",
         "geht",
+        "in",
         "ist",
         "sind",
         "um",
+    }
+)
+CONTEXT_QUALIFIER_WORDS = frozenset(
+    {
+        "deutschland",
+        "nrw",
+        "nordrhein",
+        "nordrhein-westfalen",
+        "westfalen",
     }
 )
 
@@ -160,7 +171,9 @@ def _is_concrete_context_name(candidate: str) -> bool:
     meaningful_tokens = [
         token
         for token in tokens
-        if token not in CONTEXT_FILLER_WORDS and token not in CLASSIFICATION_WORDS
+        if token not in CONTEXT_FILLER_WORDS
+        and token not in CLASSIFICATION_WORDS
+        and token not in CONTEXT_QUALIFIER_WORDS
     ]
     if not meaningful_tokens:
         return False

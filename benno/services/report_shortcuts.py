@@ -397,7 +397,7 @@ def looks_like_reference(normalized_text: str) -> bool:
 
 def mentions_new(normalized_text: str) -> bool:
     """Return whether normalized text indicates new master data."""
-    return any(keyword in normalized_text for keyword in ("new", "neu", "unknown"))
+    return re.search(r"\b(?:new|neu|unknown)\b", normalized_text) is not None
 
 
 def mentions_lead(message_text: str) -> bool:

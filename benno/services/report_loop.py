@@ -583,7 +583,10 @@ def _mark_report_confirmed(chat: Chat, draft: ReportDraft) -> None:
 
 
 def _record_confirmation_message(chat: Chat) -> None:
-    _add_assistant_message(chat, "The visit report has been confirmed and saved.")
+    _add_assistant_message(
+        chat,
+        "Der Besuchsbericht wurde bestätigt und in Mock-eNVenta gespeichert.",
+    )
 
 
 def cancel_report(chat: Chat) -> None:
@@ -592,7 +595,7 @@ def cancel_report(chat: Chat) -> None:
     _ensure_report_is_mutable(chat)
     chat.status = ReportStatus.CANCELLED.value
     draft.report_status = ReportStatus.CANCELLED.value
-    _add_assistant_message(chat, "The visit report has been cancelled.")
+    _add_assistant_message(chat, "Der Besuchsbericht wurde abgebrochen.")
     db.session.commit()
 
 

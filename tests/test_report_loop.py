@@ -20,6 +20,7 @@ from benno.services.report_loop import (
     apply_report_correction,
     apply_report_corrections,
     build_report_review,
+    cancel_report,
     confirm_report,
     process_report_message_with_ai,
     start_report_chat,
@@ -226,6 +227,44 @@ def test_new_interested_account_name_completes_akl_name_but_keeps_type(app) -> N
     assert draft.draft_data_json["answers"]["visit_context"] == "SunSolar"
     assert draft.draft_data_json["account_type_override"] == "A"
     assert draft.customer_context_type == "new_lead"
+    assert draft.draft_data_json["current_step"] == "visit_type"
+
+
+def test_new_interested_account_region_does_not_complete_akl_name(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+
+    process_report_message_with_ai(
+        chat,
+        "Neuer potenzieller Kunde in NRW.",
+        _FakeAiService(),
+    )
+
+    draft = chat.report_draft
+    assert draft.customer_context_type == "new_lead"
+    assert draft.draft_data_json["account_type_override"] == "A"
+    assert "visit_context" not in draft.draft_data_json.get("answers", {})
+    assert "visit_context" not in draft.draft_data_json.get("completed_steps", [])
+    assert draft.draft_data_json["current_step"] == "visit_context"
+    assert chat.messages[-1].message_text == (
+        "Wie heißt die Firma oder Adresse des neuen Interessenten?"
+    )
+
+
+def test_company_name_starting_with_neue_is_not_treated_as_new_lead(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+
+    process_report_message_with_ai(
+        chat,
+        "Neue Energie GmbH",
+        _FakeAiService(),
+    )
+
+    draft = chat.report_draft
+    assert draft.draft_data_json["answers"]["visit_context"] == "Neue Energie GmbH"
+    assert draft.customer_context_type == "unclear"
+    assert "account_type_override" not in draft.draft_data_json
     assert draft.draft_data_json["current_step"] == "visit_type"
 
 
@@ -882,6 +921,19 @@ def test_confirm_report_creates_mock_visit_report_and_reminder(app) -> None:
     assert mock_visit_report.priority_rating == 9
     assert reminder.message
     assert chat.status == ReportStatus.CONFIRMED.value
+    assert chat.messages[-1].message_text == (
+        "Der Besuchsbericht wurde bestätigt und in Mock-eNVenta gespeichert."
+    )
+
+
+def test_cancel_report_records_german_assistant_message(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+
+    cancel_report(chat)
+
+    assert chat.status == ReportStatus.CANCELLED.value
+    assert chat.messages[-1].message_text == "Der Besuchsbericht wurde abgebrochen."
 
 
 def test_review_shows_enventa_target_sections(app) -> None:
