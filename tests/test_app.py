@@ -65,6 +65,21 @@ def test_report_chat_css_reserves_space_for_sticky_composer() -> None:
     assert "scroll-padding-bottom: 260px;" in css_text
 
 
+def test_active_sales_templates_use_akl_wording() -> None:
+    template_names = [
+        "report_chat.html",
+        "open_reports.html",
+        "completed_reports.html",
+    ]
+    for template_name in template_names:
+        template_text = (
+            _project_root() / "benno" / "templates" / "sales" / template_name
+        ).read_text(encoding="utf-8")
+
+        assert "Kunde/Lead" not in template_text
+        assert "AKL" in template_text
+
+
 def test_create_app_uses_testing_configuration() -> None:
     app = create_app("testing")
 

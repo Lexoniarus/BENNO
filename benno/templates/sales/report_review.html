@@ -46,6 +46,7 @@
           Mock-eNVenta-Bereich.
         </p>
         <form class="form-stack review-correction" method="post" action="{{ url_for('sales.report_correction', chat_id=chat.id) }}">
+          <input type="hidden" name="structured_correction_form" value="1">
           <div class="review-correction-grid">
             {% for field in review.structured_correction_fields %}
               <div class="form-field">
@@ -63,6 +64,8 @@
                   </select>
                 {% elif field.type == "number" %}
                   <input id="correction_{{ field.key }}" name="correction_{{ field.key }}" type="number" min="1" max="10" value="{{ field.value }}">
+                {% elif field.type == "date" %}
+                  <input id="correction_{{ field.key }}" name="correction_{{ field.key }}" type="date" value="{{ field.value }}">
                 {% else %}
                   <input id="correction_{{ field.key }}" name="correction_{{ field.key }}" type="text" value="{{ field.value }}">
                 {% endif %}

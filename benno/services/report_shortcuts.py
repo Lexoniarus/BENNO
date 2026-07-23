@@ -307,7 +307,17 @@ def mentions_new(normalized_text: str) -> bool:
 
 def mentions_lead(message_text: str) -> bool:
     """Return whether text explicitly mentions a lead."""
-    return "lead" in message_text.lower()
+    normalized_text = message_text.lower()
+    return any(
+        keyword in normalized_text
+        for keyword in (
+            "lead",
+            "interessent",
+            "potenzieller kunde",
+            "potentieller kunde",
+            "prospect",
+        )
+    )
 
 
 def mentions_inside_sales_follow_up(message_text: str) -> bool:

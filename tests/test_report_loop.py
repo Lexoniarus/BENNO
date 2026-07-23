@@ -2,7 +2,8 @@
 
 from datetime import date
 
-from benno.enums import MessageSender, ReportStatus, UserIntent, VisitType
+from benno.enums import MessageSender, MessageType, ReportStatus, UserIntent, VisitType
+from benno.extensions import db
 from benno.models import MockReminder, MockVisitReport, User
 from benno.seed import seed_database
 from benno.services.ai_provider import AiMessageAnalysis, AiProviderError
@@ -17,6 +18,7 @@ from benno.services.mock_crm import (
 from benno.services.report_ai_context import ai_message_context
 from benno.services.report_loop import (
     apply_report_correction,
+    apply_report_corrections,
     build_report_review,
     confirm_report,
     process_report_message_with_ai,
@@ -25,8 +27,10 @@ from benno.services.report_loop import (
 from benno.services.report_review import normalize_report_display_text
 from benno.services.report_shortcuts import (
     extract_strength_weakness_answers,
+    mentions_lead,
     parse_visit_date,
 )
+from benno.services.report_state import REMINDER_SUPPRESSED_KEY
 from benno.services.report_steps import step_by_key
 
 
@@ -157,6 +161,11 @@ def test_visit_type_is_inferred_from_free_visit_context_message(app) -> None:
     assert chat.messages[-1].message_text != (
         "War der Besuch persönlich, virtuell oder telefonisch?"
     )
+
+
+def test_german_interessent_terms_count_as_lead_signal() -> None:
+    assert mentions_lead("Das ist ein neuer Interessent.")
+    assert mentions_lead("Das ist ein potenzieller Kunde.")
 
 
 def test_rating_clues_are_extracted_from_later_bundle_without_ai_rating_update(
@@ -786,6 +795,86 @@ def test_structured_review_corrections_update_akl_and_rating_fields(app) -> None
     assert "ai_cache" not in draft.draft_data_json
 
 
+def test_report_correction_batch_is_atomic(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+    draft = chat.report_draft
+    original_answers = dict(draft.draft_data_json["answers"])
+    original_priority = dict(draft.ratings_json["priority_rating"])
+    original_correction_count = _correction_message_count(chat)
+
+    try:
+        apply_report_corrections(
+            chat,
+            [
+                ("visit_context", "Solar Sales Test GmbH"),
+                ("priority_rating", "kein Zahlenwert"),
+            ],
+        )
+    except ValueError as error:
+        assert "Rating correction" in str(error)
+    else:
+        raise AssertionError("Invalid batch correction should fail.")
+
+    db.session.refresh(draft)
+    assert draft.draft_data_json["answers"] == original_answers
+    assert draft.ratings_json["priority_rating"] == original_priority
+    assert _correction_message_count(chat) == original_correction_count
+
+
+def test_empty_optional_review_corrections_clear_writeback_values(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+
+    apply_report_corrections(
+        chat,
+        [
+            ("offer_reference", ""),
+            ("order_reference", ""),
+            ("strength_text", ""),
+            ("weakness_text", ""),
+            ("reminder_message", ""),
+        ],
+    )
+
+    draft = chat.report_draft
+    answers = draft.draft_data_json["answers"]
+    review = build_report_review(draft, _FakeAiService())
+
+    assert answers["offer_reference"] == "keiner"
+    assert answers["order_reference"] == "keiner"
+    assert "strength_text" not in answers
+    assert "weakness_text" not in answers
+    assert draft.draft_data_json[REMINDER_SUPPRESSED_KEY] is True
+    assert dict(review["sections"])["Wiedervorlagen"] == "Keine"
+
+    final_report = confirm_report(chat, _FakeAiService())
+    reminder_count = MockReminder.query.filter_by(
+        visit_report_number=final_report.mock_visit_report.visit_report_number
+    ).count()
+    assert reminder_count == 0
+
+
+def test_empty_required_review_correction_is_rejected(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+    draft = chat.report_draft
+    original_answers = dict(draft.draft_data_json["answers"])
+
+    try:
+        apply_report_corrections(chat, [("visit_context", "")])
+    except ValueError as error:
+        assert "must not be empty" in str(error)
+    else:
+        raise AssertionError("Empty required correction should fail.")
+
+    db.session.refresh(draft)
+    assert draft.draft_data_json["answers"] == original_answers
+
+
 def test_indienst_near_miss_creates_mock_reminder_on_confirm(app) -> None:
     seed_database()
     chat = _start_sales_chat()
@@ -851,6 +940,14 @@ def test_report_loop_can_use_injected_crm_gateway(app) -> None:
 def _start_sales_chat():
     sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     return start_report_chat(sales_user)
+
+
+def _correction_message_count(chat) -> int:
+    return sum(
+        1
+        for message in chat.messages
+        if message.message_type == MessageType.CORRECTION.value
+    )
 
 
 def _process_all_required_until_ratings(chat) -> None:

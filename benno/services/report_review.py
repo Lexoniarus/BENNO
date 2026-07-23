@@ -3,7 +3,7 @@
 import re
 from typing import Any
 
-from benno.enums import AccountType, CustomerContextType
+from benno.enums import AccountType, CustomerContextType, VisitType
 from benno.extensions import db
 from benno.models import ReportDraft
 from benno.services.ai_provider import AiProviderError, AiService
@@ -13,6 +13,7 @@ from benno.services.report_state import (
     ACCOUNT_TYPE_OVERRIDE_KEY,
     AI_CACHE_KEY,
     INSIDE_SALES_FOLLOW_UP_KEY,
+    REMINDER_SUPPRESSED_KEY,
     crm_reference,
     display_value,
     draft_data,
@@ -120,9 +121,22 @@ def structured_correction_fields(draft: ReportDraft) -> list[dict[str, Any]]:
             options=account_type_options(),
         ),
         _correction_field(
+            "visit_type",
+            "Besuchsart",
+            draft.visit_type,
+            field_type="select",
+            options=visit_type_options(),
+        ),
+        _correction_field(
             "participants",
             "Kontakt/Teilnehmer",
             answers.get("participants"),
+        ),
+        _correction_field(
+            "visit_date",
+            "Besuchsdatum",
+            draft.visit_date.isoformat() if draft.visit_date else "",
+            field_type="date",
         ),
         _correction_field("target_topic", "Ziel/Thema", answers.get("target_topic")),
         _correction_field("info_text", "Info", draft.summary, field_type="textarea"),
@@ -137,6 +151,12 @@ def structured_correction_fields(draft: ReportDraft) -> list[dict[str, Any]]:
             "Nächster Schritt",
             draft.next_action,
             field_type="textarea",
+        ),
+        _correction_field(
+            "next_appointment_date",
+            "Termin ab",
+            draft.follow_up_date.isoformat() if draft.follow_up_date else "",
+            field_type="date",
         ),
         _correction_field(
             "offer_reference",
@@ -198,6 +218,15 @@ def account_type_options() -> list[tuple[str, str]]:
         (AccountType.ADDRESS.value, "Adresse / Interessent"),
         (AccountType.CUSTOMER.value, "Kunde"),
         (AccountType.SUPPLIER.value, "Lieferant"),
+    ]
+
+
+def visit_type_options() -> list[tuple[str, str]]:
+    """Return selectable visit type labels."""
+    return [
+        (VisitType.IN_PERSON.value, "Vor Ort"),
+        (VisitType.VIRTUAL.value, "Virtuell"),
+        (VisitType.PHONE.value, "Telefonisch"),
     ]
 
 
@@ -438,6 +467,8 @@ def reminder_preview_titles(draft: ReportDraft) -> list[str]:
 def draft_has_reminder_request(draft: ReportDraft) -> bool:
     """Return whether the draft should create a follow-up reminder."""
     data = draft_data(draft)
+    if data.get(REMINDER_SUPPRESSED_KEY):
+        return False
     if data.get(INSIDE_SALES_FOLLOW_UP_KEY):
         return True
 

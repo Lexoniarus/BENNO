@@ -282,8 +282,12 @@ def test_report_review_renders_structured_correction_fields(app) -> None:
         response = client.get(f"/sales/reports/{chat.id}/review")
 
     assert response.status_code == 200
+    assert b"structured_correction_form" in response.data
     assert b"correction_visit_context" in response.data
     assert b"correction_account_type" in response.data
+    assert b"correction_visit_type" in response.data
+    assert b"correction_visit_date" in response.data
+    assert b"correction_next_appointment_date" in response.data
     assert b"correction_priority_rating" in response.data
 
 

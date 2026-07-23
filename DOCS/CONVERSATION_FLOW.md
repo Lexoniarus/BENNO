@@ -233,8 +233,8 @@ record:
 | `unclear` | BENNO cannot decide and must ask |
 
 The UI and review should make this distinction visible. A report should not only
-show a generic "Kunde/Lead/Kontakt" label when the relevant eNVenta target is an
-AKL account plus separately linked contacts.
+show one generic mixed customer/lead/contact label when the relevant eNVenta
+target is an AKL account plus separately linked contacts.
 
 New accounts, contacts, offers, or orders must not be created automatically.
 BENNO may capture the information as report text. Follow-up work is handled
@@ -365,6 +365,11 @@ It should include:
 - report status
 
 No final report may be saved or submitted without explicit user confirmation.
+Assistant messages such as "understood" or "I have captured this" are not
+writeback confirmations. They only describe the current draft state. The
+writeback boundary is the review screen: BENNO may save to `mock_visit_reports`
+and create `MockReminder` records only after the user confirms the complete
+Mock-eNVenta write block.
 
 During review, the user may:
 
@@ -390,8 +395,10 @@ one free text field. It should allow direct field-level correction for at least:
 - eNVenta ratings
 
 The Phase 9 stabilization patch implements these corrections as structured
-review fields that still feed the existing backend correction path. This keeps
-the review safe while making common STT corrections much faster.
+review fields that still feed the existing backend correction path. Structured
+review corrections are applied as one atomic correction batch: either all changed
+fields are valid and saved back to the draft, or none of them are saved. This
+keeps the review safe while making common STT corrections much faster.
 
 Follow-up reminders also need special review attention. If the transcript or
 assistant summary clearly says that inside sales should call, follow up, or

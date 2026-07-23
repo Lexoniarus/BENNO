@@ -201,9 +201,9 @@ correct the structured review before saving.
 Voice review findings to keep visible for stabilization:
 
 - distinguish the eNVenta-like AKL account type clearly instead of showing only
-  generic "Kunde/Lead/Kontakt" wording; the Phase 9 stabilization patch starts
-  this by showing AKL name, AKL type, and contact/participants separately in
-  review/final screens
+  one generic mixed account/contact label; the Phase 9 stabilization patch shows
+  AKL name, AKL type, and contact/participants separately in review/final
+  screens
 - keep contacts or participants separate from the AKL account
 - make account/lead names directly editable in review because STT may mishear
   names; direct structured review fields are the MVP correction path

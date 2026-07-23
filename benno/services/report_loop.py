@@ -61,6 +61,7 @@ from benno.services.report_shortcuts import (
 from benno.services.report_state import (
     ACCOUNT_TYPE_OVERRIDE_KEY,
     INSIDE_SALES_FOLLOW_UP_KEY,
+    REMINDER_SUPPRESSED_KEY,
     clear_crm_reference,
     crm_reference_value,
     draft_data,
@@ -96,8 +97,17 @@ MUTABLE_REPORT_STATUSES = {
     ReportStatus.IN_PROGRESS.value,
     ReportStatus.READY_FOR_REVIEW.value,
 }
+EMPTY_CORRECTION_KEYS = {
+    "next_appointment_date",
+    "offer_reference",
+    "order_reference",
+    "strength_text",
+    "weakness_text",
+    "reminder_message",
+}
 __all__ = [
     "apply_report_correction",
+    "apply_report_corrections",
     "build_report_review",
     "cancel_report",
     "confirm_report",
@@ -225,43 +235,155 @@ def apply_report_correction(
     crm_gateway: CrmGateway | None = None,
 ) -> Chat:
     """Apply a targeted correction during final review."""
+    return apply_report_corrections(chat, [(field_key, correction_text)], crm_gateway)
+
+
+def apply_report_corrections(
+    chat: Chat,
+    corrections: list[tuple[str, str]],
+    crm_gateway: CrmGateway | None = None,
+) -> Chat:
+    """Apply targeted review corrections as one atomic change."""
     draft = _require_draft(chat)
     _ensure_report_is_mutable(chat)
     gateway = crm_gateway or get_crm_gateway()
     if not draft_is_ready_for_review(draft):
         raise ValueError("Corrections are only available during final review.")
 
-    normalized_correction = correction_text.strip()
-    if not normalized_correction:
-        raise ValueError("Correction text must not be empty.")
+    normalized_corrections = _normalized_report_corrections(corrections)
+    if not normalized_corrections:
+        raise ValueError("No correction changes were provided.")
 
-    if _apply_special_report_correction(draft, field_key, normalized_correction):
-        _record_saved_correction(chat, field_key, normalized_correction)
+    try:
+        with db.session.begin_nested():
+            for field_key, correction_text in normalized_corrections:
+                _apply_report_correction_value(
+                    draft,
+                    field_key,
+                    correction_text,
+                    gateway,
+                )
+
+            _record_saved_corrections(chat, normalized_corrections)
+
         db.session.commit()
-        return chat
-
-    correction_step = _correction_step(field_key)
-    _apply_requirement_answer(draft, correction_step, normalized_correction, gateway)
-    refresh_missing_sections(draft)
-    draft.report_status = ReportStatus.READY_FOR_REVIEW.value
-    chat.status = ReportStatus.READY_FOR_REVIEW.value
-    draft.last_question = "Korrektur gespeichert. Bitte prüfe den Bericht erneut."
-    draft.draft_data_json = {
-        **draft_data(draft),
-        "current_step": REVIEW_STEP,
-    }
-    set_section_status(draft, ReportSection.FINAL_REPORT, SectionStatus.DETECTED)
-    _add_correction_message(chat, correction_step.key, normalized_correction)
-    _add_assistant_message(chat, draft.last_question)
-    db.session.commit()
+    except ValueError:
+        db.session.rollback()
+        raise
 
     return chat
 
 
-def _record_saved_correction(
-    chat: Chat,
+def _normalized_report_corrections(
+    corrections: list[tuple[str, str]],
+) -> list[tuple[str, str]]:
+    normalized_corrections = []
+    for field_key, correction_text in corrections:
+        clean_field_key = field_key.strip()
+        clean_correction_text = correction_text.strip()
+        if not clean_field_key:
+            raise ValueError("Unknown correction field.")
+        if not clean_correction_text and clean_field_key not in EMPTY_CORRECTION_KEYS:
+            raise ValueError("Correction text must not be empty.")
+
+        normalized_corrections.append((clean_field_key, clean_correction_text))
+
+    return normalized_corrections
+
+
+def _apply_report_correction_value(
+    draft: ReportDraft,
     field_key: str,
     correction_text: str,
+    crm_gateway: CrmGateway,
+) -> None:
+    if not correction_text:
+        _apply_empty_report_correction(draft, field_key)
+        return
+
+    if _apply_special_report_correction(draft, field_key, correction_text):
+        return
+
+    correction_step = _correction_step(field_key)
+    _apply_requirement_answer(draft, correction_step, correction_text, crm_gateway)
+
+
+def _apply_empty_report_correction(
+    draft: ReportDraft,
+    field_key: str,
+) -> None:
+    if field_key not in EMPTY_CORRECTION_KEYS:
+        raise ValueError("Correction text must not be empty.")
+
+    clear_ai_cache(draft)
+    if field_key == "next_appointment_date":
+        _clear_next_appointment_correction(draft)
+    elif field_key == "offer_reference":
+        _clear_offer_reference_correction(draft)
+    elif field_key == "order_reference":
+        _clear_order_reference_correction(draft)
+    elif field_key in {"strength_text", "weakness_text"}:
+        _clear_optional_text_correction(draft, field_key)
+    elif field_key == "reminder_message":
+        _clear_reminder_correction(draft)
+
+
+def _clear_next_appointment_correction(draft: ReportDraft) -> None:
+    draft.follow_up_date = None
+    _replace_requirement_answer(draft, "next_appointment_date", "keine")
+    set_section_status(
+        draft,
+        ReportSection.NEXT_APPOINTMENT_DATE,
+        SectionStatus.NOT_APPLICABLE,
+    )
+
+
+def _clear_offer_reference_correction(draft: ReportDraft) -> None:
+    draft.related_offer_id = None
+    draft.external_offer_reference = None
+    clear_crm_reference(draft, "offer")
+    _replace_requirement_answer(draft, "offer_reference", "keiner")
+    set_section_status(
+        draft, ReportSection.OFFER_REFERENCE, SectionStatus.NOT_APPLICABLE
+    )
+
+
+def _clear_order_reference_correction(draft: ReportDraft) -> None:
+    draft.related_order_id = None
+    clear_crm_reference(draft, "order")
+    data = draft_data(draft)
+    data["order_reference_raw"] = None
+    draft.draft_data_json = data
+    _replace_requirement_answer(draft, "order_reference", "keiner")
+    set_section_status(
+        draft, ReportSection.ORDER_REFERENCE, SectionStatus.NOT_APPLICABLE
+    )
+
+
+def _clear_optional_text_correction(draft: ReportDraft, field_key: str) -> None:
+    data = draft_data(draft)
+    data.pop(field_key, None)
+    draft.draft_data_json = data
+    remove_draft_answer(draft, field_key)
+    if field_key == "strength_text":
+        set_section_status(draft, ReportSection.STRENGTHS, SectionStatus.OPEN)
+    else:
+        set_section_status(draft, ReportSection.WEAKNESSES, SectionStatus.OPEN)
+
+
+def _clear_reminder_correction(draft: ReportDraft) -> None:
+    data = draft_data(draft)
+    data.pop(INSIDE_SALES_FOLLOW_UP_KEY, None)
+    data.pop("reminder_message", None)
+    data[REMINDER_SUPPRESSED_KEY] = True
+    draft.draft_data_json = data
+    remove_draft_answer(draft, "reminders")
+    set_section_status(draft, ReportSection.REMINDERS, SectionStatus.OPEN)
+
+
+def _record_saved_corrections(
+    chat: Chat,
+    corrections: list[tuple[str, str]],
 ) -> None:
     draft = _require_draft(chat)
     refresh_missing_sections(draft)
@@ -273,8 +395,15 @@ def _record_saved_correction(
         "current_step": REVIEW_STEP,
     }
     set_section_status(draft, ReportSection.FINAL_REPORT, SectionStatus.DETECTED)
-    _add_correction_message(chat, field_key, correction_text)
+    _add_correction_message(chat, "review", _correction_summary(corrections))
     _add_assistant_message(chat, draft.last_question)
+
+
+def _correction_summary(corrections: list[tuple[str, str]]) -> str:
+    return "; ".join(
+        f"{field_key}: {correction_text or 'leer'}"
+        for field_key, correction_text in corrections
+    )
 
 
 def _apply_special_report_correction(
@@ -324,12 +453,14 @@ def _apply_reminder_correction(
     if is_none_answer(correction_text):
         data.pop(INSIDE_SALES_FOLLOW_UP_KEY, None)
         data.pop("reminder_message", None)
+        data[REMINDER_SUPPRESSED_KEY] = True
         draft.draft_data_json = data
         return
 
     draft.draft_data_json = {
         **data,
         INSIDE_SALES_FOLLOW_UP_KEY: True,
+        REMINDER_SUPPRESSED_KEY: False,
         "reminder_message": correction_text,
     }
 
@@ -847,6 +978,7 @@ def _apply_inside_sales_follow_up_signal(
     draft.draft_data_json = {
         **draft_data(draft),
         INSIDE_SALES_FOLLOW_UP_KEY: True,
+        REMINDER_SUPPRESSED_KEY: False,
     }
 
 
@@ -1264,6 +1396,7 @@ def _apply_next_action_answer(draft: ReportDraft, answer_text: str) -> None:
         draft.draft_data_json = {
             **draft_data(draft),
             INSIDE_SALES_FOLLOW_UP_KEY: True,
+            REMINDER_SUPPRESSED_KEY: False,
             "reminder_message": answer_text,
         }
 
@@ -1353,6 +1486,7 @@ def _apply_reminder_answer(draft: ReportDraft, message_text: str) -> None:
     draft.draft_data_json = {
         **draft_data(draft),
         INSIDE_SALES_FOLLOW_UP_KEY: True,
+        REMINDER_SUPPRESSED_KEY: False,
         "reminder_message": message_text,
     }
 

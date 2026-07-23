@@ -22,6 +22,7 @@ from benno.models import Chat, ChatMessage, FinalReport
 from benno.services.ai_provider import get_ai_service, get_ai_status
 from benno.services.report_loop import (
     apply_report_correction,
+    apply_report_corrections,
     build_report_review,
     cancel_report,
     confirm_report,
@@ -262,10 +263,13 @@ def report_correction(chat_id: int):
     field_key = request.form.get("field_key", "").strip()
     correction_text = request.form.get("correction_text", "").strip()
     structured_corrections = _structured_review_corrections(request.form)
+    is_structured_form = request.form.get("structured_correction_form") == "1"
     try:
-        if structured_corrections:
-            for structured_field_key, structured_text in structured_corrections:
-                apply_report_correction(chat, structured_field_key, structured_text)
+        if is_structured_form:
+            if structured_corrections:
+                apply_report_corrections(chat, structured_corrections)
+            else:
+                flash("Keine Änderungen erkannt.", "info")
         else:
             apply_report_correction(chat, field_key, correction_text)
     except ValueError as error:
@@ -421,7 +425,7 @@ def _structured_review_corrections(form_data: Any) -> list[tuple[str, str]]:
         field_key = key.removeprefix("correction_")
         value = form_data.get(key, "").strip()
         original_value = form_data.get(f"original_{field_key}", "").strip()
-        if not value or value == original_value:
+        if value == original_value:
             continue
 
         corrections.append((field_key, value))
