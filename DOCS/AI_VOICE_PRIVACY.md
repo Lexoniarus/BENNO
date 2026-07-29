@@ -228,6 +228,16 @@ but the visible `Sprachmodus starten` control remains available. After voice
 activation, BENNO may continue the turn loop automatically until the user stops
 voice mode, the report reaches review, or an error requires text fallback.
 
+Mobile browser testing added a second boundary: microphone capture on phones
+and tablets requires a secure browser context. A local desktop browser may allow
+`localhost`, but an iPad or phone opening BENNO through plain LAN HTTP such as
+`http://192.168.x.x:5000` will block microphone access. For mobile hands-free
+testing and any later real use, BENNO therefore needs an HTTPS deployment path.
+The preferred product direction is a public but access-controlled HTTPS
+deployment, or an equivalent trusted internal HTTPS setup. This is an
+infrastructure requirement for browser microphone access, not an STT, TTS, or
+report-loop behavior change.
+
 The browser should handle microphone access and recording. The backend should
 coordinate the actual transcription path so BENNO keeps one stable server-side
 STT boundary. Browser-native speech recognition may be tested as an experiment,
@@ -374,7 +384,11 @@ Main risks:
 
 - AI extraction may be unreliable for free-form text.
 - Local models may be weaker than Gemini for structured extraction.
+- Local models may struggle more than Gemini with noisy German STT transcripts,
+  especially for company names, people names, and domain-specific terms.
 - Long prompts may become expensive or slow.
+- Mobile voice requires HTTPS. Plain LAN HTTP is not enough for browser
+  microphone access on phones and tablets.
 - Sensitive content must not be logged unnecessarily.
 - Raw audio must not accidentally become persistent business data.
 - Provider switching must not change business rules.
