@@ -37,6 +37,19 @@ def test_new_report_redirects_with_voice_autostart_intent(app) -> None:
     assert response.location.endswith("?voice=auto")
 
 
+def test_in_progress_report_chat_autostarts_without_query_flag(app) -> None:
+    seed_database()
+    sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
+    chat = start_report_chat(sales_user)
+
+    with app.test_client() as client:
+        _login(client)
+        response = client.get(f"/sales/reports/{chat.id}")
+
+    assert response.status_code == 200
+    assert b'data-voice-auto-start="true"' in response.data
+
+
 def test_confirmed_report_chat_does_not_render_voice_autostart(app) -> None:
     seed_database()
 

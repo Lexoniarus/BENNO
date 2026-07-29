@@ -63,6 +63,14 @@ Instead, Gemini should return section updates as a list of explicit objects:
 
 The provider may translate this provider-specific shape into BENNO's internal provider contract before the report loop receives it. This keeps the application interface stable while avoiding Gemini Developer API schema issues around free-form object properties.
 
+Gemini does support structured output through JSON response schemas. BENNO
+should still treat this as an interface guarantee, not as a truth guarantee. A
+schema-valid response can still be semantically wrong, too confident, or based
+on a noisy STT transcript. For that reason, provider output remains a proposal:
+BENNO validates allowed fields, keeps confidence and clarification signals
+visible in the flow, asks follow-up questions when something is unclear, and
+requires the review screen before any Mock-eNVenta writeback.
+
 References:
 
 - [Gemini Structured Outputs](https://ai.google.dev/gemini-api/docs/structured-output)

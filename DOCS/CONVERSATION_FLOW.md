@@ -175,6 +175,14 @@ about the uncertain field. A low-confidence `visit_type` question should not be
 the bare fallback question if the message already described the account, lead,
 or next action.
 
+Structured provider output does not change this rule. Gemini may return a valid
+JSON object that matches BENNO's schema, but the content can still be
+semantically uncertain. When the model extracts something with low confidence,
+conflicting evidence, or a noisy STT transcript, BENNO should ask back in plain
+German, for example: `Ich habe verstanden: ... Ist das korrekt?` The assistant
+message may confirm a draft interpretation, but it must not sound like the data
+has already been written to Mock-eNVenta.
+
 ## Target Sections
 
 Each detected intent should include the affected report sections.

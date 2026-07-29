@@ -80,7 +80,9 @@ Roles:
 - `sales_rep`
 - `admin`
 
-For the first implementation, seeded demo users are sufficient. Setup links and password reset flows can be added later.
+For the current local MVP, seeded demo users remain the main test baseline.
+Local setup and password reset links exist in the admin UI, but there is no
+email delivery or production identity-management system.
 
 ## Mock CRM Data
 

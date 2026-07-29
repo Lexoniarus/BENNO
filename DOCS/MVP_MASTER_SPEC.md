@@ -73,7 +73,7 @@ The MVP includes:
 Current scope boundaries:
 
 - The first vertical slice is text-based.
-- STT and TTS are added after the text-based Gemini workflow can create and save a stable report. This condition is now met by the Phase 6/8 baseline, so voice is the next planned implementation phase.
+- The first vertical slice was text-based. The Phase 6/8 baseline can create and save a stable report, and Phase 9 now implements the first turn-based STT/TTS layer on top.
 - The MVP uses a local placeholder CRM/ERP service before any real eNVenta integration.
 - The first screenshot-based eNVenta visit report field mapping is documented and used for the Phase 6 mock target.
 - The admin area stays simple in the first slice.
@@ -323,7 +323,7 @@ If local models are used, they may require tighter application-side control:
 
 Speech-to-text and text-to-speech are layers over the text workflow.
 
-The next implementation phase adds the first practical voice layer.
+Phase 9 adds the first practical voice layer.
 
 The frontend records microphone audio and plays generated audio. The backend coordinates transcription and speech synthesis.
 
@@ -753,7 +753,7 @@ The following decisions remain open, deferred, or dependent on external input:
 | Local LLM candidates | Later provider work should evaluate LM Studio through an OpenAI-compatible local API after admin configuration and demo stabilization |
 | eNVenta visit report fields | First screenshot-based field mapping is documented; Phase 6 uses an eNVenta-shaped mock target rather than a real eNVenta API |
 | Placeholder CRM/ERP API contract | Phase 6 defines an internal CRM/eNVenta gateway boundary backed by local mock tables; Postgres or real eNVenta access can replace the backend later |
-| Setup/password reset token flow | Needs clarification: decide whether the first slice needs real setup/reset tokens or only seeded demo users |
+| Setup and reset links | Local setup and reset links are implemented for the admin UI; email delivery and production identity management remain later |
 | HTTPS deployment | Needed for mobile browser microphone access; likely public but access-controlled for practical demos and later field use |
 | Production data access | Deferred until real system access is available; not part of the Masterschool demo because the demo must stay on mock data |
 

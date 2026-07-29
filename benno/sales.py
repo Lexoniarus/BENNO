@@ -439,7 +439,7 @@ def _voice_should_auto_start(chat: Chat) -> bool:
     if chat.status != ReportStatus.IN_PROGRESS.value:
         return False
 
-    return request.args.get("voice") == "auto"
+    return True
 
 
 def _speech_context(chat: Chat) -> dict[str, object]:
