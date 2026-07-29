@@ -522,12 +522,20 @@ Done when:
 - Error cases are handled understandably.
 - The text and first voice-assisted loop are stable enough for a mentor demo.
 
+Phase 10 should include an opt-in live functional test harness, documented in
+`PHASE_10_LIVE_FUNCTIONAL_TESTS.md`. This harness is automated and repeatable,
+but it is not part of the normal deterministic regression suite. It should
+exercise the real Gemini, Speaches, Kokoro/Martin, and optional Langfuse chain
+with deliberately fragile demo scenarios.
+
 Masterschool demo scope:
 
 - finish Phase 9 as a turn-based voice layer over the existing text report loop
 - keep text fallback and visible transcripts available at all times
 - harden structured review correction for noisy STT, especially AKL names,
   participants, ratings, and reminders
+- build opt-in live functional tests with real provider/voice calls and
+  Langfuse evidence for the risky demo paths
 - repeat and document the core demo scenarios against Mock-eNVenta data
 - show `FinalReport`, `MockVisitReport`, and `MockReminder` creation after
   explicit user confirmation

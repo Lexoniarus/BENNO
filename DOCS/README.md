@@ -17,8 +17,9 @@ Recommended reading order:
 7. `ENVENTA_FIELD_NOTES.md` for the first eNVenta visit report field observations and source classification
 8. `USER_ADMIN_SETTINGS.md` for login, role, language, and admin behavior
 9. `AI_VOICE_PRIVACY.md` for provider, voice, and privacy direction
-10. `DOCUMENTATION_COVERAGE.md` for the mapping from archived German notes to current English docs
-11. `archive_de/` only when historical German concept context is needed
+10. `PHASE_10_LIVE_FUNCTIONAL_TESTS.md` for the opt-in live demo test harness
+11. `DOCUMENTATION_COVERAGE.md` for the mapping from archived German notes to current English docs
+12. `archive_de/` only when historical German concept context is needed
 
 Archived documents:
 

@@ -22,6 +22,7 @@ Use these documents for current implementation and product work:
 | `USER_ADMIN_SETTINGS.md` | Users, roles, admin scope, language and provider settings |
 | `AI_VOICE_PRIVACY.md` | Provider strategy, Langfuse observability, voice layer, local provider direction, privacy |
 | `FRONTEND_UX_SPEC.md` | S:FLEX-near frontend direction, Sales/Admin UX rules, visual acceptance |
+| `PHASE_10_LIVE_FUNCTIONAL_TESTS.md` | Opt-in live functional test harness for Gemini, voice sidecars, and Langfuse evidence |
 
 ## Archived Source Mapping
 
