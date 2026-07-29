@@ -165,7 +165,7 @@ Build the logic deliberately simple at first. It does not need perfect AI extrac
 
 Report parts to check:
 
-- customer or lead
+- AKL context
 - contact person
 - visit reason
 - summary
@@ -380,7 +380,7 @@ Frontend goals:
 - make the Sales report workflow feel coherent on desktop, tablet, and phone
 - improve dashboard, open report, completed report, chat, review, and final
   report detail screens
-- show report context clearly, including account or lead, topic, status,
+- show report context clearly, including AKL context, topic, status,
   progress, and provider/debug state where useful
 - keep German user-facing workflow text consistent for the current MVP
 - avoid changing report business rules, eNVenta mapping, or provider behavior
@@ -480,7 +480,7 @@ Done when:
 
 Goal:
 
-BENNO is reliable enough to demo as a text-based MVP.
+BENNO is reliable enough to demo as a text and first voice-assisted MVP.
 
 Demo scenarios:
 

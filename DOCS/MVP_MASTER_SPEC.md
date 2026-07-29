@@ -644,7 +644,7 @@ The final review must be block-based and human-readable.
 
 It should include:
 
-- customer or lead context
+- AKL account/address context
 - contact persons or participants
 - visit reason
 - meeting summary

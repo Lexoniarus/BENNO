@@ -296,7 +296,7 @@ safety net.
 
 Examples:
 
-- A message can fill customer or lead, contact, and visit reason together.
+- A message can fill AKL context, participant/contact, and visit reason together.
 - An outcome message can also contain the next follow-up action.
 - A lead/no-offer statement can mark offer and order references as not applicable.
 - An inside-sales follow-up statement can create a follow-up signal for later task creation.
@@ -414,4 +414,4 @@ follow-up.
 - Corrections override previous assumptions.
 - Final save requires explicit confirmation.
 - New master data is not created automatically.
-- Inside sales tasks are created when master data or follow-up work is needed.
+- MockReminders are created when reviewable follow-up work is needed.

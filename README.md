@@ -6,8 +6,10 @@ BENNO is a guided visit report assistant for B2B field sales. The current
 project phase builds a Gemini-assisted German report workflow on top of the
 local Flask foundation, login, data model, and eNVenta-shaped mock CRM/ERP
 gateway. Confirmed reports are saved locally as mock visit reports with optional
-follow-up reminders. Voice, Postgres, real eNVenta access, and local AI are
-planned for later phases.
+follow-up reminders. The first Phase 9 voice layer is available through browser
+audio capture, local Speaches STT, and local Kokoro/Martin TTS. Postgres, real
+eNVenta access, production HTTPS deployment, and local AI are planned for later
+phases.
 
 ## Local Setup
 
@@ -47,6 +49,10 @@ flask --app benno:create_app run --host 0.0.0.0 --port 5000
 On the current development PC, the iPad URL is usually
 `http://192.168.0.42:5000`. If the page does not load, check that Windows
 Firewall allows incoming connections on port `5000`.
+
+Plain LAN HTTP is enough for page loading and TTS playback, but mobile browser
+microphone access requires HTTPS or another secure browser context. iPad and
+phone voice tests therefore need a later HTTPS setup.
 
 ## Demo Logins
 

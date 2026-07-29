@@ -89,7 +89,7 @@ Required screens:
 The report chat should feel conversational but controlled:
 
 - it is the visual reference for the whole Sales area
-- account or lead context is visible near the title
+- AKL context is visible near the title
 - provider/debug-safe status can be visible, for example Gemini active
 - chat history is the main area
 - report progress and Mock-eNVenta writeback details live in a compact right

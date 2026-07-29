@@ -153,7 +153,7 @@ The conversation should use these broad blocks:
 
 | Block | Purpose | Target fields |
 |---|---|---|
-| Visit context | Identify account or lead, contact or participants, and visit type. | `account_id` / `account_name`, `contact_id` / `contact_name`, `participants`, `visit_type` |
+| Visit context | Identify AKL account or address context, contact or participants, and visit type. | `account_id` / `account_name`, `contact_id` / `contact_name`, `participants`, `visit_type` |
 | Goal or topic | Capture the reason, goal, or main subject of the visit. | `target_topic` / `visit_topic` |
 | Discussion content | Capture what was discussed in free form. | `info_text` / `summary`, optional `strength_text`, optional `weakness_text` |
 | Agreement and next step | Capture decisions, next actions, ownership, and follow-up dates. | `agreement_text`, `outcome`, `next_action`, `next_appointment_date`, `reminders` |

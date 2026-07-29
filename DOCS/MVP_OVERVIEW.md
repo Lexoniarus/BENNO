@@ -169,7 +169,7 @@ The result is a visit report that is useful for humans and for a later CRM/ERP s
 
 The report can include:
 
-- which customer or lead is involved
+- which AKL account or address context is involved
 - who participated in the conversation
 - why the meeting took place
 - what was discussed

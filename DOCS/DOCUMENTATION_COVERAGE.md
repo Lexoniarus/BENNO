@@ -45,10 +45,13 @@ The following topics appeared in earlier notes but are not current implementatio
 - Sales users do not choose the AI provider.
 - SQLite is sufficient for the current local mock backend; Postgres remains a
   later MVP persistence step behind the CRM/eNVenta gateway boundary.
-- The first implementation starts with text, not voice.
+- The first implementation started with text. Phase 9 now adds a first
+  turn-based voice layer over the same report workflow.
 - Local AI is a later privacy-oriented provider step after the Gemini workflow is stable.
 - Langfuse is an optional development observability layer, not a business workflow dependency.
-- The exact eNVenta field mapping waits for Bernd's field list and must distinguish user input, derivation, master data, login context, and eNVenta system metadata.
+- The first screenshot-derived eNVenta visit report mapping is documented and
+  used by the Mock-eNVenta target; the real eNVenta API contract remains a
+  later integration topic.
 - Seeded users remain available for local testing; Phase 8 adds local setup and
   reset links without email delivery.
 

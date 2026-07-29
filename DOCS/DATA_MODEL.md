@@ -30,9 +30,9 @@ The MVP needs these data areas:
 | `chat_messages` | Message history for each chat |
 | `report_drafts` | Structured in-progress report state |
 | `final_reports` | Confirmed or submitted visit reports |
-| `inside_sales_tasks` | Follow-up tasks, reminders, and review tasks |
-| `mock_customers` | Placeholder CRM customer data |
-| `mock_leads` | Placeholder lead or address data |
+| `inside_sales_tasks` | Legacy Phase 2/4 follow-up scaffolding |
+| `mock_customers` | Legacy Phase 2 customer scaffolding |
+| `mock_leads` | Legacy Phase 2 lead or address scaffolding |
 | `mock_contacts` | Placeholder CRM contact data |
 | `mock_offers` | Placeholder offer references |
 | `mock_orders` | Placeholder order references |
@@ -189,11 +189,12 @@ Minimum fields:
 - `submitted_at`
 - `created_at`
 
-The final eNVenta-specific fields are added later.
+eNVenta-shaped mock write fields live in `mock_visit_reports`. Real eNVenta API
+or database fields are still a later integration topic.
 
 ## Mock eNVenta Visit Reports
 
-Phase 6 should add or emulate a mock CRM/eNVenta visit report write target.
+Phase 6 adds a mock CRM/eNVenta visit report write target.
 This is the local placeholder table or structured save result that represents
 what BENNO would later write toward eNVenta.
 
@@ -265,12 +266,12 @@ eNVenta visit report target.
 
 ## Mock Accounts And Users
 
-Phase 6 should move the target mock CRM shape toward eNVenta's AKL logic.
+Phase 6 moves the target mock CRM shape toward eNVenta's AKL logic.
 
 `mock_accounts` represent the shared AKL-like address/account domain. Leads,
 customers, and suppliers are account types inside that domain. Existing
 `mock_customers` and `mock_leads` are Phase 2 legacy scaffolding and should be
-wrapped, replaced, or migrated toward the account model during Phase 6.
+treated as non-target legacy data for the current eNVenta-oriented flow.
 
 Mock account type codes:
 
