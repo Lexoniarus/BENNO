@@ -37,6 +37,7 @@ def _configure_app(app: Flask, config_name: str | None) -> None:
     app.config.from_object(config_class)
     _configure_ai(app)
     _configure_langfuse(app)
+    _configure_voice(app)
     _configure_secret_key(app)
     _configure_database(app)
 
@@ -84,12 +85,46 @@ def _configure_langfuse(app: Flask) -> None:
     os.environ["LANGFUSE_HOST"] = app.config["LANGFUSE_BASE_URL"]
 
 
+def _configure_voice(app: Flask) -> None:
+    _configure_boolean_from_env(app, "VOICE_ENABLED")
+    _configure_integer_from_env(app, "VOICE_MAX_UPLOAD_BYTES")
+    _configure_boolean_from_env(app, "VOICE_TTS_CACHE_ENABLED")
+    _configure_boolean_from_env(app, "VOICE_TTS_PREWARM_ENABLED")
+    _configure_integer_from_env(app, "VOICE_TTS_MAX_SNIPPET_CHARS")
+    for key in (
+        "SPEACHES_BASE_URL",
+        "SPEACHES_STT_MODEL",
+        "SPEACHES_STT_LANGUAGE",
+        "KOKORO_BASE_URL",
+        "KOKORO_TTS_MODEL",
+        "KOKORO_TTS_VOICE",
+        "VOICE_TTS_CACHE_DIR",
+    ):
+        configured_value = os.environ.get(key)
+        if configured_value:
+            app.config[key] = configured_value
+
+
 def _configure_boolean_from_env(app: Flask, key: str) -> None:
     configured_value = os.environ.get(key)
     if configured_value is None:
         return
 
     app.config[key] = configured_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _configure_integer_from_env(app: Flask, key: str) -> None:
+    configured_value = os.environ.get(key)
+    if configured_value is None:
+        return
+
+    try:
+        parsed_value = int(configured_value)
+    except ValueError:
+        return
+
+    if parsed_value > 0:
+        app.config[key] = parsed_value
 
 
 def _configure_secret_key(app: Flask) -> None:

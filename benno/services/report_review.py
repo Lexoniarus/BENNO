@@ -3,13 +3,18 @@
 import re
 from typing import Any
 
+from benno.enums import AccountType, CustomerContextType, VisitType
 from benno.extensions import db
 from benno.models import ReportDraft
 from benno.services.ai_provider import AiProviderError, AiService
 from benno.services.report_ai_context import clean_ai_text, store_ai_error
+from benno.services.report_shortcuts import mentions_inside_sales_follow_up
 from benno.services.report_state import (
+    ACCOUNT_TYPE_OVERRIDE_KEY,
     AI_CACHE_KEY,
     INSIDE_SALES_FOLLOW_UP_KEY,
+    REMINDER_SUPPRESSED_KEY,
+    crm_reference,
     display_value,
     draft_data,
 )
@@ -29,6 +34,7 @@ def build_report_review(
         "sections": _build_review_sections(draft),
         "final_report_text": final_report_text,
         "correction_fields": CORRECTION_FIELDS,
+        "structured_correction_fields": structured_correction_fields(draft),
         "status": draft.report_status,
     }
 
@@ -47,9 +53,10 @@ def _core_review_sections(
     answers: dict[str, Any],
 ) -> list[tuple[str, str]]:
     return [
-        ("Kunde/Lead/Kontakt", display_value(answers.get("visit_context"))),
+        ("AKL-Name", display_value(answers.get("visit_context"))),
+        ("AKL-Typ", display_akl_type(draft)),
         ("Besuchsart", display_value(draft.visit_type)),
-        ("Teilnehmer", display_value(answers.get("participants"))),
+        ("Kontakt/Teilnehmer", display_value(answers.get("participants"))),
         ("Besuchsdatum", display_value(draft.visit_date)),
         ("Ziel/Thema", display_value(answers.get("target_topic"))),
         ("Info", display_value(draft.summary)),
@@ -99,6 +106,167 @@ def _closing_review_sections(
         ("Bewertungen", format_ratings(draft.ratings_json)),
         ("Wiedervorlagen", format_task_preview(draft)),
     ]
+
+
+def structured_correction_fields(draft: ReportDraft) -> list[dict[str, Any]]:
+    """Return directly editable review fields for STT correction."""
+    answers = dict(draft_data(draft).get("answers", {}))
+    return [
+        _correction_field("visit_context", "AKL-Name", answers.get("visit_context")),
+        _correction_field(
+            "account_type",
+            "AKL-Typ",
+            account_type_value(draft),
+            field_type="select",
+            options=account_type_options(),
+        ),
+        _correction_field(
+            "visit_type",
+            "Besuchsart",
+            draft.visit_type,
+            field_type="select",
+            options=visit_type_options(),
+        ),
+        _correction_field(
+            "participants",
+            "Kontakt/Teilnehmer",
+            answers.get("participants"),
+        ),
+        _correction_field(
+            "visit_date",
+            "Besuchsdatum",
+            draft.visit_date.isoformat() if draft.visit_date else "",
+            field_type="date",
+        ),
+        _correction_field("target_topic", "Ziel/Thema", answers.get("target_topic")),
+        _correction_field("info_text", "Info", draft.summary, field_type="textarea"),
+        _correction_field(
+            "agreement_text",
+            "Vereinbarung",
+            draft.outcome,
+            field_type="textarea",
+        ),
+        _correction_field(
+            "next_action",
+            "Nächster Schritt",
+            draft.next_action,
+            field_type="textarea",
+        ),
+        _correction_field(
+            "next_appointment_date",
+            "Termin ab",
+            draft.follow_up_date.isoformat() if draft.follow_up_date else "",
+            field_type="date",
+        ),
+        _correction_field(
+            "offer_reference",
+            "Angebotsbezug",
+            answers.get("offer_reference"),
+        ),
+        _correction_field(
+            "order_reference",
+            "Auftragsbezug",
+            answers.get("order_reference"),
+        ),
+        _correction_field(
+            "reminder_message",
+            "Wiedervorlage",
+            reminder_message(draft) if reminder_preview_titles(draft) else "",
+            field_type="textarea",
+        ),
+        *_rating_correction_fields(draft),
+    ]
+
+
+def _correction_field(
+    key: str,
+    label: str,
+    value: Any,
+    *,
+    field_type: str = "text",
+    options: list[tuple[str, str]] | None = None,
+) -> dict[str, Any]:
+    return {
+        "key": key,
+        "label": label,
+        "type": field_type,
+        "value": "" if value is None else str(value),
+        "options": options or [],
+    }
+
+
+def _rating_correction_fields(draft: ReportDraft) -> list[dict[str, Any]]:
+    ratings = dict(draft.ratings_json)
+    fields = []
+    for rating_key, _label_en, label_de in RATING_FIELDS:
+        rating = ratings.get(rating_key)
+        value = rating.get("value") if isinstance(rating, dict) else ""
+        fields.append(
+            _correction_field(
+                rating_key,
+                label_de,
+                value,
+                field_type="number",
+            )
+        )
+    return fields
+
+
+def account_type_options() -> list[tuple[str, str]]:
+    """Return selectable AKL account type labels."""
+    return [
+        (AccountType.ADDRESS.value, "Adresse / Interessent"),
+        (AccountType.CUSTOMER.value, "Kunde"),
+        (AccountType.SUPPLIER.value, "Lieferant"),
+    ]
+
+
+def visit_type_options() -> list[tuple[str, str]]:
+    """Return selectable visit type labels."""
+    return [
+        (VisitType.IN_PERSON.value, "Vor Ort"),
+        (VisitType.VIRTUAL.value, "Virtuell"),
+        (VisitType.PHONE.value, "Telefonisch"),
+    ]
+
+
+def display_akl_type(draft: ReportDraft) -> str:
+    """Return a German AKL/account classification label."""
+    account_type = account_type_value(draft)
+    context_type = draft.customer_context_type
+    if (
+        account_type == AccountType.ADDRESS.value
+        and context_type == CustomerContextType.NEW_LEAD.value
+    ):
+        return "Adresse / neuer Interessent"
+    if (
+        account_type == AccountType.ADDRESS.value
+        and context_type == CustomerContextType.EXISTING_LEAD.value
+    ):
+        return "Adresse / bestehender Interessent"
+
+    return display_value(account_type, empty="Unklar")
+
+
+def account_type_value(draft: ReportDraft) -> str | None:
+    """Return the best current AKL type code for review/writeback display."""
+    override = draft_data(draft).get(ACCOUNT_TYPE_OVERRIDE_KEY)
+    if override:
+        return str(override)
+
+    account = crm_reference(draft, "account")
+    if account is not None and account.get("account_type"):
+        return str(account["account_type"])
+
+    if draft.customer_context_type in {
+        CustomerContextType.NEW_LEAD.value,
+        CustomerContextType.EXISTING_LEAD.value,
+    }:
+        return AccountType.ADDRESS.value
+    if draft.customer_context_type == CustomerContextType.EXISTING_CUSTOMER.value:
+        return AccountType.CUSTOMER.value
+
+    return None
 
 
 def _review_section(label: str, value: Any, empty: str) -> tuple[str, str]:
@@ -174,7 +342,8 @@ def build_final_report_text(draft: ReportDraft) -> str:
     report_lines = [
         "Besuchsbericht",
         "",
-        f"Kunde/Lead/Kontakt: {display_value(answers.get('visit_context'))}",
+        f"AKL-Name: {display_value(answers.get('visit_context'))}",
+        f"AKL-Typ: {display_akl_type(draft)}",
         f"Besuchsart: {display_value(draft.visit_type)}",
         f"Teilnehmer: {display_value(answers.get('participants'))}",
         f"Besuchsdatum: {display_value(draft.visit_date)}",
@@ -285,7 +454,7 @@ def reminder_message(draft: ReportDraft) -> str:
 
 def reminder_preview_titles(draft: ReportDraft) -> list[str]:
     """Return reminder preview labels for review and AI draft context."""
-    if not draft_data(draft).get(INSIDE_SALES_FOLLOW_UP_KEY):
+    if not draft_has_reminder_request(draft):
         return []
 
     message = reminder_message(draft)
@@ -293,6 +462,26 @@ def reminder_preview_titles(draft: ReportDraft) -> list[str]:
         draft.follow_up_date.isoformat() if draft.follow_up_date else "ohne Datum"
     )
     return [f"Wiedervorlage Innendienst ({due_date}): {message}"]
+
+
+def draft_has_reminder_request(draft: ReportDraft) -> bool:
+    """Return whether the draft should create a follow-up reminder."""
+    data = draft_data(draft)
+    if data.get(REMINDER_SUPPRESSED_KEY):
+        return False
+    if data.get(INSIDE_SALES_FOLLOW_UP_KEY):
+        return True
+
+    return any(
+        mentions_inside_sales_follow_up(text)
+        for text in (
+            data.get("reminder_message"),
+            draft.next_action,
+            draft.outcome,
+            draft.summary,
+        )
+        if text
+    )
 
 
 def draft_context(draft: ReportDraft) -> dict[str, Any]:

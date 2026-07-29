@@ -63,6 +63,14 @@ Instead, Gemini should return section updates as a list of explicit objects:
 
 The provider may translate this provider-specific shape into BENNO's internal provider contract before the report loop receives it. This keeps the application interface stable while avoiding Gemini Developer API schema issues around free-form object properties.
 
+Gemini does support structured output through JSON response schemas. BENNO
+should still treat this as an interface guarantee, not as a truth guarantee. A
+schema-valid response can still be semantically wrong, too confident, or based
+on a noisy STT transcript. For that reason, provider output remains a proposal:
+BENNO validates allowed fields, keeps confidence and clarification signals
+visible in the flow, asks follow-up questions when something is unclear, and
+requires the review screen before any Mock-eNVenta writeback.
+
 References:
 
 - [Gemini Structured Outputs](https://ai.google.dev/gemini-api/docs/structured-output)
@@ -172,14 +180,71 @@ Text-to-speech only adds spoken output. It does not replace the visible text int
 
 The core report workflow remains text-based internally.
 
-For the next implementation phase, BENNO should start with explicit voice
-controls rather than immediate full hands-free automation:
+For Phase 9, BENNO should treat voice mode as the default for active report
+chats:
 
-- record button in the report chat
+- automatic speech playback of the latest BENNO question when a new report chat
+  opens
+- automatic opening of the answer gate after playback
+- visible voice controls as fallback and user control surface
 - visible recording state
-- transcript preview or direct transcript insertion as a normal chat message
-- assistant audio playback after the text answer is produced
+- direct transcript insertion as a normal chat message
+- automatic assistant audio playback after the text answer is produced
+- automatic reopening of the answer gate after playback
+- silence detection plus manual stop/cancel controls
 - text input remains available at all times
+
+The first implementation uses direct send rather than an editable transcript
+preview. This matches the hands-free target more closely, while the visible chat
+still provides transparency and later correction options.
+
+Manual Phase 9 testing showed an important practical boundary: STT transcripts
+can be noisy even when the final report remains useful. German speech can
+produce distorted company names, contact names, and business terms. BENNO should
+therefore treat STT as a lossy input layer, not as authoritative master data.
+The LLM may still produce a good report by filtering irrelevant conversational
+details, such as coffee or casual small talk, but the user must be able to
+correct the structured review before saving.
+
+Voice review findings to keep visible for stabilization:
+
+- distinguish the eNVenta-like AKL account type clearly instead of showing only
+  one generic mixed account/contact label; the Phase 9 stabilization patch shows
+  AKL name, AKL type, and contact/participants separately in review/final
+  screens
+- keep contacts or participants separate from the AKL account
+- make account/lead names directly editable in review because STT may mishear
+  names; direct structured review fields are the MVP correction path
+- detect inside-sales follow-up semantically enough to create a pending
+  `MockReminder`, even when STT slightly distorts "Innendienst"; known
+  near-misses such as "Indienst" are handled by deterministic rules
+- preserve useful LLM filtering of irrelevant speech details while keeping the
+  accepted structured fields reviewable
+
+TTS needs a separate pronunciation layer. Visible and stored text should keep
+the correct business spelling, for example `Lead`, `Mock-eNVenta`, or company
+names. The text sent to Kokoro may need audio-only normalization for better
+German playback, such as phonetic spellings for English terms. This
+pronunciation map must not change report text, database values, or user-visible
+labels. The first implementation applies this only inside the TTS
+orchestration layer before snippet caching and Kokoro generation.
+
+Because browser microphone and autoplay behavior depend on a user gesture, voice
+mode may still require one manual fallback click when the browser blocks
+autostart. BENNO should attempt voice autostart for in-progress report chats,
+but the visible `Sprachmodus starten` control remains available. After voice
+activation, BENNO may continue the turn loop automatically until the user stops
+voice mode, the report reaches review, or an error requires text fallback.
+
+Mobile browser testing added a second boundary: microphone capture on phones
+and tablets requires a secure browser context. A local desktop browser may allow
+`localhost`, but an iPad or phone opening BENNO through plain LAN HTTP such as
+`http://192.168.x.x:5000` will block microphone access. For mobile hands-free
+testing and any later real use, BENNO therefore needs an HTTPS deployment path.
+The preferred product direction is a public but access-controlled HTTPS
+deployment, or an equivalent trusted internal HTTPS setup. This is an
+infrastructure requirement for browser microphone access, not an STT, TTS, or
+report-loop behavior change.
 
 The browser should handle microphone access and recording. The backend should
 coordinate the actual transcription path so BENNO keeps one stable server-side
@@ -239,8 +304,13 @@ Initial TTS direction:
 
 - use the local Docker-based Kokoro/Martin service already available in the
   development environment
-- backend TTS endpoint sends assistant text to that service
+- backend TTS endpoint sends assistant text through a local snippet cache before
+  falling back to full Kokoro generation
 - browser plays the returned audio
+- common standard phrases and frequent dynamic terms such as company/contact
+  names may be cached locally as WAV snippets
+- cached snippets may be concatenated server-side when WAV parameters are
+  compatible
 - Speaches TTS may be evaluated as an alternative, but it is not the first
   implementation target
 
@@ -254,6 +324,11 @@ TTS fallback:
 
 These are test candidates and current local integration targets, not final
 production commitments.
+
+Kokoro/Martin currently behaves as a full-response TTS source for BENNO. It is
+not treated as true streaming TTS in this MVP phase. Perceived latency should be
+reduced through prewarmed and lazy-cached snippets first; real streaming remains
+a later optimization path.
 
 References:
 
@@ -283,9 +358,12 @@ Target behavior:
 - backend processes audio for transcription through a controlled STT boundary
 - transcript becomes the relevant chat input
 - raw audio is discarded after transcription, completion, or cancellation
-- generated TTS audio is returned for playback and not stored as a long-term archive
+- generated TTS output may be cached locally as reusable snippets for
+  performance, but it is not a business record and must remain outside Git
 
-During development, temporary audio may exist for processing, but the product direction is no raw-audio archive.
+During development, temporary audio may exist for processing, and reusable TTS
+snippets may exist under a local ignored cache directory. The product direction
+remains no raw-audio archive and no long-term business audio archive.
 
 ## Persisted Data
 
@@ -304,6 +382,7 @@ Not persisted as long-term records:
 
 - raw audio archive
 - generated TTS audio archive
+- local TTS snippet cache as business data
 - real customer data in the mock MVP
 - real employee data in the mock MVP
 
@@ -313,7 +392,11 @@ Main risks:
 
 - AI extraction may be unreliable for free-form text.
 - Local models may be weaker than Gemini for structured extraction.
+- Local models may struggle more than Gemini with noisy German STT transcripts,
+  especially for company names, people names, and domain-specific terms.
 - Long prompts may become expensive or slow.
+- Mobile voice requires HTTPS. Plain LAN HTTP is not enough for browser
+  microphone access on phones and tablets.
 - Sensitive content must not be logged unnecessarily.
 - Raw audio must not accidentally become persistent business data.
 - Provider switching must not change business rules.

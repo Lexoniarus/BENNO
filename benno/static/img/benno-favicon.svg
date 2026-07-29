@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="benno-favicon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">BENNO favicon</title>
+  <desc id="desc">The yellow BENNO B mark on a dark petrol background.</desc>
+  <rect width="64" height="64" rx="8" fill="#143347"/>
+  <path fill="#ebe566" d="M7 8h32c13.3 0 24 10.7 24 24S52.3 56 39 56H7V8Z"/>
+  <text
+    x="31"
+    y="47"
+    fill="#143347"
+    font-family="Nimbus Sans, Arial, sans-serif"
+    font-size="46"
+    font-weight="700"
+    text-anchor="middle">B</text>
+</svg>

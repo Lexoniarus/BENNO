@@ -71,3 +71,16 @@ def test_reset_db_command_recreates_seeded_database(app) -> None:
         == 0
     )
     assert db.session.query(MockAccount).count() == 6
+
+
+def test_prewarm_voice_cache_command_reports_warmed_snippets(
+    app,
+    monkeypatch,
+) -> None:
+    runner = app.test_cli_runner()
+    monkeypatch.setattr("benno.cli.prewarm_voice_cache", lambda: 3)
+
+    result = runner.invoke(args=["prewarm-voice-cache"])
+
+    assert result.exit_code == 0
+    assert "Prewarmed 3 BENNO voice snippet(s)." in result.output

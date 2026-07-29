@@ -28,12 +28,86 @@ def test_report_form_script_adds_pending_typing_state() -> None:
     assert 'reportForm.setAttribute("aria-busy", "true")' in script_text
 
 
+def test_voice_script_marks_dynamic_assistant_replies_for_speech() -> None:
+    script_text = (_project_root() / "benno" / "static" / "js" / "app.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert "article.dataset.assistantMessage" in script_text
+    assert "article.dataset.speechUrl = options.speechUrl" in script_text
+    assert "payload.assistant_speech_url" in script_text
+    assert "payload.tts_error || !payload.audio" in script_text
+    assert "stopVoiceMode();" in script_text
+    assert "maxPlaybackWaitMs" in script_text
+    assert "Ich höre zu. Sprich deine Antwort." in script_text
+
+
+def test_voice_script_supports_report_chat_autostart() -> None:
+    script_text = (_project_root() / "benno" / "static" / "js" / "app.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert "dataset.voiceAutoStart" in script_text
+    assert "startVoiceMode({ auto: true })" in script_text
+    assert 'sessionStorage.setItem(storageKey, "true")' in script_text
+    assert "sessionStorage.removeItem(storageKey)" in script_text
+    assert "Automatischer Sprachstart wurde blockiert." in script_text
+
+
+def test_voice_script_rejects_audio_playback_errors() -> None:
+    script_text = (_project_root() / "benno" / "static" / "js" / "app.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'audio.addEventListener("error", failPlayback' in script_text
+    assert 'audio.addEventListener("ended", finishPlayback' in script_text
+    assert 'reject(new Error("Sprachausgabe ist nicht verfügbar."))' in script_text
+
+
+def test_report_chat_css_reserves_space_for_sticky_composer() -> None:
+    css_text = (_project_root() / "benno" / "static" / "css" / "app.css").read_text(
+        encoding="utf-8"
+    )
+
+    assert "padding: 20px 20px 180px;" in css_text
+    assert "scroll-padding-bottom: 180px;" in css_text
+    assert "padding: 14px 14px 260px;" in css_text
+    assert "scroll-padding-bottom: 260px;" in css_text
+
+
+def test_active_sales_templates_use_akl_wording() -> None:
+    template_names = [
+        "report_chat.html",
+        "open_reports.html",
+        "completed_reports.html",
+    ]
+    for template_name in template_names:
+        template_text = (
+            _project_root() / "benno" / "templates" / "sales" / template_name
+        ).read_text(encoding="utf-8")
+
+        assert "Kunde/Lead" not in template_text
+        assert "AKL" in template_text
+
+
+def test_sales_section_labels_use_akl_wording() -> None:
+    sales_text = (_project_root() / "benno" / "sales.py").read_text(encoding="utf-8")
+
+    assert '"customer_context": "AKL-Bezug"' in sales_text
+    assert '"customer_context": "Kunde oder Lead"' not in sales_text
+
+
 def test_create_app_uses_testing_configuration() -> None:
     app = create_app("testing")
 
     assert isinstance(app, Flask)
     assert app.config["TESTING"] is True
     assert app.config["SQLALCHEMY_DATABASE_URI"] == "sqlite:///:memory:"
+    assert app.config["VOICE_MAX_UPLOAD_BYTES"] == 10_485_760
+    assert app.config["VOICE_TTS_CACHE_DIR"] == "instance/voice_cache"
+    assert app.config["VOICE_TTS_CACHE_ENABLED"] is True
+    assert app.config["VOICE_TTS_MAX_SNIPPET_CHARS"] == 180
+    assert app.config["VOICE_TTS_PREWARM_ENABLED"] is True
 
 
 def test_index_redirects_anonymous_users_to_login() -> None:
@@ -56,14 +130,14 @@ def test_health_endpoint_returns_ok_status() -> None:
     assert response.get_json() == {"service": "benno", "status": "ok"}
 
 
-def test_favicon_route_redirects_to_local_logo() -> None:
+def test_favicon_route_redirects_to_local_favicon() -> None:
     app = create_app("testing")
 
     with app.test_client() as client:
         response = client.get("/favicon.ico")
 
     assert response.status_code == 302
-    assert response.location == "/static/img/benno-logo.svg"
+    assert response.location == "/static/img/benno-favicon-32.png"
 
 
 def test_development_configuration_reads_environment_at_app_creation(
@@ -96,6 +170,30 @@ def test_development_configuration_reads_langfuse_environment(monkeypatch) -> No
     assert app.config["LANGFUSE_HOST"] == "https://langfuse.test"
     assert app.config["LANGFUSE_CAPTURE_FULL_CONTEXT"] is True
     assert app.config["LANGFUSE_FLUSH_ON_TURN"] is True
+
+
+def test_development_configuration_reads_voice_upload_limit(monkeypatch) -> None:
+    monkeypatch.setenv("VOICE_MAX_UPLOAD_BYTES", "2048")
+
+    app = create_app("development")
+
+    assert app.config["VOICE_MAX_UPLOAD_BYTES"] == 2048
+
+
+def test_development_configuration_reads_voice_tts_cache_environment(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("VOICE_TTS_CACHE_ENABLED", "false")
+    monkeypatch.setenv("VOICE_TTS_PREWARM_ENABLED", "false")
+    monkeypatch.setenv("VOICE_TTS_CACHE_DIR", "instance/test-voice-cache")
+    monkeypatch.setenv("VOICE_TTS_MAX_SNIPPET_CHARS", "96")
+
+    app = create_app("development")
+
+    assert app.config["VOICE_TTS_CACHE_ENABLED"] is False
+    assert app.config["VOICE_TTS_PREWARM_ENABLED"] is False
+    assert app.config["VOICE_TTS_CACHE_DIR"] == "instance/test-voice-cache"
+    assert app.config["VOICE_TTS_MAX_SNIPPET_CHARS"] == 96
 
 
 def test_default_development_database_uses_project_root(monkeypatch) -> None:

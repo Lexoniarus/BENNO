@@ -5,9 +5,9 @@ from typing import Any
 from benno.enums import AccountType, ReminderOwnerType, VisitReportStatus, VisitType
 from benno.models import FinalReport, ReportDraft
 from benno.services.mock_crm import CrmGateway
-from benno.services.report_review import reminder_message
+from benno.services.report_review import draft_has_reminder_request, reminder_message
 from benno.services.report_state import (
-    INSIDE_SALES_FOLLOW_UP_KEY,
+    ACCOUNT_TYPE_OVERRIDE_KEY,
     crm_reference,
     draft_answer,
     draft_data,
@@ -43,12 +43,15 @@ def build_mock_visit_report_payload(
 def account_payload_fields(draft: ReportDraft) -> dict[str, Any]:
     """Build account-related visit report payload fields."""
     account = crm_reference(draft, "account")
+    account_type_override = draft_data(draft).get(ACCOUNT_TYPE_OVERRIDE_KEY)
     fallback_search_name = draft_answer(draft, "visit_context")
     return {
         "account_id": draft.account_id or (account.get("id") if account else None),
         "account_number": account.get("account_number") if account else None,
         "account_type": (
-            account.get("account_type") if account else AccountType.ADDRESS.value
+            account_type_override
+            or (account.get("account_type") if account else None)
+            or AccountType.ADDRESS.value
         ),
         "account_search_name": (
             account.get("search_name") if account else fallback_search_name
@@ -115,7 +118,7 @@ def create_mock_reminders(
     crm_gateway: CrmGateway,
 ) -> list[Any]:
     """Create follow-up reminders through the CRM gateway."""
-    if not draft_data(draft).get(INSIDE_SALES_FOLLOW_UP_KEY):
+    if not draft_has_reminder_request(draft):
         return []
 
     owner = default_crm_user(crm_gateway)

@@ -2,7 +2,8 @@
 
 from datetime import date
 
-from benno.enums import MessageSender, ReportStatus, UserIntent, VisitType
+from benno.enums import MessageSender, MessageType, ReportStatus, UserIntent, VisitType
+from benno.extensions import db
 from benno.models import MockReminder, MockVisitReport, User
 from benno.seed import seed_database
 from benno.services.ai_provider import AiMessageAnalysis, AiProviderError
@@ -16,7 +17,10 @@ from benno.services.mock_crm import (
 )
 from benno.services.report_ai_context import ai_message_context
 from benno.services.report_loop import (
+    apply_report_correction,
+    apply_report_corrections,
     build_report_review,
+    cancel_report,
     confirm_report,
     process_report_message_with_ai,
     start_report_chat,
@@ -24,7 +28,13 @@ from benno.services.report_loop import (
 from benno.services.report_review import normalize_report_display_text
 from benno.services.report_shortcuts import (
     extract_strength_weakness_answers,
+    mentions_lead,
+    parse_labeled_rating_clarifications,
     parse_visit_date,
+)
+from benno.services.report_state import (
+    RATING_CLARIFICATIONS_KEY,
+    REMINDER_SUPPRESSED_KEY,
 )
 from benno.services.report_steps import step_by_key
 
@@ -40,7 +50,8 @@ def test_service_creates_phase_6_chat_draft_and_initial_question(app) -> None:
     assert len(chat.messages) == 1
     assert chat.messages[0].sender == MessageSender.ASSISTANT.value
     assert "Laura Schneider" in chat.messages[0].message_text
-    assert "Kunden, Lead oder Kontakt" in chat.messages[0].message_text
+    assert "AKL-Eintrag" in chat.messages[0].message_text
+    assert "Adresse, Kunde oder Lieferant" in chat.messages[0].message_text
 
 
 def test_fresh_ai_context_lists_phase_6_report_requirements(app) -> None:
@@ -151,10 +162,218 @@ def test_visit_type_is_inferred_from_free_visit_context_message(app) -> None:
     assert draft.visit_type == VisitType.IN_PERSON.value
     assert draft.draft_data_json["answers"]["visit_type"] == VisitType.IN_PERSON.value
     assert "visit_type" in draft.draft_data_json["completed_steps"]
-    assert draft.draft_data_json["current_step"] == "participants"
-    assert chat.messages[-1].message_text != (
-        "War der Besuch persönlich, virtuell oder telefonisch?"
+    assert "visit_context" not in draft.draft_data_json["completed_steps"]
+    assert draft.draft_data_json["current_step"] == "visit_context"
+    assert chat.messages[-1].message_text == (
+        "Wie heißt die Firma oder Adresse des neuen Interessenten?"
     )
+
+
+def test_german_interessent_terms_count_as_lead_signal() -> None:
+    assert mentions_lead("Das ist ein neuer Interessent.")
+    assert mentions_lead("Das ist ein potenzieller Kunde.")
+
+
+def test_akl_classification_without_name_keeps_visit_context_open(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+
+    process_report_message_with_ai(
+        chat,
+        "Es geht um eine Adresse, also einen neuen Interessenten.",
+        _FakeAiService(
+            analysis=AiMessageAnalysis(
+                intent=UserIntent.ANSWER,
+                intent_confidence=0.95,
+                target_sections=["visit_context"],
+                section_updates={"visit_context": "neuer Interessent"},
+            )
+        ),
+    )
+
+    draft = chat.report_draft
+    assert draft.customer_context_type == "new_lead"
+    assert draft.draft_data_json["account_type_override"] == "A"
+    assert "visit_context" not in draft.draft_data_json.get("answers", {})
+    assert "visit_context" not in draft.draft_data_json.get("completed_steps", [])
+    assert draft.draft_data_json["current_step"] == "visit_context"
+    assert chat.messages[-1].message_text == (
+        "Wie heißt die Firma oder Adresse des neuen Interessenten?"
+    )
+
+
+def test_new_interested_account_name_completes_akl_name_but_keeps_type(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+
+    process_report_message_with_ai(
+        chat,
+        "Es ist eine Adresse.",
+        _FakeAiService(
+            analysis=AiMessageAnalysis(
+                intent=UserIntent.ANSWER,
+                intent_confidence=0.95,
+                section_updates={"visit_context": "Adresse"},
+            )
+        ),
+    )
+    process_report_message_with_ai(
+        chat,
+        "Der neue Interessent heißt SunSolar.",
+        _FakeAiService(),
+    )
+
+    draft = chat.report_draft
+    assert draft.draft_data_json["answers"]["visit_context"] == "SunSolar"
+    assert draft.draft_data_json["account_type_override"] == "A"
+    assert draft.customer_context_type == "new_lead"
+    assert draft.draft_data_json["current_step"] == "visit_type"
+
+
+def test_new_interested_account_region_does_not_complete_akl_name(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+
+    process_report_message_with_ai(
+        chat,
+        "Neuer potenzieller Kunde in NRW.",
+        _FakeAiService(),
+    )
+
+    draft = chat.report_draft
+    assert draft.customer_context_type == "new_lead"
+    assert draft.draft_data_json["account_type_override"] == "A"
+    assert "visit_context" not in draft.draft_data_json.get("answers", {})
+    assert "visit_context" not in draft.draft_data_json.get("completed_steps", [])
+    assert draft.draft_data_json["current_step"] == "visit_context"
+    assert chat.messages[-1].message_text == (
+        "Wie heißt die Firma oder Adresse des neuen Interessenten?"
+    )
+
+
+def test_company_name_starting_with_neue_is_not_treated_as_new_lead(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+
+    process_report_message_with_ai(
+        chat,
+        "Neue Energie GmbH",
+        _FakeAiService(),
+    )
+
+    draft = chat.report_draft
+    assert draft.draft_data_json["answers"]["visit_context"] == "Neue Energie GmbH"
+    assert draft.customer_context_type == "unclear"
+    assert "account_type_override" not in draft.draft_data_json
+    assert draft.draft_data_json["current_step"] == "visit_type"
+
+
+def test_address_override_survives_later_akl_name_correction(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+
+    process_report_message_with_ai(
+        chat,
+        "Neuer Interessent in NRW.",
+        _FakeAiService(),
+    )
+    process_report_message_with_ai(
+        chat,
+        "Die Firma heißt PerfSolar.",
+        _FakeAiService(),
+    )
+
+    draft = chat.report_draft
+    assert draft.draft_data_json["answers"]["visit_context"] == "PerfSolar"
+    assert draft.draft_data_json["account_type_override"] == "A"
+    assert draft.customer_context_type == "new_lead"
+    assert draft.draft_data_json["current_step"] == "visit_type"
+
+
+def test_participant_name_correction_does_not_overwrite_akl_name(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+
+    process_report_message_with_ai(
+        chat, "Der neue Interessent heißt SunSolar.", _FakeAiService()
+    )
+    process_report_message_with_ai(chat, "vor Ort", _FakeAiService())
+    process_report_message_with_ai(chat, "Er heißt Bernd Rombach.", _FakeAiService())
+
+    answers = chat.report_draft.draft_data_json["answers"]
+    assert answers["visit_context"] == "SunSolar"
+    assert answers["participants"] == "Er heißt Bernd Rombach."
+
+
+def test_qualitative_rating_clues_are_stored_without_invented_numbers(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_all_required_until_ratings(chat)
+
+    process_report_message_with_ai(
+        chat,
+        (
+            "Ich hatte den Eindruck, dass die ganz zufrieden waren. "
+            "Also würde ich eher positiv werten. Technische Attraktivität, "
+            "ja, die sind recht unerfahren. Kaufmännische Attraktivität, "
+            "die scheinen Kohle zu haben und Potenzial. Priorität vielleicht sieben."
+        ),
+        _FakeAiService(),
+    )
+
+    draft = chat.report_draft
+    clarifications = draft.draft_data_json[RATING_CLARIFICATIONS_KEY]
+    assert draft.ratings_json["priority_rating"]["value"] == 7
+    assert "customer_satisfaction_rating" not in draft.ratings_json
+    assert "technical_attractiveness_rating" not in draft.ratings_json
+    assert "commercial_attractiveness_rating" not in draft.ratings_json
+    assert "positiv" in clarifications["customer_satisfaction_rating"]
+    assert "unerfahren" in clarifications["technical_attractiveness_rating"]
+    assert "Kohle" in clarifications["commercial_attractiveness_rating"]
+    assert draft.draft_data_json["current_step"] == "ratings"
+    assert "Ich habe verstanden:" in chat.messages[-1].message_text
+    assert "Zahlen von 1 bis 10" in chat.messages[-1].message_text
+
+
+def test_ai_rating_section_updates_accept_individual_rating_keys(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_all_required_until_ratings(chat)
+
+    process_report_message_with_ai(
+        chat,
+        "Die Zufriedenheit ist eher positiv und die Priorität ist sieben.",
+        _FakeAiService(
+            analysis=AiMessageAnalysis(
+                intent=UserIntent.ANSWER,
+                intent_confidence=0.95,
+                target_sections=["customer_satisfaction_rating", "priority_rating"],
+                section_updates={
+                    "customer_satisfaction_rating": "eher positiv",
+                    "priority_rating": "7",
+                },
+            )
+        ),
+    )
+
+    draft = chat.report_draft
+    clarifications = draft.draft_data_json[RATING_CLARIFICATIONS_KEY]
+    assert clarifications["customer_satisfaction_rating"] == "eher positiv"
+    assert draft.ratings_json["priority_rating"]["value"] == 7
+    assert draft.draft_data_json["current_step"] == "ratings"
+
+
+def test_labeled_rating_clarification_parser_splits_qualitative_segments() -> None:
+    clarifications = parse_labeled_rating_clarifications(
+        "Zufriedenheit eher positiv. Technische Attraktivität recht "
+        "unerfahren. Kaufmännische Attraktivität mit Potenzial. "
+        "Priorität sieben."
+    )
+
+    assert "positiv" in clarifications["customer_satisfaction_rating"]
+    assert "unerfahren" in clarifications["technical_attractiveness_rating"]
+    assert "Potenzial" in clarifications["commercial_attractiveness_rating"]
+    assert "priority_rating" not in clarifications
 
 
 def test_rating_clues_are_extracted_from_later_bundle_without_ai_rating_update(
@@ -257,6 +476,27 @@ def test_explicit_strength_and_weakness_are_extracted_by_rules() -> None:
 
     assert answers == {
         "strength_text": "hohes Projektvolumen",
+        "weakness_text": "unklare Freigabe",
+    }
+
+
+def test_positive_rating_text_does_not_create_strength() -> None:
+    answers = extract_strength_weakness_answers(
+        "Bewertungen: Zufriedenheit wirkte ziemlich positiv, technisch "
+        "sind sie noch unsicher, kaufmännisch klingt es interessant mit "
+        "Budget, Priorität würde ich sieben sagen."
+    )
+
+    assert answers == {}
+
+
+def test_explicit_positive_and_negative_phrasing_can_create_notes() -> None:
+    answers = extract_strength_weakness_answers(
+        "Positiv war gutes Messepotenzial. Negativ war unklare Freigabe."
+    )
+
+    assert answers == {
+        "strength_text": "gutes Messepotenzial",
         "weakness_text": "unklare Freigabe",
     }
 
@@ -466,6 +706,41 @@ def test_partial_rating_answer_keeps_rating_step_open(app) -> None:
     assert draft.ratings_json["customer_satisfaction_rating"]["value"] == 8
     assert "technical_attractiveness_rating" not in draft.ratings_json
     assert draft.draft_data_json["current_step"] == "ratings"
+
+
+def test_labeled_priority_rating_updates_priority_field(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_all_required_until_ratings(chat)
+
+    process_report_message_with_ai(chat, "Priorität ist 5", _FakeAiService())
+
+    draft = chat.report_draft
+    assert draft.ratings_json["priority_rating"]["value"] == 5
+    assert "customer_satisfaction_rating" not in draft.ratings_json
+    assert draft.draft_data_json["current_step"] == "ratings"
+
+
+def test_labeled_rating_bundle_does_not_shift_values_by_position(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_all_required_until_ratings(chat)
+
+    process_report_message_with_ai(
+        chat,
+        (
+            "Zufriedenheit stabile zehn, technische Attraktivität 10, "
+            "kaufmännische Attraktivität 5, Priorität 4."
+        ),
+        _FakeAiService(),
+    )
+
+    ratings = chat.report_draft.ratings_json
+    assert ratings["customer_satisfaction_rating"]["value"] == 10
+    assert ratings["technical_attractiveness_rating"]["value"] == 10
+    assert ratings["commercial_attractiveness_rating"]["value"] == 5
+    assert ratings["priority_rating"]["value"] == 4
+    assert chat.report_draft.draft_data_json["current_step"] == "review"
 
 
 def test_not_assessable_rating_answer_can_complete_rating_step(app) -> None:
@@ -689,6 +964,19 @@ def test_confirm_report_creates_mock_visit_report_and_reminder(app) -> None:
     assert mock_visit_report.priority_rating == 9
     assert reminder.message
     assert chat.status == ReportStatus.CONFIRMED.value
+    assert chat.messages[-1].message_text == (
+        "Der Besuchsbericht wurde bestätigt und in Mock-eNVenta gespeichert."
+    )
+
+
+def test_cancel_report_records_german_assistant_message(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+
+    cancel_report(chat)
+
+    assert chat.status == ReportStatus.CANCELLED.value
+    assert chat.messages[-1].message_text == "Der Besuchsbericht wurde abgebrochen."
 
 
 def test_review_shows_enventa_target_sections(app) -> None:
@@ -705,6 +993,285 @@ def test_review_shows_enventa_target_sections(app) -> None:
     assert "Stärke" in labels
     assert "Schwäche" in labels
     assert "Wiedervorlagen" in labels
+
+
+def test_review_uses_akl_labels_and_structured_correction_fields(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+
+    review = build_report_review(chat.report_draft, _FakeAiService())
+    labels = [label for label, _value in review["sections"]]
+    field_keys = {field["key"] for field in review["structured_correction_fields"]}
+
+    assert "AKL-Name" in labels
+    assert "AKL-Typ" in labels
+    assert "Kontakt/Teilnehmer" in labels
+    assert "Kunde/Lead/Kontakt" not in labels
+    assert {
+        "visit_context",
+        "account_type",
+        "participants",
+        "reminder_message",
+        "priority_rating",
+    }.issubset(field_keys)
+
+
+def test_structured_review_corrections_update_akl_and_rating_fields(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+
+    apply_report_correction(chat, "visit_context", "Solar Sales Test GmbH")
+    apply_report_correction(chat, "account_type", "A")
+    apply_report_correction(chat, "priority_rating", "10")
+
+    draft = chat.report_draft
+    answers = draft.draft_data_json["answers"]
+    review = build_report_review(draft, _FakeAiService())
+
+    assert answers["visit_context"] == "Solar Sales Test GmbH"
+    assert draft.draft_data_json["account_type_override"] == "A"
+    assert draft.ratings_json["priority_rating"]["value"] == 10
+    assert "Adresse" in dict(review["sections"])["AKL-Typ"]
+    assert "ai_cache" not in draft.draft_data_json
+
+
+def test_account_type_override_wins_for_matched_account_review_and_writeback(
+    app,
+) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+    draft = chat.report_draft
+
+    assert draft.account.account_type == "K"
+
+    apply_report_correction(chat, "account_type", "A")
+    review = build_report_review(draft, _FakeAiService())
+    final_report = confirm_report(chat, _FakeAiService())
+
+    assert draft.draft_data_json["account_type_override"] == "A"
+    assert "Adresse" in dict(review["sections"])["AKL-Typ"]
+    assert final_report.mock_visit_report.account_type == "A"
+    assert final_report.mock_visit_report.account_number == "AKL-K-1001"
+
+
+def test_report_correction_batch_is_atomic_for_invalid_rating(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+    draft = chat.report_draft
+    original_answers = dict(draft.draft_data_json["answers"])
+    original_priority = dict(draft.ratings_json["priority_rating"])
+    original_correction_count = _correction_message_count(chat)
+
+    try:
+        apply_report_corrections(
+            chat,
+            [
+                ("visit_context", "Solar Sales Test GmbH"),
+                ("priority_rating", "kein Zahlenwert"),
+            ],
+        )
+    except ValueError as error:
+        assert "Wert von 1 bis 10" in str(error)
+    else:
+        raise AssertionError("Invalid batch correction should fail.")
+
+    db.session.refresh(draft)
+    assert draft.draft_data_json["answers"] == original_answers
+    assert draft.ratings_json["priority_rating"] == original_priority
+    assert _correction_message_count(chat) == original_correction_count
+
+
+def test_report_correction_batch_rejects_invalid_visit_date(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+    draft = chat.report_draft
+    original_answers = dict(draft.draft_data_json["answers"])
+    original_visit_date = draft.visit_date
+    original_correction_count = _correction_message_count(chat)
+
+    try:
+        apply_report_corrections(
+            chat,
+            [
+                ("visit_context", "Solar Sales Test GmbH"),
+                ("visit_date", "kein datum"),
+            ],
+        )
+    except ValueError as error:
+        assert "gültiges Datum" in str(error)
+    else:
+        raise AssertionError("Invalid visit date correction should fail.")
+
+    db.session.refresh(draft)
+    assert draft.visit_date == original_visit_date
+    assert draft.draft_data_json["answers"] == original_answers
+    assert _correction_message_count(chat) == original_correction_count
+
+
+def test_report_correction_batch_rejects_invalid_visit_type(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+    draft = chat.report_draft
+    original_answers = dict(draft.draft_data_json["answers"])
+    original_visit_type = draft.visit_type
+    original_correction_count = _correction_message_count(chat)
+
+    try:
+        apply_report_corrections(
+            chat,
+            [
+                ("visit_context", "Solar Sales Test GmbH"),
+                ("visit_type", "Rauchzeichen"),
+            ],
+        )
+    except ValueError as error:
+        assert "Vor Ort" in str(error)
+    else:
+        raise AssertionError("Invalid visit type correction should fail.")
+
+    db.session.refresh(draft)
+    assert draft.visit_type == original_visit_type
+    assert draft.draft_data_json["answers"] == original_answers
+    assert _correction_message_count(chat) == original_correction_count
+
+
+def test_report_correction_batch_rejects_invalid_account_type(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+    draft = chat.report_draft
+    original_data = dict(draft.draft_data_json)
+    original_correction_count = _correction_message_count(chat)
+
+    try:
+        apply_report_corrections(
+            chat,
+            [
+                ("visit_context", "Solar Sales Test GmbH"),
+                ("account_type", "X"),
+            ],
+        )
+    except ValueError as error:
+        message = str(error)
+        assert "Adresse" in message
+        assert "Kunde" in message
+        assert "Lieferant" in message
+    else:
+        raise AssertionError("Invalid account type correction should fail.")
+
+    db.session.refresh(draft)
+    assert draft.draft_data_json == original_data
+    assert _correction_message_count(chat) == original_correction_count
+
+
+def test_report_correction_batch_rejects_unknown_field(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+    draft = chat.report_draft
+    original_data = dict(draft.draft_data_json)
+    original_correction_count = _correction_message_count(chat)
+
+    try:
+        apply_report_corrections(
+            chat,
+            [
+                ("unknown_field", "Wert"),
+            ],
+        )
+    except ValueError as error:
+        assert "nicht bekannt" in str(error)
+    else:
+        raise AssertionError("Unbekanntes Korrekturfeld sollte fehlschlagen.")
+
+    db.session.refresh(draft)
+    assert draft.draft_data_json == original_data
+    assert _correction_message_count(chat) == original_correction_count
+
+
+def test_empty_optional_review_corrections_clear_writeback_values(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+
+    apply_report_corrections(
+        chat,
+        [
+            ("offer_reference", ""),
+            ("order_reference", ""),
+            ("strength_text", ""),
+            ("weakness_text", ""),
+            ("reminder_message", ""),
+        ],
+    )
+
+    draft = chat.report_draft
+    answers = draft.draft_data_json["answers"]
+    review = build_report_review(draft, _FakeAiService())
+
+    assert answers["offer_reference"] == "keiner"
+    assert answers["order_reference"] == "keiner"
+    assert "strength_text" not in answers
+    assert "weakness_text" not in answers
+    assert draft.draft_data_json[REMINDER_SUPPRESSED_KEY] is True
+    assert dict(review["sections"])["Wiedervorlagen"] == "Keine"
+
+    final_report = confirm_report(chat, _FakeAiService())
+    reminder_count = MockReminder.query.filter_by(
+        visit_report_number=final_report.mock_visit_report.visit_report_number
+    ).count()
+    assert reminder_count == 0
+
+
+def test_empty_required_review_correction_is_rejected(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    _process_complete_report_with_reminder(chat)
+    draft = chat.report_draft
+    original_answers = dict(draft.draft_data_json["answers"])
+
+    try:
+        apply_report_corrections(chat, [("visit_context", "")])
+    except ValueError as error:
+        assert "Pflichtfeld darf nicht leer sein" in str(error)
+    else:
+        raise AssertionError("Empty required correction should fail.")
+
+    db.session.refresh(draft)
+    assert draft.draft_data_json["answers"] == original_answers
+
+
+def test_indienst_near_miss_creates_mock_reminder_on_confirm(app) -> None:
+    seed_database()
+    chat = _start_sales_chat()
+    answers = [
+        "Nordlicht Maschinenbau GmbH",
+        "persoenlich",
+        "Mara Stein",
+        "2026-07-07",
+        "Forecast",
+        "Forecast und Lieferfaehigkeit besprochen.",
+        "Revidiertes Angebot wird geschickt.",
+        "Indienst soll anrufen.",
+        "8 7 6 9",
+    ]
+    for answer in answers:
+        process_report_message_with_ai(chat, answer, _FakeAiService())
+
+    assert chat.report_draft.draft_data_json["inside_sales_follow_up_requested"]
+
+    final_report = confirm_report(chat, _FakeAiService())
+    reminder = MockReminder.query.filter_by(
+        visit_report_number=final_report.mock_visit_report.visit_report_number
+    ).one()
+
+    assert "Indienst soll anrufen" in reminder.message
 
 
 def test_provider_error_falls_back_to_deterministic_flow(app) -> None:
@@ -745,6 +1312,14 @@ def test_report_loop_can_use_injected_crm_gateway(app) -> None:
 def _start_sales_chat():
     sales_user = User.query.filter_by(email="laura.schneider@solar-sales.example").one()
     return start_report_chat(sales_user)
+
+
+def _correction_message_count(chat) -> int:
+    return sum(
+        1
+        for message in chat.messages
+        if message.message_type == MessageType.CORRECTION.value
+    )
 
 
 def _process_all_required_until_ratings(chat) -> None:

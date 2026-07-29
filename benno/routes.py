@@ -28,5 +28,5 @@ def health() -> tuple[dict[str, str], int]:
 
 @main_blueprint.get("/favicon.ico")
 def favicon():
-    """Redirect browsers to BENNO's local SVG favicon asset."""
-    return redirect(url_for("static", filename="img/benno-logo.svg"))
+    """Redirect browsers to BENNO's local PNG favicon asset."""
+    return redirect(url_for("static", filename="img/benno-favicon-32.png"))

@@ -165,7 +165,7 @@ Build the logic deliberately simple at first. It does not need perfect AI extrac
 
 Report parts to check:
 
-- customer or lead
+- AKL context
 - contact person
 - visit reason
 - summary
@@ -380,7 +380,7 @@ Frontend goals:
 - make the Sales report workflow feel coherent on desktop, tablet, and phone
 - improve dashboard, open report, completed report, chat, review, and final
   report detail screens
-- show report context clearly, including account or lead, topic, status,
+- show report context clearly, including AKL context, topic, status,
   progress, and provider/debug state where useful
 - keep German user-facing workflow text consistent for the current MVP
 - avoid changing report business rules, eNVenta mapping, or provider behavior
@@ -440,10 +440,16 @@ Current implementation direction:
   responses.
 - Keep Speaches TTS as a secondary TTS comparison path, not the first playback
   target.
-- Return playable audio to the browser without storing generated audio as a
-  long-term business record.
-- Start with push-to-talk or an explicit recording control before attempting a
-  mostly hands-free mode.
+- Return playable audio to the browser while keeping generated TTS snippets as
+  local ignored performance artifacts, not business records.
+- Treat voice mode as the default for in-progress report chats, while keeping
+  one manual start button as browser-permission fallback.
+- Read BENNO's assistant replies aloud automatically while voice mode is active.
+- Reopen the answer gate automatically after playback, with silence detection
+  plus manual stop/cancel controls.
+- Cache and prewarm common TTS snippets such as standard phrases and frequent
+  dynamic names so BENNO does not regenerate every assistant answer from
+  scratch.
 
 Important:
 
@@ -451,7 +457,12 @@ Important:
   writeback must not be rewritten for voice.
 - STT only creates text input.
 - TTS only reads assistant output.
+- Kokoro/Martin is not treated as true streaming TTS in this phase; snippet
+  caching is the first latency-reduction path.
 - Visual text remains available for correction, transparency, and fallback.
+- Mobile browsers require HTTPS or another secure context for microphone
+  capture. Plain LAN HTTP is enough for page loading and TTS playback, but not
+  for reliable phone or tablet microphone access.
 - Browser `SpeechRecognition` may be tested as an experiment, but it is not the
   primary MVP path because browser support and behavior are less predictable
   than microphone capture plus backend-controlled STT.
@@ -462,13 +473,14 @@ Done when:
 - The transcript appears as a normal chat message.
 - The same Phase 6/8 report loop processes that transcript.
 - BENNO can read the next assistant response aloud through local TTS.
+- After spoken playback, BENNO can automatically listen for the next answer.
 - The user can continue by text if microphone, STT, or TTS fails.
 
 ## Phase 10: Stabilization And Demo Scenarios
 
 Goal:
 
-BENNO is reliable enough to demo as a text-based MVP.
+BENNO is reliable enough to demo as a text and first voice-assisted MVP.
 
 Demo scenarios:
 
@@ -481,11 +493,67 @@ Demo scenarios:
 7. Review is rejected and corrected
 8. Review is confirmed and saved
 
+Manual Phase 9 voice testing adds these stabilization topics:
+
+- noisy German STT must be expected; BENNO should keep text fallback and make
+  structured review correction easy
+- mobile voice needs HTTPS; iPad and phone browsers block microphone access
+  over plain LAN HTTP
+- AKL wording must be eNVenta-oriented: address, customer, supplier, with
+  contacts handled separately
+- BENNO must visibly distinguish known customer/account cases from new
+  address/lead cases before writing to Mock-eNVenta
+- inside-sales follow-up should create a pending reminder even when STT
+  slightly distorts words such as "Innendienst"
+- TTS should use an audio-only pronunciation map for English or product terms,
+  while visible and stored text keeps the correct spelling
+- useful LLM filtering should be preserved: irrelevant speech details may be
+  omitted from the final report when they do not belong in the visit report
+
+The Phase 9 stabilization patch addresses the application-side items above with
+AKL-aware review/final labels, structured review correction fields, near-miss
+follow-up detection, and a first TTS pronunciation map. Remaining Phase 10 work
+is mainly repeatable demo hardening, STT model/configuration quality, and
+deciding how to handle HTTPS for mobile demo testing.
+
 Done when:
 
 - All demo scenarios can be played through.
 - Error cases are handled understandably.
 - The text and first voice-assisted loop are stable enough for a mentor demo.
+
+Masterschool demo scope:
+
+- finish Phase 9 as a turn-based voice layer over the existing text report loop
+- keep text fallback and visible transcripts available at all times
+- harden structured review correction for noisy STT, especially AKL names,
+  participants, ratings, and reminders
+- repeat and document the core demo scenarios against Mock-eNVenta data
+- show `FinalReport`, `MockVisitReport`, and `MockReminder` creation after
+  explicit user confirmation
+- limit frontend and admin work to bug fixes and small usability improvements
+- document risks and next steps without promising production readiness
+
+Allowed only if small and demo-supporting:
+
+- clearer HTTPS or microphone permission error messages
+- small STT/TTS configuration fixes
+- demo seed data or demo scenario documentation
+- focused UX polish in the existing Phase 8 frontend
+
+Out of scope for the Masterschool demo:
+
+- real eNVenta access or live customer and employee data
+- final ERP/CRM validation rules based on the real system
+- Postgres migration
+- production HTTPS deployment
+- production authentication, SSO, two-factor authentication, or email delivery
+- complete GDPR, retention, deletion, backup, restore, or audit concepts
+- automatic master-data creation
+- final local-LLM strategy
+- systematic STT model benchmarking
+- realtime streaming STT, barge-in, or interrupt handling
+- native app, full PWA, or another frontend redesign
 
 ## Phase 11: Local Or OpenAI-Compatible Provider Fallback
 
@@ -515,28 +583,38 @@ Done when:
 - Differences to Gemini are documented.
 - There is enough evidence to decide how far BENNO can run locally.
 
-## Later MVP: Postgres And Real eNVenta Integration
+## Later MVP: HTTPS, Postgres, And Real eNVenta Integration
 
 Goal:
 
-The local mock backend can be replaced by a more production-like persistence
-and integration setup without changing the report loop's CRM/eNVenta boundary.
+The local mock backend can be moved toward a more production-like deployment,
+persistence, and integration setup without changing the report loop's
+CRM/eNVenta boundary.
 
 Scope:
 
+- provide BENNO through HTTPS so mobile browsers can use microphone capture
+- keep public access controlled through login and later production security
+  measures
 - move persistence from local SQLite to Postgres behind SQLAlchemy
 - keep the internal CRM/eNVenta gateway contract stable
 - prepare later real eNVenta lookup and writeback
 - avoid introducing a real eNVenta API dependency before the mock contract is stable
+- keep real customer and employee data out of Masterschool demo tests
 
 Questions to test:
 
+- Which HTTPS deployment path is practical for demo and later field use:
+  public but access-controlled, or trusted internal HTTPS?
 - Which SQLite assumptions need adjustment for Postgres?
 - Which mock gateway calls become database-backed service calls?
 - Which eNVenta fields still need real API clarification?
+- Which security, retention, backup, deletion, and audit requirements are
+  needed before real data is used?
 
 Done when:
 
+- Mobile devices can access BENNO through trusted HTTPS.
 - The same report loop works against Postgres-backed persistence.
 - The gateway boundary remains the report loop's integration surface.
 - Real eNVenta integration can be planned without reshaping the core workflow.
@@ -545,17 +623,18 @@ Done when:
 
 The completed baseline now includes Flask, data model, login, the text report
 loop, Gemini, eNVenta-shaped mock writeback, the internal CRM/eNVenta gateway,
-and optional Langfuse observability.
+optional Langfuse observability, the Phase 8 frontend/admin overhaul, and the
+first Phase 9 voice layer.
 
-Phase 8 is complete. The next practical step is Phase 9:
+The next practical work is to finish Phase 9 and move into Phase 10 demo
+stabilization:
 
-1. add browser microphone capture to the report chat
-2. connect a local Speaches Docker sidecar for STT
-3. connect local Kokoro/Martin TTS for assistant playback
-4. keep Speaches TTS available as a later comparison path
-5. keep text input and visible transcript as the fallback path
-6. test the same eNVenta-shaped report scenarios with voice-assisted input
+1. repeat the eNVenta-shaped demo scenarios with text and voice
+2. document STT failure patterns and improve the review/correction safety net
+3. decide how to handle HTTPS for mobile voice testing
+4. compare whether local LLMs can handle noisy German STT transcripts well
+   enough
+5. keep the Masterschool demo on mock data and Mock-eNVenta writeback
 
-After Phase 9, BENNO should move into repeatable demo-scenario stabilization
-before adding Postgres, local LLM provider experiments, or real eNVenta
-integration.
+After the demo baseline is stable, BENNO can branch into HTTPS deployment,
+Postgres, local provider experiments, and later real eNVenta integration.

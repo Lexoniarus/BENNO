@@ -5,6 +5,8 @@ from flask import Flask, current_app
 
 from benno.extensions import db
 from benno.seed import seed_database
+from benno.services.voice import VoiceServiceError
+from benno.services.voice_tts_cache import prewarm_voice_cache
 
 
 def register_cli_commands(app: Flask) -> None:
@@ -38,3 +40,13 @@ def register_cli_commands(app: Flask) -> None:
         db.create_all()
         seed_database()
         click.echo("Reset and seeded the BENNO database.")
+
+    @app.cli.command("prewarm-voice-cache")
+    def prewarm_voice_cache_command() -> None:
+        """Generate standard local TTS snippets for faster voice tests."""
+        try:
+            warmed_count = prewarm_voice_cache()
+        except VoiceServiceError as error:
+            raise click.ClickException(str(error)) from error
+
+        click.echo(f"Prewarmed {warmed_count} BENNO voice snippet(s).")

@@ -132,17 +132,35 @@ Required:
 - user-specific language setting
 - optional external sales representative ID
 
-For the first implementation:
+For the current MVP:
 
-- seeded demo users are sufficient
-- setup links can be delayed
-- password reset can be delayed
+- seeded demo users remain available for local testing
+- local setup links can be generated in the admin UI
+- local password reset links can be generated in the admin UI
 - no email delivery is required
 - no two-factor authentication is required
+- no production identity-management system is required
+
+## Seeded Mock Users
+
+The current local demo company is Solar Sales. After running `seed-db` or
+`reset-db --yes`, these seeded users are available for testing:
+
+| Role | Email | Password |
+|---|---|---|
+| Admin | `admin@solar-sales.local` | `Admin123` |
+| Sales Rep | `laura.schneider@solar-sales.example` | `Sales123` |
+| Sales Rep | `markus.weber@solar-sales.example` | `Sales123` |
+| Sales Rep | `sophie.klein@solar-sales.example` | `Sales123` |
+| Sales Rep | `tobias.fischer@solar-sales.example` | `Sales123` |
+
+The older BENNO demo accounts are retired and should not be used for current
+manual tests. If the application rejects the current credentials, the running
+app is likely using an outdated local database and should be reseeded or reset.
 
 ## Registration And Password Reset Direction
 
-Later target flow:
+Current local MVP flow:
 
 ```text
 Admin creates user -> system generates setup token/link -> user sets password
@@ -154,7 +172,9 @@ Password reset can follow the same pattern:
 Admin starts reset -> system generates reset token/link -> user sets new password
 ```
 
-For the first slice, this is not required. Seeded users are enough to prove the core product loop.
+For the Masterschool demo, these links are shown directly in the admin UI. The
+system stores only hashed tokens. Real email delivery, SSO, two-factor
+authentication, and production identity governance remain out of scope.
 
 ## External Sales Representative Reference
 

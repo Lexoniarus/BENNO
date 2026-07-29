@@ -73,11 +73,53 @@ The MVP includes:
 Current scope boundaries:
 
 - The first vertical slice is text-based.
-- STT and TTS are added after the text-based Gemini workflow can create and save a stable report. This condition is now met by the Phase 6/8 baseline, so voice is the next planned implementation phase.
+- The first vertical slice was text-based. The Phase 6/8 baseline can create and save a stable report, and Phase 9 now implements the first turn-based STT/TTS layer on top.
 - The MVP uses a local placeholder CRM/ERP service before any real eNVenta integration.
 - The first screenshot-based eNVenta visit report field mapping is documented and used for the Phase 6 mock target.
 - The admin area stays simple in the first slice.
 - The MVP uses a pragmatic login and user setup flow, not a full production identity management system.
+
+## 4.1 Masterschool Demo Scope Boundary
+
+The Masterschool demo MVP is a realistic end-to-end prototype, not a production
+system. It should prove the product idea and the technical control boundaries
+without promising real eNVenta operation.
+
+The remaining Masterschool work should focus on:
+
+- stabilizing the Phase 9 turn-based voice layer
+- keeping text input available as the reliable fallback
+- hardening review and structured correction against STT errors
+- running repeatable demo scenarios against Mock-eNVenta data
+- showing `FinalReport`, `MockVisitReport`, and `MockReminder` creation after
+  explicit user confirmation
+- keeping Sales and Admin UI fixes small and demo-oriented
+- documenting known risks honestly
+- keeping Ruff, Black, and Pytest checks green
+
+Small improvements may still be added when they support the demo directly, for
+example clearer HTTPS/microphone error messages, small STT/TTS configuration
+fixes, demo seed data, or focused UX polish.
+
+The Masterschool demo should not include:
+
+- real eNVenta access
+- real customer, employee, or production data
+- final ERP/CRM validation rules against the real system
+- Postgres migration
+- public HTTPS deployment as a production environment
+- production authentication, SSO, two-factor authentication, or real email flows
+- complete GDPR, retention, deletion, backup, restore, or audit concepts
+- automatic master-data creation
+- final local-LLM provider strategy
+- systematic STT model benchmarking
+- realtime streaming STT, barge-in, or interrupt handling
+- a native app, full PWA, or another frontend redesign
+
+The demo success criterion is that BENNO can create an eNVenta-shaped visit
+report from natural language, keep the backend in control of validation and
+writeback, show reviewable corrections, and save only to the mock target after
+confirmation.
 
 ## 5. Current Vertical Slice
 
@@ -281,7 +323,7 @@ If local models are used, they may require tighter application-side control:
 
 Speech-to-text and text-to-speech are layers over the text workflow.
 
-The next implementation phase adds the first practical voice layer.
+Phase 9 adds the first practical voice layer.
 
 The frontend records microphone audio and plays generated audio. The backend coordinates transcription and speech synthesis.
 
@@ -291,6 +333,12 @@ behavior vary between browsers. Instead, recorded audio should be sent to a
 backend STT boundary, and the resulting transcript should enter the existing
 text report loop.
 
+Mobile browsers require a secure browser context for microphone capture. A
+desktop-local `localhost` test can work without HTTPS, but a phone or tablet
+opening BENNO through plain LAN HTTP will normally block microphone access. The
+mobile voice path therefore needs HTTPS for real device tests and later
+hands-free use.
+
 The current STT integration target is a local Speaches Docker sidecar. Speaches
 keeps STT outside the BENNO application process while still allowing local,
 OpenAI-compatible speech API calls. Its streaming support is relevant for later
@@ -299,6 +347,12 @@ hands-free experiments, but Phase 9 may start with file/blob transcription.
 The current TTS integration target is the local Docker-based Kokoro/Martin
 service available in the development environment. Speaches TTS can be evaluated
 as a secondary comparison path.
+
+The first Phase 9 interaction mode sends transcripts directly into the existing
+report loop. While voice mode is active, BENNO reads assistant replies aloud
+automatically and then opens the next recording gate automatically. Recording is
+closed by silence detection, with manual stop and cancel controls as fallback.
+The visible text chat remains the correction and fallback surface.
 
 Initial test candidates from earlier research:
 
@@ -590,7 +644,7 @@ The final review must be block-based and human-readable.
 
 It should include:
 
-- customer or lead context
+- AKL account/address context
 - contact persons or participants
 - visit reason
 - meeting summary
@@ -686,6 +740,7 @@ The following decisions define the current MVP direction:
 | STT service | Local Speaches Docker sidecar |
 | TTS service | Local Kokoro/Martin Docker service first; Speaches TTS can be compared later |
 | Audio persistence | No long-term raw audio archive |
+| Mobile microphone access | Requires HTTPS or another secure browser context |
 | Language | Session language controls first slice behavior |
 
 ## 29. Open And Pending Decisions
@@ -698,7 +753,9 @@ The following decisions remain open, deferred, or dependent on external input:
 | Local LLM candidates | Later provider work should evaluate LM Studio through an OpenAI-compatible local API after admin configuration and demo stabilization |
 | eNVenta visit report fields | First screenshot-based field mapping is documented; Phase 6 uses an eNVenta-shaped mock target rather than a real eNVenta API |
 | Placeholder CRM/ERP API contract | Phase 6 defines an internal CRM/eNVenta gateway boundary backed by local mock tables; Postgres or real eNVenta access can replace the backend later |
-| Setup/password reset token flow | Needs clarification: decide whether the first slice needs real setup/reset tokens or only seeded demo users |
+| Setup and reset links | Local setup and reset links are implemented for the admin UI; email delivery and production identity management remain later |
+| HTTPS deployment | Needed for mobile browser microphone access; likely public but access-controlled for practical demos and later field use |
+| Production data access | Deferred until real system access is available; not part of the Masterschool demo because the demo must stay on mock data |
 
 ## 30. Next Implementation Step
 
@@ -711,16 +768,46 @@ The current implementation baseline includes:
 - Gemini-assisted text report loop
 - internal CRM/eNVenta gateway boundary
 - optional Langfuse observability
+- Phase 8 frontend/admin UX
+- first Phase 9 voice STT/TTS layer
 
-The next practical step is the Phase 9 voice foundation:
+The next practical step is finishing the Phase 9 voice foundation and moving
+into repeatable demo stabilization:
 
-- add browser microphone capture to the report chat
-- connect a local Speaches Docker sidecar for STT
-- submit transcripts into the existing text report loop
-- connect local Kokoro/Martin Docker TTS for assistant playback
-- keep text input and visible transcript as the fallback path
+- repeat the eNVenta-shaped report scenarios with text and voice
+- document STT failure patterns and improve the review/correction safety net
+- decide how to handle HTTPS for mobile voice testing
+- compare whether local LLMs can handle noisy German STT transcripts well
+  enough
+- keep the Masterschool demo on mock data and Mock-eNVenta writeback
 
-After that, BENNO should move into repeatable demo-scenario stabilization.
-Postgres, local LLM provider experiments, and real eNVenta integration should
-stay behind the stabilized voice-assisted workflow and the existing
-CRM/eNVenta gateway boundary.
+Postgres, HTTPS deployment, local LLM provider experiments, and real eNVenta
+integration should stay behind the stabilized voice-assisted workflow and the
+existing CRM/eNVenta gateway boundary.
+
+## 31. Beyond Masterschool MVP: Real Data And Production System
+
+The Masterschool demo should continue to use mock data and the local
+Mock-eNVenta gateway. Real customer, employee, and eNVenta data should not be
+used for demo tests.
+
+Once real system access is available, BENNO needs a separate production-readiness
+track before it can be connected to live data:
+
+- HTTPS deployment for mobile browser microphone access
+- access-controlled hosting, likely public HTTPS or a trusted internal HTTPS
+  setup
+- Postgres or another production-ready persistence layer behind SQLAlchemy
+- a real eNVenta connector behind the existing CRM/eNVenta gateway boundary
+- exact lookup and writeback mapping based on the real eNVenta API or database
+  contract
+- secret management for provider keys, Langfuse, STT/TTS services, and eNVenta
+  credentials
+- retention, deletion, audit, backup, and restore rules
+- test data separation from real customer and employee data
+- security and GDPR review before any production-like usage
+
+The important architectural point is that the report loop should not be
+rewritten for the real system. The real connector should replace the mock
+gateway backend, while BENNO keeps the same application-side validation,
+review, confirmation, and writeback boundary.

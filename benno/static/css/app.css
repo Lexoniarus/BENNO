@@ -27,6 +27,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html {
   min-width: 320px;
 }
@@ -439,6 +443,12 @@ h3 {
   resize: vertical;
 }
 
+.review-correction-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .form-stack input:focus,
 .form-stack select:focus,
 .form-stack textarea:focus {
@@ -756,7 +766,8 @@ td a {
   align-content: start;
   gap: 16px;
   overflow-y: auto;
-  padding: 20px;
+  padding: 20px 20px 180px;
+  scroll-padding-bottom: 180px;
 }
 
 .report-rail {
@@ -932,6 +943,41 @@ td a {
   background: var(--workspace);
 }
 
+.voice-controls {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.voice-controls__label,
+.voice-status {
+  margin: 0;
+}
+
+.voice-controls__label {
+  color: var(--sflex-muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.voice-status {
+  color: var(--sflex-graphite);
+  font-weight: 700;
+}
+
+.voice-controls__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .message-composer {
   display: flex;
   gap: 12px;
@@ -1025,6 +1071,19 @@ td a {
     max-height: 58vh;
   }
 
+  .voice-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .voice-controls__actions {
+    justify-content: flex-start;
+  }
+
+  .review-correction-grid {
+    grid-template-columns: 1fr;
+  }
+
   .metric-grid--workspace {
     grid-template-columns: 1fr;
   }
@@ -1108,7 +1167,8 @@ td a {
   .chat-panel {
     min-height: 52vh;
     max-height: 56vh;
-    padding: 14px;
+    padding: 14px 14px 260px;
+    scroll-padding-bottom: 260px;
   }
 
   .chat-message {

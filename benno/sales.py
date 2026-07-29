@@ -2,15 +2,27 @@
 
 from typing import Any
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import (
+    Blueprint,
+    Response,
+    abort,
+    current_app,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from flask_login import current_user
 
 from benno.auth import sales_required
-from benno.enums import ReportStatus
-from benno.models import Chat, FinalReport
+from benno.enums import MessageSender, ReportStatus
+from benno.models import Chat, ChatMessage, FinalReport
 from benno.services.ai_provider import get_ai_service, get_ai_status
 from benno.services.report_loop import (
     apply_report_correction,
+    apply_report_corrections,
     build_report_review,
     cancel_report,
     confirm_report,
@@ -19,6 +31,8 @@ from benno.services.report_loop import (
     start_report_chat,
 )
 from benno.services.report_state import display_value
+from benno.services.voice import VoiceServiceError, transcribe_audio
+from benno.services.voice_tts_cache import synthesize_assistant_speech
 
 sales_blueprint = Blueprint("sales", __name__, url_prefix="/sales")
 
@@ -27,6 +41,16 @@ OPEN_REPORT_STATUSES = (
     ReportStatus.READY_FOR_REVIEW.value,
     ReportStatus.INSIDE_SALES_INPUT_REQUIRED.value,
     ReportStatus.BLOCKED.value,
+)
+SUPPORTED_VOICE_MIME_TYPES = frozenset(
+    {
+        "audio/mp4",
+        "audio/mpeg",
+        "audio/ogg",
+        "audio/wav",
+        "audio/webm",
+        "audio/x-wav",
+    }
 )
 REPORT_STATUS_LABELS_DE = {
     ReportStatus.BLOCKED.value: "Blockiert",
@@ -39,7 +63,7 @@ REPORT_STATUS_LABELS_DE = {
 }
 REPORT_SECTION_LABELS_DE = {
     "contacts": "Teilnehmer",
-    "customer_context": "Kunde oder Lead",
+    "customer_context": "AKL-Bezug",
     "final_report": "Finaler Bericht",
     "info_text": "Info",
     "next_action": "N\u00e4chster Schritt",
@@ -105,7 +129,7 @@ def new_report():
     """Start a new deterministic report chat."""
     chat = start_report_chat(current_user)
 
-    return redirect(url_for("sales.report_chat", chat_id=chat.id))
+    return redirect(url_for("sales.report_chat", chat_id=chat.id, voice="auto"))
 
 
 @sales_blueprint.get("/reports/<int:chat_id>")
@@ -120,6 +144,8 @@ def report_chat(chat_id: int):
         draft=chat.report_draft,
         ready_for_review=is_ready_for_review(chat),
         ai_status=get_ai_status(),
+        voice_auto_start=_voice_should_auto_start(chat),
+        voice_enabled=current_app.config.get("VOICE_ENABLED", False),
         section_labels=REPORT_SECTION_LABELS_DE,
         status_labels=REPORT_STATUS_LABELS_DE,
     )
@@ -141,6 +167,74 @@ def report_message(chat_id: int):
         flash(str(error), "warning")
 
     return redirect(url_for("sales.report_chat", chat_id=chat.id))
+
+
+@sales_blueprint.post("/reports/<int:chat_id>/voice-turn")
+@sales_required
+def report_voice_turn(chat_id: int):
+    """Transcribe one recorded audio answer and advance the report chat."""
+    chat = _get_own_chat_or_404(chat_id)
+    if _voice_request_is_too_large():
+        return _voice_error_response("Audiodatei ist zu groß.", 413)
+
+    audio_file = request.files.get("audio")
+    if audio_file is None:
+        return _voice_error_response("Keine Audiodatei empfangen.", 400)
+    if not _voice_mimetype_is_supported(audio_file.mimetype):
+        return _voice_error_response("Audioformat wird nicht unterstützt.", 415)
+
+    audio_bytes = audio_file.read()
+    if _voice_payload_is_too_large(audio_bytes):
+        return _voice_error_response("Audiodatei ist zu groß.", 413)
+
+    try:
+        transcript = transcribe_audio(
+            audio_bytes,
+            audio_file.filename or "recording.webm",
+            audio_file.mimetype or "application/octet-stream",
+        )
+        process_report_message(chat, transcript)
+    except VoiceServiceError as error:
+        return _voice_error_response(str(error), 503)
+    except ValueError as error:
+        return _voice_error_response(str(error), 422)
+
+    assistant_message = _latest_assistant_message(chat)
+    speech = _speech_for_message(assistant_message)
+
+    return jsonify(
+        {
+            "transcript": transcript,
+            "assistant_reply": assistant_message.message_text,
+            "assistant_message_id": assistant_message.id,
+            "assistant_speech_url": url_for(
+                "sales.assistant_message_speech",
+                chat_id=chat.id,
+                message_id=assistant_message.id,
+            ),
+            "chat_status": chat.status,
+            "ready_for_review": is_ready_for_review(chat),
+            "audio": speech.as_base64() if speech else None,
+            "audio_mime_type": speech.mimetype if speech else None,
+            "tts_error": None if speech else "Sprachausgabe nicht verfügbar.",
+        }
+    )
+
+
+@sales_blueprint.post("/reports/<int:chat_id>/messages/<int:message_id>/speech")
+@sales_required
+def assistant_message_speech(chat_id: int, message_id: int):
+    """Generate speech audio for one assistant message in the current user's chat."""
+    chat = _get_own_chat_or_404(chat_id)
+    message = _get_chat_message_or_404(chat, message_id)
+    if message.sender != MessageSender.ASSISTANT.value:
+        abort(404)
+
+    speech = _speech_for_message(message)
+    if speech is None:
+        return _voice_error_response("Sprachausgabe nicht verfügbar.", 503)
+
+    return Response(speech.audio_bytes, mimetype=speech.mimetype)
 
 
 @sales_blueprint.get("/reports/<int:chat_id>/review")
@@ -168,8 +262,16 @@ def report_correction(chat_id: int):
     chat = _get_own_chat_or_404(chat_id)
     field_key = request.form.get("field_key", "").strip()
     correction_text = request.form.get("correction_text", "").strip()
+    structured_corrections = _structured_review_corrections(request.form)
+    is_structured_form = request.form.get("structured_correction_form") == "1"
     try:
-        apply_report_correction(chat, field_key, correction_text)
+        if is_structured_form:
+            if structured_corrections:
+                apply_report_corrections(chat, structured_corrections)
+            else:
+                flash("Keine Änderungen erkannt.", "info")
+        else:
+            apply_report_correction(chat, field_key, correction_text)
     except ValueError as error:
         flash(str(error), "warning")
 
@@ -257,6 +359,108 @@ def _get_own_final_report_or_404(report_id: int) -> FinalReport:
     return final_report
 
 
+def _get_chat_message_or_404(chat: Chat, message_id: int) -> ChatMessage:
+    message = ChatMessage.query.filter_by(id=message_id, chat_id=chat.id).one_or_none()
+    if message is None:
+        abort(404)
+
+    return message
+
+
+def _latest_assistant_message(chat: Chat) -> ChatMessage:
+    message = (
+        ChatMessage.query.filter_by(
+            chat_id=chat.id,
+            sender=MessageSender.ASSISTANT.value,
+        )
+        .order_by(ChatMessage.created_at.desc(), ChatMessage.id.desc())
+        .first()
+    )
+    if message is None:
+        raise ValueError("Keine BENNO-Antwort gefunden.")
+
+    return message
+
+
+def _speech_for_message(message: ChatMessage):
+    try:
+        return synthesize_assistant_speech(
+            message.message_text,
+            _speech_context(message.chat),
+        )
+    except VoiceServiceError:
+        return None
+
+
+def _voice_error_response(message: str, status_code: int):
+    return jsonify({"error": message}), status_code
+
+
+def _voice_request_is_too_large() -> bool:
+    content_length = request.content_length
+    if content_length is None:
+        return False
+
+    return content_length > _voice_upload_limit()
+
+
+def _voice_payload_is_too_large(audio_bytes: bytes) -> bool:
+    return len(audio_bytes) > _voice_upload_limit()
+
+
+def _voice_upload_limit() -> int:
+    return int(current_app.config["VOICE_MAX_UPLOAD_BYTES"])
+
+
+def _voice_mimetype_is_supported(mimetype: str | None) -> bool:
+    return (mimetype or "").lower() in SUPPORTED_VOICE_MIME_TYPES
+
+
+def _structured_review_corrections(form_data: Any) -> list[tuple[str, str]]:
+    corrections = []
+    for key in form_data:
+        if not key.startswith("correction_"):
+            continue
+
+        field_key = key.removeprefix("correction_")
+        value = form_data.get(key, "").strip()
+        original_value = form_data.get(f"original_{field_key}", "").strip()
+        if value == original_value:
+            continue
+
+        corrections.append((field_key, value))
+
+    return corrections
+
+
+def _voice_should_auto_start(chat: Chat) -> bool:
+    if not current_app.config.get("VOICE_ENABLED", False):
+        return False
+    if chat.status != ReportStatus.IN_PROGRESS.value:
+        return False
+
+    return True
+
+
+def _speech_context(chat: Chat) -> dict[str, object]:
+    draft = chat.report_draft
+    answers = dict(draft.draft_data_json.get("answers", {})) if draft else {}
+    context: dict[str, object] = {
+        "username": chat.sales_user.username,
+        "visit_context": answers.get("visit_context"),
+        "participants": answers.get("participants"),
+        "target_topic": answers.get("target_topic"),
+    }
+    account = getattr(draft, "account", None) if draft else None
+    contact = getattr(draft, "contact", None) if draft else None
+    if account:
+        context["account_name"] = account.display_name or account.search_name
+    if contact:
+        context["contact_name"] = contact.full_name
+
+    return context
+
+
 def _build_open_report_rows(chats: list[Chat]) -> list[dict[str, object]]:
     return [_build_open_report_row(chat) for chat in chats]
 
@@ -324,9 +528,10 @@ def _build_final_report_sections(report: FinalReport) -> list[tuple[str, str]]:
         return _fallback_final_report_sections(report)
 
     return [
-        ("Kunde/Lead", display_value(mock_visit_report.account_search_name)),
+        ("AKL-Name", display_value(mock_visit_report.account_search_name)),
+        ("AKL-Typ", display_value(mock_visit_report.account_type)),
         ("Besuchsart", display_value(mock_visit_report.visit_type)),
-        ("Teilnehmer", display_value(mock_visit_report.contact_name)),
+        ("Kontakt/Teilnehmer", display_value(mock_visit_report.contact_name)),
         ("Besuchsdatum", display_value(mock_visit_report.visit_date)),
         ("Ziel/Thema", display_value(mock_visit_report.target_topic)),
         ("Info", display_value(mock_visit_report.info_text)),
@@ -360,7 +565,14 @@ def _build_final_report_sections(report: FinalReport) -> list[tuple[str, str]]:
 
 def _fallback_final_report_sections(report: FinalReport) -> list[tuple[str, str]]:
     return [
-        ("Kunde/Lead", display_value(getattr(report.account, "search_name", None))),
+        ("AKL-Name", display_value(getattr(report.account, "search_name", None))),
+        (
+            "AKL-Typ",
+            display_value(
+                getattr(report.account, "account_type", None),
+                empty="Unklar",
+            ),
+        ),
         ("Besuchsart", display_value(report.visit_type)),
         ("Besuchsdatum", display_value(report.visit_date)),
         ("Info", display_value(report.summary)),

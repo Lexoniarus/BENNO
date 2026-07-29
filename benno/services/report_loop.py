@@ -3,6 +3,8 @@
 from typing import Any
 
 from benno.enums import (
+    AccountType,
+    CustomerContextType,
     MessageSender,
     MessageType,
     ReportSection,
@@ -25,6 +27,8 @@ from benno.services.mock_crm import CrmGateway, get_crm_gateway
 from benno.services.observability import trace_report_decision, trace_report_turn
 from benno.services.report_account_resolution import (
     apply_lead_context_signal,
+    extract_visit_context_name,
+    mentions_address_or_lead_context,
     resolve_visit_context,
 )
 from benno.services.report_ai_context import (
@@ -50,16 +54,23 @@ from benno.services.report_shortcuts import (
     looks_like_reference,
     mentions_inside_sales_follow_up,
     mentions_lead,
+    parse_labeled_rating_clarifications,
+    parse_labeled_rating_values,
+    parse_rating_value,
     parse_rating_values,
     parse_visit_date,
     parse_visit_type,
 )
 from benno.services.report_state import (
+    ACCOUNT_TYPE_OVERRIDE_KEY,
     INSIDE_SALES_FOLLOW_UP_KEY,
+    RATING_CLARIFICATIONS_KEY,
+    REMINDER_SUPPRESSED_KEY,
     clear_crm_reference,
     crm_reference_value,
     draft_data,
     remove_draft_answer,
+    set_draft_metadata,
     store_crm_reference,
 )
 from benno.services.report_steps import (
@@ -90,8 +101,17 @@ MUTABLE_REPORT_STATUSES = {
     ReportStatus.IN_PROGRESS.value,
     ReportStatus.READY_FOR_REVIEW.value,
 }
+EMPTY_CORRECTION_KEYS = {
+    "next_appointment_date",
+    "offer_reference",
+    "order_reference",
+    "strength_text",
+    "weakness_text",
+    "reminder_message",
+}
 __all__ = [
     "apply_report_correction",
+    "apply_report_corrections",
     "build_report_review",
     "cancel_report",
     "confirm_report",
@@ -219,19 +239,174 @@ def apply_report_correction(
     crm_gateway: CrmGateway | None = None,
 ) -> Chat:
     """Apply a targeted correction during final review."""
+    return apply_report_corrections(chat, [(field_key, correction_text)], crm_gateway)
+
+
+def apply_report_corrections(
+    chat: Chat,
+    corrections: list[tuple[str, str]],
+    crm_gateway: CrmGateway | None = None,
+) -> Chat:
+    """Apply targeted review corrections as one atomic change."""
     draft = _require_draft(chat)
     _ensure_report_is_mutable(chat)
     gateway = crm_gateway or get_crm_gateway()
     if not draft_is_ready_for_review(draft):
-        raise ValueError("Corrections are only available during final review.")
+        raise ValueError("Korrekturen sind erst in der Berichtprüfung möglich.")
 
-    normalized_correction = correction_text.strip()
-    if not normalized_correction:
-        raise ValueError("Correction text must not be empty.")
+    normalized_corrections = _normalized_report_corrections(corrections)
+    if not normalized_corrections:
+        raise ValueError("Es wurden keine Änderungen übergeben.")
+
+    try:
+        with db.session.begin_nested():
+            for field_key, correction_text in normalized_corrections:
+                _apply_report_correction_value(
+                    draft,
+                    field_key,
+                    correction_text,
+                    gateway,
+                )
+
+            _record_saved_corrections(chat, normalized_corrections)
+
+        db.session.commit()
+    except ValueError:
+        db.session.rollback()
+        raise
+
+    return chat
+
+
+def _normalized_report_corrections(
+    corrections: list[tuple[str, str]],
+) -> list[tuple[str, str]]:
+    normalized_corrections = []
+    for field_key, correction_text in corrections:
+        clean_field_key = field_key.strip()
+        clean_correction_text = correction_text.strip()
+        if not clean_field_key:
+            raise ValueError("Dieses Korrekturfeld ist nicht bekannt.")
+        if not clean_correction_text and clean_field_key not in EMPTY_CORRECTION_KEYS:
+            raise ValueError("Dieses Pflichtfeld darf nicht leer sein.")
+
+        normalized_corrections.append((clean_field_key, clean_correction_text))
+
+    return normalized_corrections
+
+
+def _apply_report_correction_value(
+    draft: ReportDraft,
+    field_key: str,
+    correction_text: str,
+    crm_gateway: CrmGateway,
+) -> None:
+    if not correction_text:
+        _apply_empty_report_correction(draft, field_key)
+        return
+
+    if _apply_special_report_correction(draft, field_key, correction_text):
+        return
 
     correction_step = _correction_step(field_key)
-    _add_correction_message(chat, correction_step.key, normalized_correction)
-    _apply_requirement_answer(draft, correction_step, normalized_correction, gateway)
+    if not _apply_requirement_answer(
+        draft,
+        correction_step,
+        correction_text,
+        crm_gateway,
+    ):
+        raise ValueError(_invalid_correction_message(correction_step))
+
+
+def _invalid_correction_message(correction_step: ReportStep) -> str:
+    if correction_step.key == "visit_type":
+        return (
+            "Ungültige Besuchsart. Erlaubt sind Vor Ort, Virtuell " "oder Telefonisch."
+        )
+    if correction_step.key in {"visit_date", "next_appointment_date"}:
+        return "Ungültiges Datum. Bitte gib ein gültiges Datum ein."
+
+    return f"Ungültiger Wert für {correction_step.question_de}"
+
+
+def _apply_empty_report_correction(
+    draft: ReportDraft,
+    field_key: str,
+) -> None:
+    if field_key not in EMPTY_CORRECTION_KEYS:
+        raise ValueError("Dieses Pflichtfeld darf nicht leer sein.")
+
+    clear_ai_cache(draft)
+    if field_key == "next_appointment_date":
+        _clear_next_appointment_correction(draft)
+    elif field_key == "offer_reference":
+        _clear_offer_reference_correction(draft)
+    elif field_key == "order_reference":
+        _clear_order_reference_correction(draft)
+    elif field_key in {"strength_text", "weakness_text"}:
+        _clear_optional_text_correction(draft, field_key)
+    elif field_key == "reminder_message":
+        _clear_reminder_correction(draft)
+
+
+def _clear_next_appointment_correction(draft: ReportDraft) -> None:
+    draft.follow_up_date = None
+    _replace_requirement_answer(draft, "next_appointment_date", "keine")
+    set_section_status(
+        draft,
+        ReportSection.NEXT_APPOINTMENT_DATE,
+        SectionStatus.NOT_APPLICABLE,
+    )
+
+
+def _clear_offer_reference_correction(draft: ReportDraft) -> None:
+    draft.related_offer_id = None
+    draft.external_offer_reference = None
+    clear_crm_reference(draft, "offer")
+    _replace_requirement_answer(draft, "offer_reference", "keiner")
+    set_section_status(
+        draft, ReportSection.OFFER_REFERENCE, SectionStatus.NOT_APPLICABLE
+    )
+
+
+def _clear_order_reference_correction(draft: ReportDraft) -> None:
+    draft.related_order_id = None
+    clear_crm_reference(draft, "order")
+    data = draft_data(draft)
+    data["order_reference_raw"] = None
+    draft.draft_data_json = data
+    _replace_requirement_answer(draft, "order_reference", "keiner")
+    set_section_status(
+        draft, ReportSection.ORDER_REFERENCE, SectionStatus.NOT_APPLICABLE
+    )
+
+
+def _clear_optional_text_correction(draft: ReportDraft, field_key: str) -> None:
+    data = draft_data(draft)
+    data.pop(field_key, None)
+    draft.draft_data_json = data
+    remove_draft_answer(draft, field_key)
+    if field_key == "strength_text":
+        set_section_status(draft, ReportSection.STRENGTHS, SectionStatus.OPEN)
+    else:
+        set_section_status(draft, ReportSection.WEAKNESSES, SectionStatus.OPEN)
+
+
+def _clear_reminder_correction(draft: ReportDraft) -> None:
+    data = draft_data(draft)
+    data.pop(INSIDE_SALES_FOLLOW_UP_KEY, None)
+    data.pop("reminder_message", None)
+    data[REMINDER_SUPPRESSED_KEY] = True
+    draft.draft_data_json = data
+    remove_draft_answer(draft, "reminders")
+    set_section_status(draft, ReportSection.REMINDERS, SectionStatus.OPEN)
+
+
+def _record_saved_corrections(
+    chat: Chat,
+    corrections: list[tuple[str, str]],
+) -> None:
+    draft = _require_draft(chat)
     refresh_missing_sections(draft)
     draft.report_status = ReportStatus.READY_FOR_REVIEW.value
     chat.status = ReportStatus.READY_FOR_REVIEW.value
@@ -241,10 +416,95 @@ def apply_report_correction(
         "current_step": REVIEW_STEP,
     }
     set_section_status(draft, ReportSection.FINAL_REPORT, SectionStatus.DETECTED)
+    _add_correction_message(chat, "review", _correction_summary(corrections))
     _add_assistant_message(chat, draft.last_question)
-    db.session.commit()
 
-    return chat
+
+def _correction_summary(corrections: list[tuple[str, str]]) -> str:
+    return "; ".join(
+        f"{field_key}: {correction_text or 'leer'}"
+        for field_key, correction_text in corrections
+    )
+
+
+def _apply_special_report_correction(
+    draft: ReportDraft,
+    field_key: str,
+    correction_text: str,
+) -> bool:
+    if field_key == "account_type":
+        _apply_account_type_correction(draft, correction_text)
+        return True
+    if field_key == "reminder_message":
+        _apply_reminder_correction(draft, correction_text)
+        return True
+    if field_key in {rating_key for rating_key, _label_en, _label_de in RATING_FIELDS}:
+        _apply_single_rating_correction(draft, field_key, correction_text)
+        return True
+
+    return False
+
+
+def _apply_account_type_correction(
+    draft: ReportDraft,
+    correction_text: str,
+) -> None:
+    account_type = correction_text.strip().upper()
+    allowed_types = {account_type.value for account_type in AccountType}
+    if account_type not in allowed_types:
+        raise ValueError(
+            "Ungültiger AKL-Typ. Erlaubt sind Adresse, Kunde oder Lieferant."
+        )
+
+    clear_ai_cache(draft)
+    set_draft_metadata(draft, ACCOUNT_TYPE_OVERRIDE_KEY, account_type)
+    if account_type == AccountType.ADDRESS.value:
+        if draft.account_id is None:
+            draft.customer_context_type = CustomerContextType.NEW_LEAD.value
+        else:
+            draft.customer_context_type = CustomerContextType.EXISTING_LEAD.value
+    elif account_type == AccountType.CUSTOMER.value:
+        draft.customer_context_type = CustomerContextType.EXISTING_CUSTOMER.value
+
+
+def _apply_reminder_correction(
+    draft: ReportDraft,
+    correction_text: str,
+) -> None:
+    clear_ai_cache(draft)
+    data = draft_data(draft)
+    if is_none_answer(correction_text):
+        data.pop(INSIDE_SALES_FOLLOW_UP_KEY, None)
+        data.pop("reminder_message", None)
+        data[REMINDER_SUPPRESSED_KEY] = True
+        draft.draft_data_json = data
+        return
+
+    draft.draft_data_json = {
+        **data,
+        INSIDE_SALES_FOLLOW_UP_KEY: True,
+        REMINDER_SUPPRESSED_KEY: False,
+        "reminder_message": correction_text,
+    }
+
+
+def _apply_single_rating_correction(
+    draft: ReportDraft,
+    field_key: str,
+    correction_text: str,
+) -> None:
+    value = parse_rating_value(correction_text)
+    if value is None:
+        raise ValueError("Bewertungen müssen einen Wert von 1 bis 10 enthalten.")
+
+    clear_ai_cache(draft)
+    ratings = dict(draft.ratings_json)
+    ratings[field_key] = {
+        "value": value,
+        "reason": correction_text,
+        "not_assessable": False,
+    }
+    draft.ratings_json = ratings
 
 
 def confirm_report(
@@ -323,7 +583,10 @@ def _mark_report_confirmed(chat: Chat, draft: ReportDraft) -> None:
 
 
 def _record_confirmation_message(chat: Chat) -> None:
-    _add_assistant_message(chat, "The visit report has been confirmed and saved.")
+    _add_assistant_message(
+        chat,
+        "Der Besuchsbericht wurde bestätigt und in Mock-eNVenta gespeichert.",
+    )
 
 
 def cancel_report(chat: Chat) -> None:
@@ -332,7 +595,7 @@ def cancel_report(chat: Chat) -> None:
     _ensure_report_is_mutable(chat)
     chat.status = ReportStatus.CANCELLED.value
     draft.report_status = ReportStatus.CANCELLED.value
-    _add_assistant_message(chat, "The visit report has been cancelled.")
+    _add_assistant_message(chat, "Der Besuchsbericht wurde abgebrochen.")
     db.session.commit()
 
 
@@ -383,7 +646,7 @@ def _correction_step(field_key: str) -> ReportStep:
         None,
     )
     if correction_step is None:
-        raise ValueError("Unknown correction field.")
+        raise ValueError("Dieses Korrekturfeld ist nicht bekannt.")
 
     return correction_step
 
@@ -437,8 +700,12 @@ def _apply_requirement_specific_update(
     crm_gateway: CrmGateway,
 ) -> bool:
     if requirement.key in _GATEWAY_REQUIREMENT_KEYS:
-        _apply_gateway_requirement_answer(draft, requirement, answer_text, crm_gateway)
-        return True
+        return _apply_gateway_requirement_answer(
+            draft,
+            requirement,
+            answer_text,
+            crm_gateway,
+        )
     if requirement.key == "visit_type":
         if not _apply_visit_type_answer(draft, answer_text):
             return False
@@ -483,15 +750,17 @@ def _apply_gateway_requirement_answer(
     requirement: ReportStep,
     answer_text: str,
     crm_gateway: CrmGateway,
-) -> None:
+) -> bool:
     if requirement.key == "visit_context":
-        _apply_visit_context_answer(draft, answer_text, crm_gateway)
+        return _apply_visit_context_answer(draft, answer_text, crm_gateway)
     elif requirement.key == "participants":
         _apply_participants_answer(draft, answer_text, crm_gateway)
     elif requirement.key == "offer_reference":
         _apply_offer_reference_answer(draft, answer_text, crm_gateway)
     elif requirement.key == "order_reference":
         _apply_order_reference_answer(draft, answer_text, crm_gateway)
+
+    return True
 
 
 def _apply_local_requirement_answer(
@@ -661,10 +930,14 @@ def _apply_ai_requirement_updates(
         analysis,
         completed_before_message,
     ):
+        ai_answer = _ai_update_answer_for_requirement(requirement, analysis)
+        if ai_answer is None:
+            continue
+
         if _apply_requirement_answer(
             draft,
             requirement,
-            analysis.section_updates[requirement.key],
+            ai_answer,
             crm_gateway,
         ):
             applied_steps.append(requirement)
@@ -684,13 +957,37 @@ def _answer_for_requirement(
     if analysis is None:
         return message_text
 
-    suggested_value = analysis.section_updates.get(requirement.key)
+    suggested_value = _ai_update_answer_for_requirement(requirement, analysis)
     if not suggested_value:
         if analysis.intent == UserIntent.CORRECTION:
             return None
         return message_text
 
     return suggested_value
+
+
+def _ai_update_answer_for_requirement(
+    requirement: ReportStep,
+    analysis: AiMessageAnalysis,
+) -> str | None:
+    if requirement.key == "ratings":
+        return analysis.section_updates.get("ratings") or _rating_answer_from_analysis(
+            analysis
+        )
+
+    return analysis.section_updates.get(requirement.key)
+
+
+def _rating_answer_from_analysis(analysis: AiMessageAnalysis) -> str | None:
+    rating_parts = [
+        f"{label_de} {analysis.section_updates[rating_key]}"
+        for rating_key, _label_en, label_de in RATING_FIELDS
+        if analysis.section_updates.get(rating_key)
+    ]
+    if not rating_parts:
+        return None
+
+    return ", ".join(rating_parts)
 
 
 def _apply_rule_based_updates(
@@ -741,6 +1038,7 @@ def _apply_inside_sales_follow_up_signal(
     draft.draft_data_json = {
         **draft_data(draft),
         INSIDE_SALES_FOLLOW_UP_KEY: True,
+        REMINDER_SUPPRESSED_KEY: False,
     }
 
 
@@ -999,7 +1297,7 @@ def _additional_ai_requirements(
         step
         for step in REPORT_STEPS
         if step.key != current_step.key
-        and step.key in analysis.section_updates
+        and _analysis_updates_requirement(step, analysis)
         and _can_apply_ai_update(
             step,
             current_index,
@@ -1007,6 +1305,16 @@ def _additional_ai_requirements(
             completed_before_message,
         )
     ]
+
+
+def _analysis_updates_requirement(
+    requirement: ReportStep,
+    analysis: AiMessageAnalysis,
+) -> bool:
+    if requirement.key == "ratings":
+        return bool(_ai_update_answer_for_requirement(requirement, analysis))
+
+    return requirement.key in analysis.section_updates
 
 
 def _can_apply_ai_update(
@@ -1086,6 +1394,8 @@ def _next_question(
         message = _review_ready_message(chat)
     elif next_step.section == ReportSection.RATINGS:
         message = rating_question(draft)
+    elif next_step.key == "visit_context" and _needs_akl_name_question(draft):
+        message = "Wie heißt die Firma oder Adresse des neuen Interessenten?"
     else:
         message = _suggested_question(next_step, analysis) or step_question(
             next_step,
@@ -1108,8 +1418,38 @@ def _apply_visit_context_answer(
     draft: ReportDraft,
     message_text: str,
     crm_gateway: CrmGateway,
-) -> None:
-    resolve_visit_context(draft, message_text, crm_gateway)
+) -> bool:
+    visit_context_name = extract_visit_context_name(message_text)
+    if visit_context_name is None:
+        if mentions_address_or_lead_context(message_text):
+            resolve_visit_context(draft, message_text, crm_gateway)
+        return False
+
+    has_address_or_lead_context = mentions_address_or_lead_context(message_text)
+    had_address_override = (
+        draft_data(draft).get(ACCOUNT_TYPE_OVERRIDE_KEY) == AccountType.ADDRESS.value
+    )
+    resolve_visit_context(draft, visit_context_name, crm_gateway)
+    if draft.account_id is None and (
+        has_address_or_lead_context or had_address_override
+    ):
+        apply_lead_context_signal(draft, message_text)
+        if had_address_override:
+            draft.customer_context_type = CustomerContextType.NEW_LEAD.value
+            set_draft_metadata(
+                draft,
+                ACCOUNT_TYPE_OVERRIDE_KEY,
+                AccountType.ADDRESS.value,
+            )
+    _replace_requirement_answer(draft, "visit_context", visit_context_name)
+    return True
+
+
+def _needs_akl_name_question(draft: ReportDraft) -> bool:
+    return (
+        draft.customer_context_type == CustomerContextType.NEW_LEAD.value
+        and not draft_data(draft).get("answers", {}).get("visit_context")
+    )
 
 
 def _apply_visit_type_answer(draft: ReportDraft, message_text: str) -> bool:
@@ -1154,6 +1494,13 @@ def _apply_agreement_answer(draft: ReportDraft, answer_text: str) -> None:
 def _apply_next_action_answer(draft: ReportDraft, answer_text: str) -> None:
     draft.next_action = answer_text
     draft.follow_up_date = parse_visit_date(answer_text)
+    if mentions_inside_sales_follow_up(answer_text):
+        draft.draft_data_json = {
+            **draft_data(draft),
+            INSIDE_SALES_FOLLOW_UP_KEY: True,
+            REMINDER_SUPPRESSED_KEY: False,
+            "reminder_message": answer_text,
+        }
 
 
 def _apply_offer_reference_answer(
@@ -1210,15 +1557,30 @@ def _apply_order_reference_answer(
 
 def _apply_rating_answers(draft: ReportDraft, message_text: str) -> None:
     ratings = dict(draft.ratings_json)
-    parsed_values = parse_rating_values(message_text)
     is_not_assessable = is_not_assessable_rating_answer(message_text)
+    labeled_values = {}
+    qualitative_clarifications = {}
+    parsed_values = []
+    if not is_not_assessable:
+        labeled_values = parse_labeled_rating_values(message_text)
+        qualitative_clarifications = parse_labeled_rating_clarifications(message_text)
+        parsed_values = parse_rating_values(message_text)
     for index, (rating_key, _label_en, _label_de) in enumerate(RATING_FIELDS):
-        value = parsed_values[index] if index < len(parsed_values) else None
+        value = labeled_values.get(rating_key)
+        if value is None and not labeled_values:
+            value = parsed_values[index] if index < len(parsed_values) else None
         if value is None and not is_not_assessable:
+            if rating_key in qualitative_clarifications and rating_key not in ratings:
+                _store_rating_clarification(
+                    draft,
+                    rating_key,
+                    qualitative_clarifications[rating_key],
+                )
             continue
         if value is None and rating_key in ratings:
             continue
 
+        _clear_rating_clarification(draft, rating_key)
         ratings[rating_key] = {
             "value": value,
             "reason": message_text,
@@ -1228,6 +1590,33 @@ def _apply_rating_answers(draft: ReportDraft, message_text: str) -> None:
     draft.ratings_json = ratings
 
 
+def _store_rating_clarification(
+    draft: ReportDraft,
+    rating_key: str,
+    clarification: str,
+) -> None:
+    data = draft_data(draft)
+    clarifications = dict(data.get(RATING_CLARIFICATIONS_KEY, {}))
+    clarifications[rating_key] = clarification
+    draft.draft_data_json = {
+        **data,
+        RATING_CLARIFICATIONS_KEY: clarifications,
+    }
+
+
+def _clear_rating_clarification(draft: ReportDraft, rating_key: str) -> None:
+    data = draft_data(draft)
+    clarifications = dict(data.get(RATING_CLARIFICATIONS_KEY, {}))
+    if rating_key not in clarifications:
+        return
+
+    clarifications.pop(rating_key, None)
+    draft.draft_data_json = {
+        **data,
+        RATING_CLARIFICATIONS_KEY: clarifications,
+    }
+
+
 def _apply_reminder_answer(draft: ReportDraft, message_text: str) -> None:
     if is_none_answer(message_text):
         return
@@ -1235,6 +1624,7 @@ def _apply_reminder_answer(draft: ReportDraft, message_text: str) -> None:
     draft.draft_data_json = {
         **draft_data(draft),
         INSIDE_SALES_FOLLOW_UP_KEY: True,
+        REMINDER_SUPPRESSED_KEY: False,
         "reminder_message": message_text,
     }
 
