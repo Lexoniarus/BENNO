@@ -522,6 +522,39 @@ Done when:
 - Error cases are handled understandably.
 - The text and first voice-assisted loop are stable enough for a mentor demo.
 
+Masterschool demo scope:
+
+- finish Phase 9 as a turn-based voice layer over the existing text report loop
+- keep text fallback and visible transcripts available at all times
+- harden structured review correction for noisy STT, especially AKL names,
+  participants, ratings, and reminders
+- repeat and document the core demo scenarios against Mock-eNVenta data
+- show `FinalReport`, `MockVisitReport`, and `MockReminder` creation after
+  explicit user confirmation
+- limit frontend and admin work to bug fixes and small usability improvements
+- document risks and next steps without promising production readiness
+
+Allowed only if small and demo-supporting:
+
+- clearer HTTPS or microphone permission error messages
+- small STT/TTS configuration fixes
+- demo seed data or demo scenario documentation
+- focused UX polish in the existing Phase 8 frontend
+
+Out of scope for the Masterschool demo:
+
+- real eNVenta access or live customer and employee data
+- final ERP/CRM validation rules based on the real system
+- Postgres migration
+- production HTTPS deployment
+- production authentication, SSO, two-factor authentication, or email delivery
+- complete GDPR, retention, deletion, backup, restore, or audit concepts
+- automatic master-data creation
+- final local-LLM strategy
+- systematic STT model benchmarking
+- realtime streaming STT, barge-in, or interrupt handling
+- native app, full PWA, or another frontend redesign
+
 ## Phase 11: Local Or OpenAI-Compatible Provider Fallback
 
 Goal:

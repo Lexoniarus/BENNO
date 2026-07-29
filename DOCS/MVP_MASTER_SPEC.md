@@ -79,6 +79,48 @@ Current scope boundaries:
 - The admin area stays simple in the first slice.
 - The MVP uses a pragmatic login and user setup flow, not a full production identity management system.
 
+## 4.1 Masterschool Demo Scope Boundary
+
+The Masterschool demo MVP is a realistic end-to-end prototype, not a production
+system. It should prove the product idea and the technical control boundaries
+without promising real eNVenta operation.
+
+The remaining Masterschool work should focus on:
+
+- stabilizing the Phase 9 turn-based voice layer
+- keeping text input available as the reliable fallback
+- hardening review and structured correction against STT errors
+- running repeatable demo scenarios against Mock-eNVenta data
+- showing `FinalReport`, `MockVisitReport`, and `MockReminder` creation after
+  explicit user confirmation
+- keeping Sales and Admin UI fixes small and demo-oriented
+- documenting known risks honestly
+- keeping Ruff, Black, and Pytest checks green
+
+Small improvements may still be added when they support the demo directly, for
+example clearer HTTPS/microphone error messages, small STT/TTS configuration
+fixes, demo seed data, or focused UX polish.
+
+The Masterschool demo should not include:
+
+- real eNVenta access
+- real customer, employee, or production data
+- final ERP/CRM validation rules against the real system
+- Postgres migration
+- public HTTPS deployment as a production environment
+- production authentication, SSO, two-factor authentication, or real email flows
+- complete GDPR, retention, deletion, backup, restore, or audit concepts
+- automatic master-data creation
+- final local-LLM provider strategy
+- systematic STT model benchmarking
+- realtime streaming STT, barge-in, or interrupt handling
+- a native app, full PWA, or another frontend redesign
+
+The demo success criterion is that BENNO can create an eNVenta-shaped visit
+report from natural language, keep the backend in control of validation and
+writeback, show reviewable corrections, and save only to the mock target after
+confirmation.
+
 ## 5. Current Vertical Slice
 
 Vertical Slice 1 proves the core application behavior with text only.
