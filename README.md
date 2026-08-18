@@ -11,7 +11,7 @@ audio capture, local Speaches STT, and local Kokoro/Martin TTS. Postgres, real
 eNVenta access, production HTTPS deployment, and local AI are planned for later
 phases.
 
-## Local Setup
+## Local Setup And Start
 
 Create and activate a virtual environment:
 
@@ -84,6 +84,9 @@ reliable fallback for those devices.
 
 After running `seed-db` or `reset-db --yes`, these Solar Sales mock users are
 available:
+
+See [`DOCS/USER_ADMIN_SETTINGS.md`](DOCS/USER_ADMIN_SETTINGS.md) for the full
+role, login, user setup, and admin behavior.
 
 | Role | Email | Password |
 |---|---|---|
