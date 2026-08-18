@@ -2,14 +2,47 @@
 
 BENNO means **B2B Encounter Notes and Next-step Organizer**.
 
-BENNO is a guided visit report assistant for B2B field sales. The current
-project phase builds a Gemini-assisted German report workflow on top of the
-local Flask foundation, login, data model, and eNVenta-shaped mock CRM/ERP
-gateway. Confirmed reports are saved locally as mock visit reports with optional
-follow-up reminders. The first Phase 9 voice layer is available through browser
-audio capture, local Speaches STT, and local Kokoro/Martin TTS. Postgres, real
-eNVenta access, production HTTPS deployment, and local AI are planned for later
-phases.
+BENNO is a voice-assisted visit report assistant for B2B field sales. It turns
+natural-language meeting notes into structured, reviewable CRM/ERP-ready reports
+and follow-up reminders.
+
+The current Masterschool MVP uses a Gemini-assisted German report workflow on
+top of Flask, SQLite, and an eNVenta-shaped mock CRM/ERP gateway. Confirmed
+reports are saved locally only after explicit review. The first turn-based voice
+layer uses browser audio capture, local Speaches STT, and local Kokoro/Martin
+TTS.
+
+> **Demo scope:** BENNO currently uses fictional seed data and Mock-eNVenta
+> writeback. It is not a production deployment and must not be connected to real
+> customer or employee data.
+
+## Screenshots
+
+### Sales Workspace
+
+![BENNO sales workspace](DOCS/assets/benno-sales-dashboard.png)
+
+### Open Visit Reports
+
+![BENNO open visit reports](DOCS/assets/benno-open-reports.png)
+
+### Confirmed Mock-eNVenta Report
+
+![BENNO confirmed Mock-eNVenta visit report](DOCS/assets/benno-final-report.png)
+
+## Requirements
+
+- Python 3.11 or newer
+- a Gemini API key for the full AI-assisted report workflow
+- SQLite, included with Python, for the local mock database
+- a modern browser for the responsive text workflow
+- Docker plus compatible Speaches and Kokoro/Martin services for optional voice
+- HTTPS or another secure browser context for microphone capture on phones and
+  tablets
+
+Development and test tooling is installed through the `dev` extra documented
+below. The complete dependency declaration lives in `pyproject.toml`; a separate
+`requirements.txt` is not required.
 
 ## Local Setup And Start
 
@@ -23,13 +56,19 @@ python -m venv .venv
 Install the project with development dependencies:
 
 ```powershell
-python -m pip install --upgrade pip
+python -m pip install --upgrade pip setuptools
 python -m pip install -e ".[dev]"
 ```
 
 Copy `.env.example` to `.env` and adjust local values if needed. Leave
 `DATABASE_URL` unset for the default local SQLite file:
 `sqlite:///benno-dev.sqlite3`.
+
+Create the local tables and fictional demo users:
+
+```powershell
+flask --app benno:create_app seed-db
+```
 
 Run the application:
 
