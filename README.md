@@ -173,3 +173,10 @@ Reset the local development database:
 ```powershell
 flask --app benno:create_app reset-db --yes
 ```
+
+## License
+
+BENNO is proprietary software. Copyright (c) 2026
+[@Lexoniarus](https://github.com/Lexoniarus). All rights reserved. Use,
+modification, or distribution requires prior written permission. See
+[`LICENSE`](LICENSE) for details.
