@@ -16,10 +16,12 @@ Recommended reading order:
 6. `DATA_MODEL.md` for database and mock CRM structure
 7. `ENVENTA_FIELD_NOTES.md` for the first eNVenta visit report field observations and source classification
 8. `USER_ADMIN_SETTINGS.md` for login, role, language, and admin behavior
-9. `AI_VOICE_PRIVACY.md` for provider, voice, and privacy direction
-10. `PHASE_10_LIVE_FUNCTIONAL_TESTS.md` for the opt-in live demo test harness
-11. `DOCUMENTATION_COVERAGE.md` for the mapping from archived German notes to current English docs
-12. `archive_de/` only when historical German concept context is needed
+9. `FRONTEND_UX_SPEC.md` for the accepted Sales/Admin frontend direction
+10. `AI_VOICE_PRIVACY.md` for provider, voice, and privacy direction
+11. `PHASE_10_LIVE_FUNCTIONAL_TESTS.md` for the planned opt-in live demo test
+    harness specification; the runner is not implemented yet
+12. `DOCUMENTATION_COVERAGE.md` for the mapping from archived German notes to current English docs
+13. `archive_de/` only when historical German concept context is needed
 
 Archived documents:
 

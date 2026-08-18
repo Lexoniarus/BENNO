@@ -187,7 +187,7 @@ Required behavior:
 - create block-based review
 - request final confirmation
 - save final report
-- create inside sales task if needed
+- create a reviewable follow-up reminder if needed
 
 Done when:
 
@@ -230,7 +230,7 @@ The code still decides:
 - What was validated against the mock CRM?
 - When is the report ready for review?
 - When may the report be saved?
-- Whether an inside sales task is created.
+- Whether a follow-up reminder is created.
 
 Done when:
 
@@ -261,7 +261,7 @@ Questions to resolve:
 - Which values come from mock CRM data?
 - Which values must BENNO ask for?
 - Which fields are written back?
-- Which information creates reminders or inside sales tasks?
+- Which information creates `MockReminder` records?
 
 Field classification rule:
 
@@ -415,6 +415,8 @@ Done when:
 
 ## Phase 9: Voice STT/TTS Foundation
 
+Status: foundation implemented; demo hardening continues in Phase 10.
+
 Goal:
 
 Voice is added as an input and output layer over the existing text report
@@ -478,6 +480,9 @@ Done when:
 
 ## Phase 10: Stabilization And Demo Scenarios
 
+Status: in progress. The live harness design is documented, but its runner is
+not implemented yet.
+
 Goal:
 
 BENNO is reliable enough to demo as a text and first voice-assisted MVP.
@@ -485,7 +490,7 @@ BENNO is reliable enough to demo as a text and first voice-assisted MVP.
 Demo scenarios:
 
 1. Known customer, known contact, normal follow-up
-2. Known customer, new contact, inside sales task
+2. Known customer, new contact, inside-sales `MockReminder`
 3. Existing offer is mentioned and found
 4. Offer is mentioned but unclear
 5. New lead with reminder
@@ -522,15 +527,16 @@ Done when:
 - Error cases are handled understandably.
 - The text and first voice-assisted loop are stable enough for a mentor demo.
 
-Phase 10 should include an opt-in live functional test harness, documented in
-`PHASE_10_LIVE_FUNCTIONAL_TESTS.md`. This harness is automated and repeatable,
-but it is not part of the normal deterministic regression suite. It should
-exercise the real Gemini, Speaches, Kokoro/Martin, and optional Langfuse chain
-with deliberately fragile demo scenarios.
+Phase 10 should implement the opt-in live functional test harness specified in
+`PHASE_10_LIVE_FUNCTIONAL_TESTS.md`. The planned harness is automated and
+repeatable, but it is not part of the normal deterministic regression suite. It
+should exercise the real Gemini, Speaches, Kokoro/Martin, and optional Langfuse
+chain with deliberately fragile demo scenarios.
 
 Masterschool demo scope:
 
-- finish Phase 9 as a turn-based voice layer over the existing text report loop
+- stabilize the implemented Phase 9 turn-based voice layer over the existing
+  text report loop
 - keep text fallback and visible transcripts available at all times
 - harden structured review correction for noisy STT, especially AKL names,
   participants, ratings, and reminders
@@ -634,15 +640,16 @@ loop, Gemini, eNVenta-shaped mock writeback, the internal CRM/eNVenta gateway,
 optional Langfuse observability, the Phase 8 frontend/admin overhaul, and the
 first Phase 9 voice layer.
 
-The next practical work is to finish Phase 9 and move into Phase 10 demo
-stabilization:
+The next practical work is Phase 10 demo stabilization around the implemented
+Phase 9 foundation:
 
-1. repeat the eNVenta-shaped demo scenarios with text and voice
-2. document STT failure patterns and improve the review/correction safety net
-3. decide how to handle HTTPS for mobile voice testing
-4. compare whether local LLMs can handle noisy German STT transcripts well
+1. implement the opt-in live functional test harness
+2. repeat the eNVenta-shaped demo scenarios with text and voice
+3. document STT failure patterns and improve the review/correction safety net
+4. decide how to handle HTTPS for mobile voice testing
+5. compare whether local LLMs can handle noisy German STT transcripts well
    enough
-5. keep the Masterschool demo on mock data and Mock-eNVenta writeback
+6. keep the Masterschool demo on mock data and Mock-eNVenta writeback
 
 After the demo baseline is stable, BENNO can branch into HTTPS deployment,
 Postgres, local provider experiments, and later real eNVenta integration.

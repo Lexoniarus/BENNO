@@ -1,5 +1,7 @@
 # Phase 10 Live Functional Test Harness
 
+Status: planned specification. The runner is not implemented yet.
+
 ## Purpose
 
 Phase 10 should add automated live functional tests for BENNO's demo-critical
@@ -32,7 +34,8 @@ Live functional tests are different:
 - they may take longer and be rate-limit dependent
 - they must be opt-in
 
-They should be started through a dedicated command or script, for example:
+The planned runner should use a dedicated command or script. The following
+interface is illustrative and is not available yet:
 
 ```powershell
 python scripts/run_live_demo_tests.py
@@ -256,4 +259,3 @@ The first Phase 10 live harness should not implement:
 - complete STT model benchmarking
 - true realtime streaming, barge-in, or interrupt handling
 - native mobile app tests
-

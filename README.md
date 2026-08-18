@@ -39,6 +39,31 @@ flask --app benno:create_app run
 
 Open `http://127.0.0.1:5000` in a browser.
 
+## Local Voice Prerequisites
+
+Voice is optional. The text report workflow remains available when the local
+voice services are stopped or unavailable. BENNO does not start the voice
+containers itself; compatible services must be available at the URLs configured
+through `SPEACHES_BASE_URL` and `KOKORO_BASE_URL`.
+
+On the current development PC, start the existing containers with:
+
+```powershell
+docker start speaches kokoro-onnx
+```
+
+Check that Speaches exposes its models and that BENNO can generate Kokoro/Martin
+audio through the configured TTS endpoint:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/v1/models
+flask --app benno:create_app prewarm-voice-cache
+```
+
+Container names are specific to the current development PC. On another machine,
+start equivalent OpenAI-compatible Speaches and Kokoro/Martin services and set
+their base URLs in `.env`.
+
 To open BENNO from another device in the same local network, start Flask with a
 LAN-visible host:
 
@@ -52,7 +77,8 @@ Firewall allows incoming connections on port `5000`.
 
 Plain LAN HTTP is enough for page loading and TTS playback, but mobile browser
 microphone access requires HTTPS or another secure browser context. iPad and
-phone voice tests therefore need a later HTTPS setup.
+phone voice tests therefore need a later HTTPS setup. Text input remains the
+reliable fallback for those devices.
 
 ## Demo Logins
 

@@ -67,7 +67,7 @@ structured handoff target with these groups:
 - ratings and visit type derived or confirmed through the conversation
 - account and contact lookup data from AKL/contact tables
 - offer and order references as separate document types
-- reminders or inside-sales tasks for follow-up work
+- `MockReminder` records for follow-up work
 - eNVenta-managed metadata that BENNO does not ask for
 
 The MVP should not implement `visit_rhythm`, supplier-specific behavior, or a
@@ -277,7 +277,8 @@ Conditional required fields:
 - `offer_reference` / `offer_id` is required only when an offer is mentioned or the visit is explicitly about an offer. Otherwise it may be `not_applicable`.
 - `order_reference` / `order_id` is required only when an order is mentioned or the visit is explicitly about an order. Otherwise it may be `not_applicable`.
 - `next_appointment_date` is required only when a concrete next appointment, reminder, or callback date is agreed.
-- `responsible_user_id` is required only when a reminder or inside-sales task needs a responsible owner.
+- `responsible_user_id` is required only when a `MockReminder` needs a
+  responsible owner.
 
 Optional MVP fields:
 

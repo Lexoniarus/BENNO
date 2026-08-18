@@ -104,11 +104,12 @@ The relevant CRM/ERP product context is eNVenta by the eNVenta Group:
 
 https://www.enventa-group.com/
 
-## Why Start With Text And Add Voice Later?
+## Why Was Text Built Before Voice?
 
 The full goal is voice-guided and mostly hands-free.
 
-Still, the first technical step is text-based. The user writes into a chat, and the app answers as text.
+The first technical step was text-based. The user wrote into a chat, and the app
+answered as text.
 
 That may sound less impressive, but it is the right order. The most important part is not the microphone. The important part is the workflow behind it:
 
@@ -119,7 +120,8 @@ That may sound less impressive, but it is the right order. The most important pa
 - When is the report complete?
 - What does final confirmation look like?
 
-Once this workflow is stable, voice can be added:
+That workflow is now the stable baseline. Phase 9 adds the first turn-based
+voice layer without replacing it:
 
 - Speech input is converted into text.
 - The same report workflow processes that text.
@@ -179,13 +181,15 @@ The report can include:
 - how the case is rated
 - whether inside sales needs to do something
 
-If a new contact person is mentioned, BENNO does not simply create that contact automatically. Instead, it can create a task for inside sales, such as: "Please check or complete this contact."
+If a new contact person is mentioned, BENNO does not simply create that contact
+automatically. Instead, it can create a reviewable `MockReminder`, such as:
+"Please check or complete this contact."
 
 This helps avoid uncontrolled or incorrect master data.
 
-## Follow-Ups And Inside Sales Tasks
+## Follow-Ups And Reminders
 
-Follow-ups and next-step tasks are an important part of the project.
+Follow-ups and reminders are an important part of the project.
 
 Not every visit report is finished when it is saved. Customer meetings often create follow-up work:
 
@@ -203,7 +207,8 @@ The field sales user says:
 
 > The customer wants an adjusted offer. Inside sales should clarify the technical details again.
 
-BENNO should then not only write a visit report. It should also record that this creates a task for inside sales.
+BENNO should then not only write a visit report. It should also prepare a
+reviewable reminder for inside sales.
 
 This means the project is not only about documentation. It is also about making sure something actually happens after the customer meeting.
 
@@ -276,4 +281,6 @@ BENNO is a voice-guided assistant for B2B field sales visit reports.
 
 After a customer meeting, the field sales user should be able to freely describe what happened. The app detects important information, asks for missing details, processes corrections, and creates a clean report. At the end, everything is shown or read aloud. Only after explicit confirmation is the report saved.
 
-The first technical step is a text chat. The actual product goal is a mostly hands-free workflow with speech input and speech output.
+The text chat is the reliable core workflow. Phase 9 adds the first turn-based
+speech input and output layer, while Phase 10 focuses on demo hardening and
+repeatable live scenarios.

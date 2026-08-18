@@ -130,7 +130,7 @@ The application code must:
 - decide whether a report is ready for review
 - decide whether a report may be saved
 - enforce user confirmation
-- create inside sales tasks
+- create reviewable follow-up reminders
 - persist data
 
 Guiding principle:
@@ -154,7 +154,7 @@ Important events:
 - review generated
 - report confirmed
 - report saved
-- inside sales task created
+- follow-up reminder created
 - provider errors
 
 Errors should be handled explicitly. Avoid broad `except Exception` blocks unless they re-raise or log enough context and return a controlled user-facing result.
@@ -186,7 +186,7 @@ Initial test focus:
 - correction handling
 - final review generation
 - confirmation before save
-- inside sales task creation
+- follow-up reminder creation
 - placeholder CRM lookup
 
 Tests should prefer behavior over implementation details.

@@ -17,12 +17,12 @@ Use these documents for current implementation and product work:
 | `IMPLEMENTATION_ROADMAP.md` | Practical development phases |
 | `CODING_STANDARDS.md` | Coding quality, naming, and architecture standards |
 | `CONVERSATION_FLOW.md` | Dialog behavior, report sections, intents, correction, review |
-| `DATA_MODEL.md` | Database areas, draft/report/task model, mock CRM structure |
+| `DATA_MODEL.md` | Database areas, draft/report/reminder model, mock CRM structure |
 | `ENVENTA_FIELD_NOTES.md` | First eNVenta visit report field observations and source classification |
 | `USER_ADMIN_SETTINGS.md` | Users, roles, admin scope, language and provider settings |
 | `AI_VOICE_PRIVACY.md` | Provider strategy, Langfuse observability, voice layer, local provider direction, privacy |
 | `FRONTEND_UX_SPEC.md` | S:FLEX-near frontend direction, Sales/Admin UX rules, visual acceptance |
-| `PHASE_10_LIVE_FUNCTIONAL_TESTS.md` | Opt-in live functional test harness for Gemini, voice sidecars, and Langfuse evidence |
+| `PHASE_10_LIVE_FUNCTIONAL_TESTS.md` | Planned opt-in live functional test harness specification for Gemini, voice sidecars, and Langfuse evidence; the runner is not implemented yet |
 
 ## Archived Source Mapping
 

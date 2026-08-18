@@ -38,7 +38,8 @@ The assistant should help with:
 
 The MVP focuses on the standard B2B sales visit report.
 
-The first vertical slice is text-based. Voice input and voice output remain part of the target vision. After the stable text workflow, Phase 9 adds voice as a layer over the same workflow.
+The first vertical slice was text-based. Phase 9 now adds the first turn-based
+voice input and output layer over the same stable report workflow.
 
 The core flow is:
 
@@ -72,7 +73,6 @@ The MVP includes:
 
 Current scope boundaries:
 
-- The first vertical slice is text-based.
 - The first vertical slice was text-based. The Phase 6/8 baseline can create and save a stable report, and Phase 9 now implements the first turn-based STT/TTS layer on top.
 - The MVP uses a local placeholder CRM/ERP service before any real eNVenta integration.
 - The first screenshot-based eNVenta visit report field mapping is documented and used for the Phase 6 mock target.
@@ -697,7 +697,9 @@ Not persisted as long-term records:
 - real customer data
 - real employee data
 
-Raw audio, once implemented, may exist temporarily during an open report session. It should be discarded after transcription, report completion, or cancellation unless a later explicit design decision says otherwise.
+Raw audio exists only temporarily while a voice request is recorded and
+transcribed. It is discarded after transcription and is not stored as a
+long-term business record.
 
 ## 27. Debug Logging
 
@@ -735,8 +737,8 @@ The following decisions define the current MVP direction:
 | Database | SQLite is the current local mock backend; Postgres can be introduced later behind the same CRM/eNVenta gateway |
 | Observability | Langfuse is available as an optional development tracing layer and must not affect business logic |
 | Frontend/Admin UX | Phase 8 is complete and merged |
-| Voice | Phase 9 adds voice as a layer over the existing text workflow |
-| STT/TTS timing | Next implementation step after the Phase 6/8 stable text baseline |
+| Voice | Phase 9 implements the first turn-based voice layer over the existing text workflow |
+| STT/TTS timing | Phase 9 foundation implemented; stabilization and repeatable live testing continue in Phase 10 |
 | STT service | Local Speaches Docker sidecar |
 | TTS service | Local Kokoro/Martin Docker service first; Speaches TTS can be compared later |
 | Audio persistence | No long-term raw audio archive |
@@ -771,9 +773,10 @@ The current implementation baseline includes:
 - Phase 8 frontend/admin UX
 - first Phase 9 voice STT/TTS layer
 
-The next practical step is finishing the Phase 9 voice foundation and moving
-into repeatable demo stabilization:
+The next practical step is Phase 10 demo stabilization around the implemented
+Phase 9 voice foundation:
 
+- implement the opt-in live functional test harness described in `PHASE_10_LIVE_FUNCTIONAL_TESTS.md`
 - repeat the eNVenta-shaped report scenarios with text and voice
 - document STT failure patterns and improve the review/correction safety net
 - decide how to handle HTTPS for mobile voice testing
