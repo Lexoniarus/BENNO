@@ -73,10 +73,11 @@ flask --app benno:create_app seed-db
 Run the application:
 
 ```powershell
-flask --app benno:create_app run
+python main.py
 ```
 
-Open `http://127.0.0.1:5000` in a browser.
+Open `http://127.0.0.1:5000` on the development PC. The `main.py` entry point
+also listens on the local network so another device can use the PC's LAN IP.
 
 ## Local Voice Prerequisites
 
@@ -103,8 +104,8 @@ Container names are specific to the current development PC. On another machine,
 start equivalent OpenAI-compatible Speaches and Kokoro/Martin services and set
 their base URLs in `.env`.
 
-To open BENNO from another device in the same local network, start Flask with a
-LAN-visible host:
+The standard `python main.py` start above is already LAN-visible. When starting
+BENNO through the Flask CLI instead, include the LAN-visible host explicitly:
 
 ```powershell
 flask --app benno:create_app run --host 0.0.0.0 --port 5000
